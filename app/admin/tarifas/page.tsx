@@ -13,10 +13,23 @@ export default async function TarifasPage() {
     return <main className="p-6"><p className="rounded bg-red-50 px-4 py-3 text-red-700">Solo los administradores pueden gestionar tipos y tarifas.</p></main>;
   }
 
-  const tiposRaw = await prisma.tipoVisitante.findMany({
-    orderBy: [{ activo: "desc" }, { orden: "asc" }],
-    include: { tarifas: { orderBy: { vigente_desde: "desc" } } },
-  });
+  const [tiposRaw, motivosRaw] = await Promise.all([
+    prisma.tipoVisitante.findMany({
+      orderBy: [{ activo: "desc" }, { orden: "asc" }],
+      include: { tarifas: { orderBy: { vigente_desde: "desc" } } },
+    }),
+    prisma.motivoCortesia.findMany({
+      orderBy: [{ activo: "desc" }, { nombre: "asc" }],
+      include: { _count: { select: { detalle: true } } },
+    }),
+  ]);
+
+  const motivos = motivosRaw.map((m) => ({
+    id: m.id,
+    nombre: m.nombre,
+    activo: m.activo,
+    usos: m._count.detalle,
+  }));
 
   const tipos = tiposRaw.map((t) => {
     const vigente = t.tarifas.find((x) => x.vigente_hasta === null) ?? t.tarifas[0] ?? null;
@@ -40,5 +53,5 @@ export default async function TarifasPage() {
     };
   });
 
-  return <TarifasClient tipos={tipos} />;
+  return <TarifasClient tipos={tipos} motivos={motivos} />;
 }

@@ -222,3 +222,75 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
   revalidatePath("/taquilla");
   return { ok: true };
 }
+
+// ============================================================ MOTIVOS DE CORTESÍA
+// Los que salen en el selector "Motivo…" de taquilla al registrar una atención
+// o invitación. Nada se borra: se desactiva, y las ventas viejas conservan el suyo.
+
+export async function crearMotivo(nombre: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador puede gestionar los motivos." };
+
+  const limpio = nombre?.trim();
+  if (!limpio) return { ok: false, error: "El nombre del motivo es obligatorio." };
+
+  const repetido = await prisma.motivoCortesia.findFirst({ where: { nombre: { equals: limpio, mode: "insensitive" } } });
+  if (repetido) {
+    return {
+      ok: false,
+      error: repetido.activo ? `Ya existe el motivo "${repetido.nombre}".` : `"${repetido.nombre}" ya existe pero está inactivo: actívalo en vez de crearlo de nuevo.`,
+    };
+  }
+
+  const m = await prisma.motivoCortesia.create({ data: { nombre: limpio, creado_por: s.id } });
+  await registrarAuditoria({ usuario_id: s.id, entidad: "motivo_cortesia", entidad_id: m.id, accion: "crear", datos_despues: { nombre: limpio } });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}
+
+export async function editarMotivo(id: string, nombre: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador." };
+
+  const limpio = nombre?.trim();
+  if (!limpio) return { ok: false, error: "El nombre no puede quedar vacío." };
+
+  const antes = await prisma.motivoCortesia.findUnique({ where: { id } });
+  if (!antes) return { ok: false, error: "Motivo no encontrado." };
+  if (antes.nombre === limpio) return { ok: true };
+
+  const repetido = await prisma.motivoCortesia.findFirst({
+    where: { nombre: { equals: limpio, mode: "insensitive" }, id: { not: id } },
+  });
+  if (repetido) return { ok: false, error: `Ya existe otro motivo llamado "${repetido.nombre}".` };
+
+  await prisma.motivoCortesia.update({ where: { id }, data: { nombre: limpio, actualizado_por: s.id } });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "motivo_cortesia", entidad_id: id, accion: "editar",
+    datos_antes: { nombre: antes.nombre }, datos_despues: { nombre: limpio },
+  });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}
+
+export async function cambiarEstadoMotivo(id: string, activo: boolean): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador." };
+
+  const motivo = await prisma.motivoCortesia.findUnique({ where: { id } });
+  if (!motivo) return { ok: false, error: "Motivo no encontrado." };
+
+  // Desactivar el último motivo activo dejaría la taquilla sin poder registrar cortesías.
+  if (!activo) {
+    const activos = await prisma.motivoCortesia.count({ where: { activo: true } });
+    if (activos <= 1) return { ok: false, error: "Debe quedar al menos un motivo activo: taquilla lo necesita para registrar cortesías." };
+  }
+
+  await prisma.motivoCortesia.update({ where: { id }, data: { activo, actualizado_por: s.id } });
+  await registrarAuditoria({ usuario_id: s.id, entidad: "motivo_cortesia", entidad_id: id, accion: activo ? "activar" : "desactivar" });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}

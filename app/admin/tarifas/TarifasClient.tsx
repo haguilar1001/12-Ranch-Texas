@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatearCOP } from "@/lib/dinero/cop";
-import { crearTipo, editarTipo, cambiarEstadoTipo, cambiarTarifa } from "./actions";
+import {
+  crearTipo, editarTipo, cambiarEstadoTipo, cambiarTarifa,
+  crearMotivo, editarMotivo, cambiarEstadoMotivo,
+} from "./actions";
 
 interface HistLinea { valor: number; desde: string; hasta: string | null; motivo: string }
 interface Tipo {
@@ -27,7 +30,15 @@ const rangoEdad = (min: number | null, max: number | null) => {
   return "—";
 };
 
-export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
+export interface Motivo {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  /** Cuántas líneas de venta lo usaron. Sirve para saber si vale la pena conservarlo. */
+  usos: number;
+}
+
+export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motivos: Motivo[] }) {
   const router = useRouter();
   const [nuevo, setNuevo] = useState({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -61,6 +72,8 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
   }
   const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
+  const [nuevoMotivo, setNuevoMotivo] = useState("");
+  const [editMotivo, setEditMotivo] = useState<{ id: string; v: string } | null>(null);
   const [verHist, setVerHist] = useState<string | null>(null);
 
   const aviso = (r: { ok: boolean; error?: string }, exito: string) => {
@@ -268,8 +281,100 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
         </div>
       </section>
 
+      {/* Motivos de cortesía — alimentan el selector "Motivo…" de taquilla. */}
+      <section className="mt-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
+        <h2 className="mb-1 font-bold text-ranch-marron">Motivos de cortesía</h2>
+        <p className="mb-3 text-xs text-ranch-marron/55">
+          Son las causas que el cajero elige al registrar una atención o invitación, y por las que se
+          agrupa la relación de lo no cobrado.
+        </p>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input
+            value={nuevoMotivo}
+            onChange={(e) => setNuevoMotivo(e.target.value)}
+            placeholder="Nuevo motivo (p. ej. Alcaldía)"
+            className="flex-1 rounded-lg border border-ranch-marron/30 px-3 py-2 text-sm"
+          />
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              const r = await crearMotivo(nuevoMotivo);
+              setBusy(false);
+              if (r.ok) setNuevoMotivo("");
+              aviso(r, "Motivo creado.");
+            }}
+            className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema disabled:opacity-50"
+          >
+            Agregar
+          </button>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase text-ranch-marron/50">
+              <th className="py-1">Motivo</th>
+              <th className="py-1 text-right">Usos</th>
+              <th className="py-1 text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {motivos.map((m) => (
+              <tr key={m.id} className={`border-t border-ranch-marron/10 ${m.activo ? "" : "opacity-50"}`}>
+                <td className="py-2">
+                  {editMotivo?.id === m.id ? (
+                    <input
+                      value={editMotivo.v}
+                      onChange={(e) => setEditMotivo({ id: m.id, v: e.target.value })}
+                      className="w-48 rounded border border-ranch-marron/30 px-2 py-1"
+                    />
+                  ) : (
+                    <span className="font-semibold text-ranch-marron">{m.nombre}</span>
+                  )}
+                </td>
+                <td className="py-2 text-right text-xs text-ranch-marron/50">{m.usos || "—"}</td>
+                <td className="py-2">
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {editMotivo?.id === m.id ? (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            const r = await editarMotivo(m.id, editMotivo.v);
+                            setBusy(false);
+                            aviso(r, "Motivo actualizado.");
+                            if (r.ok) setEditMotivo(null);
+                          }}
+                          className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50"
+                        >Guardar</button>
+                        <button onClick={() => setEditMotivo(null)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs text-ranch-marron">Cancelar</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => setEditMotivo({ id: m.id, v: m.nombre })} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60">✏️ Editar</button>
+                        <button
+                          disabled={busy}
+                          onClick={async () => aviso(await cambiarEstadoMotivo(m.id, !m.activo), m.activo ? "Motivo desactivado." : "Motivo activado.")}
+                          className={`rounded px-2 py-0.5 text-xs font-semibold ${m.activo ? "bg-ranch-verde/15 text-ranch-verde" : "bg-red-100 text-red-700"}`}
+                        >{m.activo ? "Activo" : "Inactivo"}</button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {motivos.length === 0 && (
+              <tr><td colSpan={3} className="py-4 text-center text-ranch-marron/50">No hay motivos. Crea el primero arriba.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
       <p className="mt-4 text-xs text-ranch-marron/50">
-        Nota: nada se borra. Para retirar un tipo, desactívalo (deja de aparecer en taquilla pero conserva su historial).
+        Nota: nada se borra. Para retirar un tipo o un motivo, desactívalo (deja de aparecer en taquilla
+        pero conserva su historial).
       </p>
     </main>
   );
