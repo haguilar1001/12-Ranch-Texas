@@ -15,44 +15,51 @@ export default async function NavBar() {
 
   // El menú se agrupa por ÁREA, no por pantalla: antes eran 14 enlaces sueltos en una fila.
   // Cada enlace lleva su permiso; un grupo que queda vacío no se muestra.
-  const definicion: { label: string; href?: string; enlaces?: [string, string, string, boolean][] }[] = [
-    { label: "Inicio", href: "/" },
+  // [icono, label, href, descripción, ¿lo ve este rol?]
+  type Fila = [string, string, string, string, boolean];
+  const definicion: { icono: string; label: string; href?: string; enlaces?: Fila[] }[] = [
+    { icono: "🏠", label: "Inicio", href: "/" },
     {
+      icono: "🎟️",
       label: "Operación",
       enlaces: [
-        ["Taquilla", "/taquilla", "Vender manillas", cajero],
-        ["Caja y turno", "/caja/turno", "Abrir, movimientos y cierre", cajero],
-        ["Escaneo", "/escaneo", "Control de acceso en puerta", control],
+        ["🎟️", "Taquilla", "/taquilla", "Vender manillas", cajero],
+        ["💵", "Caja y turno", "/caja/turno", "Abrir, movimientos y cierre", cajero],
+        ["🚪", "Escaneo", "/escaneo", "Control de acceso en puerta", control],
+        ["🎢", "Fila de atracciones", "/escaneo/fila", "Llamar turnos y marcar atendidos", control],
       ],
     },
     {
+      icono: "🎡",
       label: "Parque",
       enlaces: [
-        ["Accesos y atracciones", "/admin/accesos", "Condiciones y conteo del día", consulta],
-        ["Animales", "/admin/animales", "Inventario, ubicación y alimentación", puedeOperarGranja(s.rol)],
-        ["Equipos", "/admin/equipos", "Inventario y mantenimientos", supervisor],
-        ["Personal", "/admin/personal", "Empleados, áreas y cargos", supervisor],
+        ["🎡", "Accesos y atracciones", "/admin/accesos", "Condiciones, fila y conteo del día", consulta],
+        ["🐄", "Animales", "/admin/animales", "Inventario, ubicación y alimentación", puedeOperarGranja(s.rol)],
+        ["🔧", "Equipos", "/admin/equipos", "Inventario y mantenimientos", supervisor],
+        ["👷", "Personal", "/admin/personal", "Empleados, áreas y costo de nómina", supervisor],
       ],
     },
     {
+      icono: "📊",
       label: "Reportes",
       enlaces: [
-        ["Dashboard de ventas", "/admin/dashboard", "Indicadores del día", consulta],
-        ["Reporte de ventas", "/admin/reportes/ventas", "Por tipo, medio, día y hora", consulta],
-        ["Comparativo año vs año", "/admin/reportes/comparativo", "Contra la venta histórica", consulta],
-        ["Atenciones e invitaciones", "/admin/reportes/cortesias", "Lo que no se cobró y quién lo autorizó", supervisor],
-        ["Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
-        ["Cuadre diario", "/admin/cuadre", "Consolidado de todos los turnos", supervisor],
+        ["📊", "Dashboard de ventas", "/admin/dashboard", "Indicadores del día", consulta],
+        ["📋", "Reporte de ventas", "/admin/reportes/ventas", "Por tipo, medio, día y hora", consulta],
+        ["📈", "Comparativo año vs año", "/admin/reportes/comparativo", "Contra la venta histórica", consulta],
+        ["🎁", "Atenciones e invitaciones", "/admin/reportes/cortesias", "Lo que no se cobró y quién lo autorizó", supervisor],
+        ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
+        ["💰", "Cuadre diario", "/admin/cuadre", "Consolidado de todos los turnos", supervisor],
       ],
     },
     {
+      icono: "⚙️",
       label: "Administración",
       enlaces: [
-        ["Gastos", "/admin/gastos", "Registrar por rubro con soporte", supervisor],
-        ["Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
-        ["Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
-        ["Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
-        ["Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],
+        ["💸", "Gastos", "/admin/gastos", "Registrar por rubro con soporte", supervisor],
+        ["🏷️", "Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
+        ["🎫", "Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
+        ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
+        ["🖨️", "Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],
       ],
     },
   ];
@@ -61,7 +68,8 @@ export default async function NavBar() {
     .map((g) => ({
       label: g.label,
       href: g.href,
-      enlaces: g.enlaces?.filter(([, , , ver]) => ver).map(([label, href, desc]) => ({ label, href, desc })),
+      icono: g.icono,
+      enlaces: g.enlaces?.filter(([, , , , ver]) => ver).map(([icono, label, href, desc]) => ({ icono, label, href, desc })),
     }))
     .filter((g) => g.href || (g.enlaces && g.enlaces.length > 0));
 

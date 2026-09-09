@@ -9,12 +9,14 @@ export interface EnlaceNav {
   href: string;
   /** Texto corto que explica a dónde lleva. Se ve dentro del grupo desplegado. */
   desc?: string;
+  icono?: string;
 }
 
 export interface GrupoNav {
   /** Si no hay `enlaces`, es un enlace suelto (p. ej. Inicio). */
   label: string;
   href?: string;
+  icono?: string;
   enlaces?: EnlaceNav[];
 }
 
@@ -79,6 +81,7 @@ export default function NavLinks({
           if (g.href) {
             return (
               <Link key={g.label} href={g.href} className={claseTop(activo)}>
+                {g.icono && <span className="mr-1">{g.icono}</span>}
                 {g.label}
               </Link>
             );
@@ -93,6 +96,7 @@ export default function NavLinks({
                 aria-haspopup="true"
                 className={claseTop(activo)}
               >
+                {g.icono && <span className="mr-1">{g.icono}</span>}
                 {g.label}
                 <span className={`ml-1 inline-block text-[10px] transition-transform ${estaAbierto ? "rotate-180" : ""}`}>▾</span>
               </button>
@@ -105,12 +109,15 @@ export default function NavLinks({
                       <Link
                         key={e.href}
                         href={e.href}
-                        className={`block px-3 py-2 text-sm transition hover:bg-ranch-crema/70 ${
+                        className={`flex items-start gap-2 px-3 py-2 text-sm transition hover:bg-ranch-crema/70 ${
                           aqui ? "bg-ranch-crema font-bold text-ranch-marron" : "text-ranch-marron/80"
                         }`}
                       >
-                        <span className="font-semibold">{e.label}</span>
-                        {e.desc && <span className="block text-xs text-ranch-marron/45">{e.desc}</span>}
+                        <span className="w-5 shrink-0 text-center text-base leading-5">{e.icono ?? "•"}</span>
+                        <span>
+                          <span className="block font-semibold">{e.label}</span>
+                          {e.desc && <span className="block text-xs text-ranch-marron/45">{e.desc}</span>}
+                        </span>
                       </Link>
                     );
                   })}
@@ -150,10 +157,11 @@ export default function NavLinks({
                   <Link
                     key={g.label}
                     href={g.href}
-                    className={`block border-b border-ranch-marron/10 px-4 py-3 font-bold ${
+                    className={`flex items-center gap-3 border-b border-ranch-marron/10 px-4 py-3 font-bold ${
                       activo ? "bg-ranch-crema text-ranch-marron" : "text-ranch-marron/80"
                     }`}
                   >
+                    <span className="w-5 text-center text-base">{g.icono ?? "•"}</span>
                     {g.label}
                   </Link>
                 );
@@ -162,6 +170,7 @@ export default function NavLinks({
               return (
                 <div key={g.label} className="border-b border-ranch-marron/10 last:border-b-0">
                   <p className="bg-ranch-crema/40 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ranch-marron/50">
+                    {g.icono && <span className="mr-1">{g.icono}</span>}
                     {g.label}
                   </p>
                   {(g.enlaces ?? []).map((e) => {
@@ -170,10 +179,11 @@ export default function NavLinks({
                       <Link
                         key={e.href}
                         href={e.href}
-                        className={`block px-4 py-3 text-sm ${
+                        className={`flex items-center gap-3 px-4 py-3 text-sm ${
                           aqui ? "bg-ranch-crema font-bold text-ranch-marron" : "text-ranch-marron/80"
                         }`}
                       >
+                        <span className="w-5 text-center text-base">{e.icono ?? "•"}</span>
                         {e.label}
                       </Link>
                     );
