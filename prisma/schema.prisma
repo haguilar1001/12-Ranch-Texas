@@ -847,6 +847,11 @@ model Empleado {
   fecha_ingreso  DateTime?
   fecha_retiro   DateTime?
   estado         EstadoEmpleado @default(activo)
+  /// Unidad de negocio de la nómina: Parque o Caballos. No es lo mismo que el área:
+  /// alguien de Administración puede estar en la nómina de Caballos.
+  unidad_negocio String?
+  /// Salario base mensual en COP entero. Dato sensible: solo supervisor hacia arriba.
+  salario_base   Int?
   usuario_id     String? // enlace opcional al Usuario del sistema (login)
   observaciones  String?
   activo         Boolean        @default(true)

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
+import { formatearCOP } from "@/lib/dinero/cop";
+import { consolidarNomina, costoEmpresa, FACTOR_PRESTACIONAL } from "@/lib/personal/costo";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,19 @@ export default async function PersonalPage() {
     prisma.cargo.count({ where: { activo: true } }),
   ]);
 
+  const costo = consolidarNomina(empleados.map((e) => e.salario_base));
+
+  // Costo por área, para saber dónde pesa la nómina.
+  const porArea = new Map<string, { personas: number; costo: number }>();
+  for (const e of empleados) {
+    const k = e.area?.nombre ?? "Sin área";
+    const acc = porArea.get(k) ?? { personas: 0, costo: 0 };
+    acc.personas += 1;
+    acc.costo += costoEmpresa(e.salario_base ?? 0);
+    porArea.set(k, acc);
+  }
+  const areasOrdenadas = [...porArea.entries()].sort((a, b) => b[1].costo - a[1].costo);
+
   return (
     <main className="mx-auto max-w-5xl p-4 sm:p-6">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
@@ -32,15 +47,51 @@ export default async function PersonalPage() {
           <h1 className="text-2xl font-black text-ranch-marron">Personal</h1>
           <p className="text-sm text-ranch-marron/60">Empleados, áreas y cargos</p>
         </div>
-        <span className="rounded-full bg-ranch-dorado/20 px-3 py-1 text-xs font-semibold text-ranch-marron">
-          Boceto · datos de ejemplo
+        <span className="rounded-full bg-ranch-verde/15 px-3 py-1 text-xs font-semibold text-ranch-verde">
+          Nómina real · {empleados.length} personas
         </span>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Empleados" valor={empleados.length} />
         <Kpi label="Áreas" valor={areas} />
-        <Kpi label="Cargos" valor={cargos} />
+        <Kpi label="Salarios base" valor={formatearCOP(costo.salarios)} />
+        <Kpi label="Costo real / mes" valor={formatearCOP(costo.total)} />
+      </div>
+
+      <p className="mb-6 rounded-lg bg-ranch-crema/60 px-3 py-2 text-xs text-ranch-marron/70">
+        El <strong>costo real</strong> suma {FACTOR_PRESTACIONAL * 100}% de factor prestacional sobre el
+        salario: en Colombia un empleado vale 1,5 veces su sueldo por prestaciones, seguridad social a
+        cargo del empleador y parafiscales. Carga prestacional: <strong>{formatearCOP(costo.carga)}/mes</strong>.
+        {costo.personas < empleados.length && (
+          <> {empleados.length - costo.personas} empleado(s) sin salario cargado no entran en el cálculo.</>
+        )}
+      </p>
+
+      <h2 className="mb-2 font-bold text-ranch-marron">Costo por área</h2>
+      <div className="mb-6 overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-ranch-crema/60 text-xs uppercase text-ranch-marron/60">
+            <tr>
+              <th className="px-3 py-2">Área</th>
+              <th className="px-3 py-2 text-right">Personas</th>
+              <th className="px-3 py-2 text-right">Costo real / mes</th>
+              <th className="px-3 py-2 text-right">Participación</th>
+            </tr>
+          </thead>
+          <tbody>
+            {areasOrdenadas.map(([nombre, d]) => (
+              <tr key={nombre} className="border-t border-ranch-marron/10">
+                <td className="px-3 py-2 font-semibold text-ranch-marron">{nombre}</td>
+                <td className="px-3 py-2 text-right text-ranch-marron/70">{d.personas}</td>
+                <td className="px-3 py-2 text-right font-bold text-ranch-marron">{formatearCOP(d.costo)}</td>
+                <td className="px-3 py-2 text-right text-ranch-marron/55">
+                  {costo.total > 0 ? ((d.costo / costo.total) * 100).toFixed(1) : "0.0"}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
@@ -51,6 +102,8 @@ export default async function PersonalPage() {
               <th className="px-3 py-2">Documento</th>
               <th className="px-3 py-2">Cargo</th>
               <th className="px-3 py-2">Área</th>
+              <th className="px-3 py-2">Unidad</th>
+              <th className="px-3 py-2 text-right">Costo real</th>
               <th className="px-3 py-2">Estado</th>
             </tr>
           </thead>
@@ -61,6 +114,10 @@ export default async function PersonalPage() {
                 <td className="px-3 py-2 text-ranch-marron/70">{e.tipo_documento} {e.documento}</td>
                 <td className="px-3 py-2 text-ranch-marron/70">{e.cargo?.nombre ?? "—"}</td>
                 <td className="px-3 py-2 text-ranch-marron/70">{e.area?.nombre ?? "—"}</td>
+                <td className="px-3 py-2 text-ranch-marron/70">{e.unidad_negocio ?? "—"}</td>
+                <td className="px-3 py-2 text-right text-ranch-marron/70">
+                  {e.salario_base ? formatearCOP(costoEmpresa(e.salario_base)) : "—"}
+                </td>
                 <td className="px-3 py-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ESTADO_COLOR[e.estado] ?? ""}`}>{e.estado}</span>
                 </td>
@@ -68,8 +125,8 @@ export default async function PersonalPage() {
             ))}
             {empleados.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-ranch-marron/50">
-                  Aún no hay empleados. Corre <code>npm run seed:boceto</code> para cargar datos de ejemplo.
+                <td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">
+                  Aún no hay empleados. Corre <code>npm run import:personal</code> para cargar la nómina.
                 </td>
               </tr>
             )}
@@ -80,10 +137,10 @@ export default async function PersonalPage() {
   );
 }
 
-function Kpi({ label, valor }: { label: string; valor: number }) {
+function Kpi({ label, valor }: { label: string; valor: number | string }) {
   return (
     <div className="rounded-2xl border-2 border-ranch-marron/15 bg-white p-4 text-center shadow-sm">
-      <p className="text-2xl font-black text-ranch-marron">{valor}</p>
+      <p className="text-xl font-black text-ranch-marron sm:text-2xl">{valor}</p>
       <p className="text-xs uppercase tracking-wide text-ranch-marron/50">{label}</p>
     </div>
   );

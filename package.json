@@ -24,7 +24,8 @@
     "postinstall": "prisma generate",
     "verificar:f12": "tsx scripts/verificar-f12.ts",
     "verificar:f13": "tsx scripts/verificar-f13.ts",
-    "import:atracciones": "tsx scripts/import-atracciones.ts"
+    "import:atracciones": "tsx scripts/import-atracciones.ts",
+    "import:personal": "tsx scripts/import-personal.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
