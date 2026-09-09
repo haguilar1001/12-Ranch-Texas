@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../db";
-import { calcularTotales, validarVenta, type LineaVenta } from "./calculo";
+import { calcularTotales, resolverValorCobrado, validarVenta, type LineaVenta } from "./calculo";
 import { firmarUuid } from "../qr/firma";
 import { finDelDiaOperativo, formatearFechaHoraBogota } from "../tiempo";
 import { textoManilla, type DatosManilla } from "../impresion";
@@ -35,14 +35,16 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
 
   const lineas: LineaVenta[] = entrada.lineas.map((l) => {
     const valor = tarifas.get(l.tipo_visitante_id)!.valor;
-    const esCortesia = l.tipo_linea !== "pago";
+    const cobrado = resolverValorCobrado(valor, l.tipo_linea, l.valor_cobrado);
     return {
       tipo_visitante_id: l.tipo_visitante_id,
       cantidad: l.cantidad,
       valor_lista: valor,
-      valor_cobrado: esCortesia ? 0 : valor,
+      valor_cobrado: cobrado,
       tipo_linea: l.tipo_linea,
       motivo_cortesia_id: l.motivo_cortesia_id ?? null,
+      // El motivo del descuento solo aplica si de verdad se cobró menos.
+      motivo_descuento: cobrado < valor && l.tipo_linea === "pago" ? l.motivo_descuento?.trim() || null : null,
       autorizado_por: l.autorizado_por ?? null,
     };
   });
@@ -87,6 +89,7 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
             valor_lista: l.valor_lista,
             valor_cobrado: l.valor_cobrado,
             motivo_cortesia_id: l.motivo_cortesia_id ?? null,
+            motivo_descuento: l.motivo_descuento ?? null,
             autorizado_por: l.autorizado_por ?? null,
             creado_por: ctx.usuarioId,
           },

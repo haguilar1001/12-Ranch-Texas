@@ -6,6 +6,12 @@ export interface EntradaLinea {
   tipo_linea: TipoLinea;
   motivo_cortesia_id?: string | null;
   autorizado_por?: string | null;
+  /**
+   * Descuento: cuánto se cobra por unidad. Se omite si se cobra la tarifa completa.
+   * El servidor lo recorta al rango [0, tarifa vigente] — nunca confía en este número.
+   */
+  valor_cobrado?: number | null;
+  motivo_descuento?: string | null;
 }
 
 export interface EntradaPago {

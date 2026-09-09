@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas } from "@/lib/reportes/ventas";
 import { fechaBogota } from "@/lib/tiempo";
@@ -17,7 +18,7 @@ function Kpi({ label, valor }: { label: string; valor: string }) {
   );
 }
 
-export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string }> }) {
+export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; caja?: string; cajero?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "consulta")) return <main className="p-6">Sin acceso.</main>;
@@ -30,16 +31,33 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
   const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
   const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
 
-  const ind = await indicadoresVentas(inicio, fin);
+  const cajaId = sp.caja || undefined;
+  const cajeroId = sp.cajero || undefined;
+
+  const [ind, cajas, cajeros] = await Promise.all([
+    indicadoresVentas(inicio, fin, { cajaId, cajeroId }),
+    prisma.caja.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.usuario.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+  ]);
+  const filtroQs = `${cajaId ? `&caja=${cajaId}` : ""}${cajeroId ? `&cajero=${cajeroId}` : ""}`;
 
   return (
     <main className="mx-auto max-w-4xl p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Reporte de ventas</h1>
-      <form className="mb-4 flex gap-2 text-sm">
+      <form className="mb-4 flex flex-wrap gap-2 text-sm">
         <select name="mes" defaultValue={mes} className="rounded border px-2 py-1">{MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}</select>
         <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">{[2024, 2025, 2026].map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        <select name="caja" defaultValue={cajaId ?? ""} className="rounded border px-2 py-1">
+          <option value="">Todas las cajas</option>
+          {cajas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <select name="cajero" defaultValue={cajeroId ?? ""} className="rounded border px-2 py-1">
+          <option value="">Todos los cajeros</option>
+          {cajeros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
         <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
-        <a href={`/admin/reportes/ventas/csv?anio=${anio}&mes=${mes}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
+        <a href={`/admin/reportes/ventas/csv?anio=${anio}&mes=${mes}${filtroQs}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
+        <a href={`/admin/reportes/cortesias?anio=${anio}&mes=${mes}${filtroQs}`} className="rounded border border-ranch-marron/25 px-3 py-1 font-semibold text-ranch-marron">Ver cortesías</a>
       </form>
 
       <p className="mb-2 text-sm text-ranch-marron/60">{MESES[mes - 1]} {anio}</p>

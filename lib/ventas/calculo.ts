@@ -106,3 +106,28 @@ export function validarVenta(lineas: LineaVenta[], pagos: Pago[]): ResultadoVali
 
   return { ok: errores.length === 0, errores };
 }
+
+/**
+ * Resuelve cuánto se cobra por unidad en una línea, a partir de lo que pidió la taquilla.
+ * El servidor SIEMPRE pasa por aquí: no se confía en el valor que manda el cliente.
+ *
+ * - Cortesía (atencion/invitacion) → 0, sin excepción.
+ * - Línea de pago sin descuento pedido → el valor de lista.
+ * - Línea de pago con descuento → el valor pedido, recortado al rango [0, valor_lista]
+ *   y redondeado a entero (nunca decimales en pesos).
+ */
+export function resolverValorCobrado(
+  valorLista: number,
+  tipoLinea: TipoLinea,
+  valorCobradoPedido?: number | null,
+): number {
+  if (tipoLinea !== "pago") return 0;
+  if (valorCobradoPedido === null || valorCobradoPedido === undefined) return valorLista;
+  if (!Number.isFinite(valorCobradoPedido)) return valorLista;
+  return Math.min(valorLista, Math.max(0, Math.round(valorCobradoPedido)));
+}
+
+/** Descuento total de una línea (por las unidades), en pesos enteros. */
+export function descuentoDeLinea(l: Pick<LineaVenta, "valor_lista" | "valor_cobrado" | "cantidad">): number {
+  return (l.valor_lista - l.valor_cobrado) * l.cantidad;
+}

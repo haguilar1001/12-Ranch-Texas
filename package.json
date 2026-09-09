@@ -21,7 +21,8 @@
     "import:historico": "tsx scripts/import-historico.ts",
     "import:animales": "tsx scripts/import-inventario-animales.ts",
     "export:analitica": "tsx scripts/export-analitica.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verificar:f12": "tsx scripts/verificar-f12.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
@@ -36,6 +37,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -51,7 +53,6 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
-    "xlsx": "^0.18.5"
+    "vitest": "^2.1.8"
   }
 }

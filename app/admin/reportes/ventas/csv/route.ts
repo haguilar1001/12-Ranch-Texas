@@ -11,7 +11,9 @@ export async function GET(req: Request) {
   const inicio = new Date(`${anio}-${String(mes).padStart(2, "0")}-01T00:00:00-05:00`);
   const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
   const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
-  const ind = await indicadoresVentas(inicio, fin);
+  const cajaId = url.searchParams.get("caja") || undefined;
+  const cajeroId = url.searchParams.get("cajero") || undefined;
+  const ind = await indicadoresVentas(inicio, fin, { cajaId, cajeroId });
 
   const filas: string[][] = [
     [`Reporte de ventas ${mes}/${anio}`],

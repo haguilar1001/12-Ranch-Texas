@@ -20,7 +20,8 @@ export default function CuadreAcciones({ turnoId, esAdmin, cerrado }: { turnoId:
     <div className="no-print mb-4 space-y-2">
       <div className="flex flex-wrap gap-2">
         <button onClick={() => window.print()} className="rounded-lg bg-ranch-marron px-4 py-2 font-semibold text-ranch-crema hover:bg-ranch-marron-oscuro">🖨️ Imprimir / PDF</button>
-        <a href={`/caja/cuadre/${turnoId}/csv`} className="rounded-lg bg-ranch-verde px-4 py-2 font-semibold text-white">⬇️ Excel (CSV)</a>
+        <a href={`/caja/cuadre/${turnoId}/xlsx`} className="rounded-lg bg-ranch-verde px-4 py-2 font-semibold text-white">⬇️ Excel</a>
+        <a href={`/caja/cuadre/${turnoId}/csv`} className="rounded-lg border border-ranch-marron/30 px-4 py-2 text-sm font-semibold text-ranch-marron hover:bg-white">CSV</a>
         <a href="/caja/turno" className="rounded-lg border border-ranch-marron/30 px-4 py-2 font-semibold text-ranch-marron">← Volver</a>
       </div>
       {esAdmin && cerrado && (

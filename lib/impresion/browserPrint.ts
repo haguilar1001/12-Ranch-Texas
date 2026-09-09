@@ -84,3 +84,69 @@ export async function imprimirZpl(zpls: string[]): Promise<ResultadoImpresion> {
     return { ok: false, error: "No se pudo enviar a la impresora. Verifica que Browser Print esté abierto y la ZD411d encendida." };
   }
 }
+
+export interface DispositivoZebra {
+  nombre: string;
+  uid: string;
+  conexion: string;
+}
+
+export interface DiagnosticoImpresion {
+  /** ¿Está instalado y cargado el SDK de Zebra Browser Print? */
+  sdk: boolean;
+  dispositivos: DispositivoZebra[];
+  predeterminada: string | null;
+  error?: string;
+}
+
+function listarDispositivos(): Promise<DispositivoZebra[]> {
+  return new Promise((resolve) => {
+    window.BrowserPrint.getLocalDevices(
+      (lista: any) => {
+        const impresoras = (lista?.printer ?? lista ?? []) as any[];
+        resolve(
+          impresoras.map((d) => ({
+            nombre: String(d?.name ?? d?.uid ?? "(sin nombre)"),
+            uid: String(d?.uid ?? ""),
+            conexion: String(d?.connection ?? "?"),
+          })),
+        );
+      },
+      () => resolve([]),
+      "printer",
+    );
+  });
+}
+
+/**
+ * Revisa el estado de la impresión en ESTE equipo: si Browser Print está instalado,
+ * qué impresoras ve y cuál es la predeterminada. Es lo primero que hay que mirar
+ * cuando "no imprime" — dice si el problema es el SDK, el cable o la configuración.
+ */
+export async function diagnosticarImpresoras(): Promise<DiagnosticoImpresion> {
+  const listo = await cargarSdk();
+  if (!listo) {
+    return {
+      sdk: false,
+      dispositivos: [],
+      predeterminada: null,
+      error: "Zebra Browser Print no está instalado en este equipo, o falta el SDK en public/vendor/BrowserPrint.min.js.",
+    };
+  }
+
+  const dispositivos = await listarDispositivos();
+  let predeterminada: string | null = null;
+  try {
+    const d = await dispositivoPorDefecto();
+    predeterminada = String(d?.name ?? d?.uid ?? "(sin nombre)");
+  } catch {
+    predeterminada = null;
+  }
+
+  return {
+    sdk: true,
+    dispositivos,
+    predeterminada,
+    error: dispositivos.length === 0 ? "Browser Print responde, pero no ve ninguna impresora conectada." : undefined,
+  };
+}

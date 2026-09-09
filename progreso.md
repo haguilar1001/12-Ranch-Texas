@@ -16,6 +16,34 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F9 | Modo offline, respaldos, despliegue y manual de usuario | ✅ Completada |
 | F10 | Reorganización por módulos + maestros de operación (Atracciones, Personal, Animales, Equipos) | 🟡 Boceto en revisión |
 | F11 | Animales: alimentación (dieta individual/grupal + bitácora + kardex) y ubicación con historial | ✅ Completada (faltan datos reales de recintos) |
+| F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
+
+## F12 — Caja lista para operación real (completada, verificada)
+
+- [x] **Descuentos parciales en taquilla**: control por tipo de visitante (cuánto se cobra c/u, motivo y
+      quién autoriza). El servidor **recalcula desde la tarifa vigente** y recorta el valor a [0, tarifa]:
+      `resolverValorCobrado` en `lib/ventas/calculo.ts`. Sin motivo o sin autorización, la venta se rechaza.
+- [x] **Captura del comprador** (nombre y documento) en taquilla — los campos ya existían en el modelo.
+- [x] **Relación de atenciones e invitaciones** (`/admin/reportes/cortesias`, supervisor+): detalle de todo
+      lo que salió sin cobrarse, con motivo, quién autorizó, cajero y caja; agrupado por tipo, motivo y
+      autorizador; export. Incluye los **descuentos**, no solo las cortesías. `lib/reportes/cortesias.ts`.
+- [x] **Filtros por caja y cajero** en el reporte de ventas (el lib ya los soportaba) y el CSV los respeta.
+- [x] **Excel NATIVO (.xlsx)** del cuadre de turno (`lib/reportes/xlsx.ts`): los números van como números,
+      en tres hojas (Resumen, Por medio de pago, Por tipo). El CSV se conserva como alternativa.
+- [x] **Diagnóstico de impresora** (`/admin/impresora`): detecta si Zebra Browser Print está instalado,
+      lista las impresoras que ve, imprime una manilla de PRUEBA (con firma inválida a propósito, para que
+      el lector la rechace) y muestra el ZPL para pegarlo en Zebra Setup Utilities.
+- [x] Verificado con `npm run verificar:f12` (**26 comprobaciones**, todas verdes): el descuento se guarda
+      con su motivo, el encabezado cuadra con el detalle, se rechaza el descuento sin motivo y sin
+      autorización, el servidor no acepta un valor por encima de la tarifa, y el .xlsx generado es un ZIP
+      real (empieza con "PK"), no un CSV disfrazado.
+- [x] **88 tests verdes** (12 nuevos), typecheck limpio, build OK.
+
+Pendiente / próximo:
+- **Probar la Zebra físicamente** con `/admin/impresora` — el código está listo pero nunca se ha
+  ejecutado contra la impresora real (no la tengo aquí).
+- `xlsx` pasó de devDependency a **dependency** (ahora se usa en runtime).
+- Falta llevar el .xlsx nativo al resto de reportes (hoy solo el cuadre de turno).
 
 ## F11 — Alimentación y ubicación de animales (completada, verificada)
 
