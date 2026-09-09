@@ -57,17 +57,17 @@ export default async function PersonalPage() {
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Empleados" valor={empleados.length} />
-        <Kpi label="Áreas" valor={areas} />
-        <Kpi label="Salarios base" valor={formatearCOP(costo.salarios)} />
-        <Kpi label="Costo real / mes" valor={formatearCOP(costo.total)} />
+      {/* Los tres valores de la nómina: lo que se paga, lo que cuesta encima, y el total. */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Kpi label="Salarios" valor={formatearCOP(costo.salarios)} />
+        <Kpi label={`Carga prestacional (+${FACTOR_PRESTACIONAL * 100}%)`} valor={formatearCOP(costo.carga)} />
+        <Kpi label="Total nómina / mes" valor={formatearCOP(costo.total)} destacado />
       </div>
 
       <p className="mb-6 rounded-lg bg-ranch-crema/60 px-3 py-2 text-xs text-ranch-marron/70">
-        El <strong>costo real</strong> suma {FACTOR_PRESTACIONAL * 100}% de factor prestacional sobre el
-        salario: en Colombia un empleado vale 1,5 veces su sueldo por prestaciones, seguridad social a
-        cargo del empleador y parafiscales. Carga prestacional: <strong>{formatearCOP(costo.carga)}/mes</strong>.
+        {empleados.length} empleados en {areas} áreas. En Colombia un empleado vale <strong>1,5 veces su
+        sueldo</strong>: sobre el salario van prestaciones, seguridad social a cargo del empleador y
+        parafiscales.
         {costo.personas < empleados.length && (
           <> {empleados.length - costo.personas} empleado(s) sin salario cargado no entran en el cálculo.</>
         )}
@@ -142,9 +142,9 @@ export default async function PersonalPage() {
   );
 }
 
-function Kpi({ label, valor }: { label: string; valor: number | string }) {
+function Kpi({ label, valor, destacado }: { label: string; valor: number | string; destacado?: boolean }) {
   return (
-    <div className="rounded-2xl border-2 border-ranch-marron/15 bg-white p-4 text-center shadow-sm">
+    <div className={`rounded-2xl border-2 bg-white p-4 text-center shadow-sm ${destacado ? "border-ranch-dorado" : "border-ranch-marron/15"}`}>
       <p className="text-xl font-black text-ranch-marron sm:text-2xl">{valor}</p>
       <p className="text-xs uppercase tracking-wide text-ranch-marron/50">{label}</p>
     </div>
