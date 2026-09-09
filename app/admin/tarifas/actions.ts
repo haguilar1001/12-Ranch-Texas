@@ -37,14 +37,22 @@ async function codigoUnico(base: string): Promise<string> {
   return candidato;
 }
 
-/** Valida el número entero COP de una tarifa contra la regla de "requiere_pago". */
-function validarTarifa(valorTexto: string | number, requierePago: boolean): { ok: true; valor: number } | { ok: false; error: string } {
+/**
+ * Valida el número entero COP de una tarifa.
+ *
+ * La TARIFA es la fuente de verdad: si vale más de 0, el tipo cobra; si vale 0, no cobra.
+ * Antes `requiere_pago` era un dato independiente y había que cuadrarlo a mano, lo que
+ * dejaba tipos atrapados (no se podía subir la tarifa sin marcar "cobra", ni marcar
+ * "cobra" sin tener tarifa). Ahora se deriva y no puede quedar incoherente.
+ */
+function validarTarifa(valorTexto: string | number): { ok: true; valor: number } | { ok: false; error: string } {
   const valor = parseCOP(String(valorTexto));
   if (!Number.isInteger(valor) || valor < 0) return { ok: false, error: "La tarifa debe ser un entero mayor o igual a 0." };
-  if (requierePago && valor === 0) return { ok: false, error: "Un tipo que cobra debe tener una tarifa mayor a 0." };
-  if (!requierePago && valor !== 0) return { ok: false, error: "Un tipo que no cobra debe tener tarifa 0." };
   return { ok: true, valor };
 }
+
+/** ¿Este valor de tarifa implica que el tipo cobra entrada? */
+const cobra = (valor: number) => valor > 0;
 
 function normalizarEdad(v: number | string | null | undefined): number | null | "error" {
   if (v === null || v === undefined || v === "") return null;
@@ -68,8 +76,12 @@ export async function crearTipo(e: EntradaCrearTipo): Promise<Resultado> {
   const nombre = e.nombre?.trim();
   if (!nombre) return { ok: false, error: "El nombre es obligatorio." };
 
-  const tarifa = validarTarifa(e.valor, e.requiere_pago);
+  const tarifa = validarTarifa(e.valor);
   if (!tarifa.ok) return { ok: false, error: tarifa.error };
+  const requierePago = cobra(tarifa.valor);
+  if (e.requiere_pago && !requierePago) {
+    return { ok: false, error: "Marcaste que este tipo cobra entrada: ponle una tarifa mayor a $ 0." };
+  }
 
   const edadMin = normalizarEdad(e.edad_min);
   const edadMax = normalizarEdad(e.edad_max);
@@ -82,7 +94,7 @@ export async function crearTipo(e: EntradaCrearTipo): Promise<Resultado> {
 
   const tipo = await prisma.$transaction(async (tx) => {
     const t = await tx.tipoVisitante.create({
-      data: { codigo, nombre, requiere_pago: e.requiere_pago, edad_min: edadMin, edad_max: edadMax, orden, creado_por: s.id },
+      data: { codigo, nombre, requiere_pago: requierePago, edad_min: edadMin, edad_max: edadMax, orden, creado_por: s.id },
     });
     await tx.tarifa.create({
       data: { tipo_visitante_id: t.id, valor: tarifa.valor, vigente_desde: new Date(), motivo_cambio: "Tarifa inicial", creado_por: s.id },
@@ -92,7 +104,7 @@ export async function crearTipo(e: EntradaCrearTipo): Promise<Resultado> {
 
   await registrarAuditoria({
     usuario_id: s.id, entidad: "tipo_visitante", entidad_id: tipo.id, accion: "crear",
-    datos_despues: { codigo, nombre, requiere_pago: e.requiere_pago, valor: tarifa.valor, edad_min: edadMin, edad_max: edadMax },
+    datos_despues: { codigo, nombre, requiere_pago: requierePago, valor: tarifa.valor, edad_min: edadMin, edad_max: edadMax },
   });
   revalidatePath("/admin/tarifas");
   return { ok: true };
@@ -100,7 +112,6 @@ export async function crearTipo(e: EntradaCrearTipo): Promise<Resultado> {
 
 interface CambiosTipo {
   nombre?: string;
-  requiere_pago?: boolean;
   edad_min?: number | string | null;
   edad_max?: number | string | null;
   orden?: number;
@@ -115,7 +126,6 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     include: { tarifas: { where: { vigente_hasta: null }, orderBy: { vigente_desde: "desc" }, take: 1 } },
   });
   if (!tipo) return { ok: false, error: "Tipo no encontrado." };
-  const valorVigente = tipo.tarifas[0]?.valor ?? 0;
 
   const data: Record<string, unknown> = { actualizado_por: s.id };
 
@@ -124,16 +134,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     data.nombre = cambios.nombre.trim();
   }
 
-  if (cambios.requiere_pago !== undefined) {
-    // Mantener coherencia con la tarifa vigente (la tarifa se cambia aparte, con vigencia).
-    if (cambios.requiere_pago && valorVigente === 0) {
-      return { ok: false, error: "Antes de marcar que cobra, cámbiale la tarifa a un valor mayor a 0." };
-    }
-    if (!cambios.requiere_pago && valorVigente > 0) {
-      return { ok: false, error: "Antes de marcar que no cobra, pon su tarifa en 0." };
-    }
-    data.requiere_pago = cambios.requiere_pago;
-  }
+  // `requiere_pago` NO se edita aquí: se deriva de la tarifa (ver cambiarTarifa).
 
   if (cambios.edad_min !== undefined) {
     const v = normalizarEdad(cambios.edad_min);
@@ -188,8 +189,9 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
   const tipo = await prisma.tipoVisitante.findUnique({ where: { id: tipoId } });
   if (!tipo) return { ok: false, error: "Tipo no encontrado." };
 
-  const tarifa = validarTarifa(nuevoValor, tipo.requiere_pago);
+  const tarifa = validarTarifa(nuevoValor);
   if (!tarifa.ok) return { ok: false, error: tarifa.error };
+  const requierePago = cobra(tarifa.valor);
 
   const motivoLimpio = motivo?.trim();
   if (!motivoLimpio) return { ok: false, error: "Indica el motivo del cambio de tarifa (queda en la auditoría)." };
@@ -205,11 +207,16 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
     await tx.tarifa.create({
       data: { tipo_visitante_id: tipoId, valor: tarifa.valor, vigente_desde: ahora, motivo_cambio: motivoLimpio, creado_por: s.id },
     });
+    // El flag se deriva del valor y viaja con él: no puede quedar desfasado.
+    if (tipo.requiere_pago !== requierePago) {
+      await tx.tipoVisitante.update({ where: { id: tipoId }, data: { requiere_pago: requierePago, actualizado_por: s.id } });
+    }
   });
 
   await registrarAuditoria({
     usuario_id: s.id, entidad: "tarifa", entidad_id: tipoId, accion: "cambiar_tarifa",
-    datos_antes: { valor: vigente?.valor ?? null }, datos_despues: { valor: tarifa.valor, motivo: motivoLimpio },
+    datos_antes: { valor: vigente?.valor ?? null, requiere_pago: tipo.requiere_pago },
+    datos_despues: { valor: tarifa.valor, requiere_pago: requierePago, motivo: motivoLimpio },
   });
   revalidatePath("/admin/tarifas");
   revalidatePath("/taquilla");

@@ -60,6 +60,7 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
     if (r.ok) setEdicion(null);
   }
   const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
+  const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
   const [verHist, setVerHist] = useState<string | null>(null);
 
   const aviso = (r: { ok: boolean; error?: string }, exito: string) => {
@@ -163,15 +164,24 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
                         <input value={cambioTarifa.valor} onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })} placeholder="Nuevo valor" inputMode="numeric" className="w-28 rounded border px-1 py-0.5" />
                         <input value={cambioTarifa.motivo} onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })} placeholder="Motivo del cambio" className="w-40 rounded border px-1 py-0.5" />
                         <span className="flex gap-1">
-                          <button onClick={async () => { const r = await cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo); aviso(r, "Tarifa actualizada."); if (r.ok) setCambioTarifa(null); }} className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white">Guardar</button>
-                          <button onClick={() => setCambioTarifa(null)} className="text-red-500">✕</button>
+                          <button
+                            onClick={async () => {
+                              const r = await cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo);
+                              aviso(r, "Tarifa actualizada.");
+                              setErrorTarifa(r.ok ? null : r.error ?? "Error");
+                              if (r.ok) setCambioTarifa(null);
+                            }}
+                            className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white"
+                          >Guardar</button>
+                          <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="text-red-500">✕</button>
                         </span>
+                        {errorTarifa && <span className="max-w-[16rem] rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</span>}
                       </div>
                     ) : (
                       <div>
                         <span className="font-semibold text-ranch-marron">{t.valorVigente > 0 ? formatearCOP(t.valorVigente) : "Gratis"}</span>
                         <br />
-                        <button onClick={() => setCambioTarifa({ id: t.id, valor: String(t.valorVigente), motivo: "" })} className="text-xs text-ranch-dorado hover:underline">Cambiar tarifa</button>
+                        <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, valor: String(t.valorVigente), motivo: "" }); }} className="text-xs text-ranch-dorado hover:underline">Cambiar tarifa</button>
                         {t.historial.length > 1 && (
                           <> · <button onClick={() => setVerHist(verHist === t.id ? null : t.id)} className="text-xs text-ranch-marron/50 hover:underline">{verHist === t.id ? "ocultar" : "historial"}</button></>
                         )}
@@ -179,14 +189,14 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
                     )}
                   </td>
 
-                  {/* Cobra */}
+                  {/* Cobra — se deduce de la tarifa, no se marca aparte. */}
                   <td>
-                    <button
-                      onClick={async () => aviso(await editarTipo(t.id, { requiere_pago: !t.requiere_pago }), "Actualizado.")}
+                    <span
+                      title="Lo define la tarifa: mayor a $ 0 cobra, en $ 0 no cobra."
                       className={`rounded px-2 py-0.5 text-xs font-semibold ${t.requiere_pago ? "bg-ranch-verde/15 text-ranch-verde" : "bg-ranch-crema text-ranch-marron/60"}`}
                     >
                       {t.requiere_pago ? "Cobra" : "No cobra"}
-                    </button>
+                    </span>
                   </td>
 
                   {/* Edad */}
