@@ -73,10 +73,54 @@ interface Persona {
   salario: number | null;
   documento: string | null;
   email: string | null;
+  cargo: string | null;
+  estado: "activo" | "inactivo" | "retirado";
 }
 
-function leer(ruta: string): { personas: Persona[]; sinDatos: string[] } {
+const ESTADOS = ["activo", "inactivo", "retirado"] as const;
+type Estado = (typeof ESTADOS)[number];
+
+/**
+ * Formato de VUELTA: la hoja PERSONAL que exporta /admin/personal/xlsx, ya completada
+ * por el responsable. Columnas: NOMBRE | DOCUMENTO | CARGO | AREA | UNIDAD | SALARIO |
+ * COSTO REAL (calculado, se ignora) | ESTADO.
+ */
+function leerHojaPersonal(wb: XLSX.WorkBook): Persona[] {
+  const filas = XLSX.utils.sheet_to_json(wb.Sheets["PERSONAL"], { header: 1, defval: "" }) as unknown[][];
+  const personas: Persona[] = [];
+
+  for (const r of filas.slice(1)) {
+    const nombre = limpio(r[0]);
+    if (!nombre) continue;
+    const salario = Math.round(Number(r[5]) || 0);
+    const estado = limpio(r[7]).toLowerCase() as Estado;
+    personas.push({
+      nombre: titulo(nombre),
+      documento: limpio(r[1]).replace(/\D/g, "") || null,
+      cargo: limpio(r[2]) ? titulo(limpio(r[2])) : null,
+      area: titulo(limpio(r[3]) || "Sin área"),
+      unidad: titulo(limpio(r[4]) || "Sin unidad"),
+      salario: salario > 0 ? salario : null,
+      email: null, // esta hoja no lo trae; no se pisa el correo ya guardado
+      estado: ESTADOS.includes(estado) ? estado : "activo",
+    });
+  }
+  return personas;
+}
+
+function leer(ruta: string): { personas: Persona[]; sinDatos: string[]; formato: string } {
   const wb = XLSX.readFile(ruta);
+
+  // Si trae la hoja PERSONAL es el archivo que exportó la app, ya completado.
+  if (wb.SheetNames.includes("PERSONAL")) {
+    const personas = leerHojaPersonal(wb);
+    return {
+      personas,
+      sinDatos: personas.filter((p) => !p.documento).map((p) => p.nombre),
+      formato: "hoja PERSONAL (archivo devuelto completo)",
+    };
+  }
+
   const filas = (h: string) => XLSX.utils.sheet_to_json(wb.Sheets[h], { header: 1, defval: "" }) as unknown[][];
 
   // Maestro con cédula y correo, indexado por nombre comparable.
@@ -105,18 +149,21 @@ function leer(ruta: string): { personas: Persona[]; sinDatos: string[] } {
       salario: salario > 0 ? salario : null,
       documento: extra?.documento || null,
       email: extra?.email || null,
+      cargo: null, // el Excel de nómina no trae la columna de cargo
+      estado: "activo",
     });
   }
 
-  return { personas, sinDatos };
+  return { personas, sinDatos, formato: "hojas NOMINA + BASE DE DATOS" };
 }
 
 async function main() {
   const ruta = process.argv[2] ?? RUTA_POR_DEFECTO;
   console.log(`\n👷 Importando personal desde:\n   ${ruta}\n`);
 
-  const { personas, sinDatos } = leer(ruta);
-  if (personas.length === 0) throw new Error("La hoja NOMINA no tiene personas.");
+  const { personas, sinDatos, formato } = leer(ruta);
+  if (personas.length === 0) throw new Error("El archivo no tiene personas.");
+  console.log("  Formato detectado: " + formato + "\n");
 
   // Áreas de trabajo (centro de costo). Se emparejan ignorando tildes para no
   // terminar con "Administracion" y "Administración" como áreas distintas.
@@ -135,6 +182,24 @@ async function main() {
     }
   }
 
+  // Cargos, colgados de su área. Solo llegan cuando el archivo es el devuelto.
+  const cargos = new Map<string, string>();
+  for (const p of personas) {
+    if (!p.cargo) continue;
+    const clave = `${claveArea(p.cargo)}|${p.area}`;
+    if (cargos.has(clave)) continue;
+    const areaId = areas.get(p.area)!;
+    const previo = await prisma.cargo.findFirst({
+      where: { nombre: { equals: p.cargo, mode: "insensitive" }, area_id: areaId },
+    });
+    cargos.set(
+      clave,
+      previo
+        ? (await prisma.cargo.update({ where: { id: previo.id }, data: { activo: true, actualizado_por: POR } })).id
+        : (await prisma.cargo.create({ data: { nombre: p.cargo, area_id: areaId, creado_por: POR } })).id,
+    );
+  }
+
   const existentes = await prisma.empleado.findMany();
   const porDocumento = new Map(existentes.filter((e) => e.documento).map((e) => [e.documento as string, e]));
   const porNombre = new Map(existentes.map((e) => [claveNombre(e.nombre), e]));
@@ -150,12 +215,14 @@ async function main() {
       nombre: p.nombre,
       documento: p.documento,
       tipo_documento: p.documento ? "CC" : null,
-      email: p.email,
+      // El archivo devuelto no trae correo: se conserva el que ya estaba.
+      ...(p.email ? { email: p.email } : {}),
       area_id: areas.get(p.area)!,
+      cargo_id: p.cargo ? cargos.get(`${claveArea(p.cargo)}|${p.area}`) ?? null : null,
       unidad_negocio: p.unidad,
       salario_base: p.salario,
-      estado: "activo" as const,
-      activo: true,
+      estado: p.estado,
+      activo: p.estado === "activo",
     };
 
     if (previo) {

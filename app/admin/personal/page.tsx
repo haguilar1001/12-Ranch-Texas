@@ -47,9 +47,14 @@ export default async function PersonalPage() {
           <h1 className="text-2xl font-black text-ranch-marron">Personal</h1>
           <p className="text-sm text-ranch-marron/60">Empleados, áreas y cargos</p>
         </div>
-        <span className="rounded-full bg-ranch-verde/15 px-3 py-1 text-xs font-semibold text-ranch-verde">
-          Nómina real · {empleados.length} personas
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-ranch-verde/15 px-3 py-1 text-xs font-semibold text-ranch-verde">
+            Nómina real · {empleados.length} personas
+          </span>
+          <a href="/admin/personal/xlsx" className="rounded-lg bg-ranch-verde px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+            ⬇️ Excel para completar
+          </a>
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
