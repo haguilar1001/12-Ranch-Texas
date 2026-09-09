@@ -23,7 +23,8 @@
     "export:analitica": "tsx scripts/export-analitica.ts",
     "postinstall": "prisma generate",
     "verificar:f12": "tsx scripts/verificar-f12.ts",
-    "verificar:f13": "tsx scripts/verificar-f13.ts"
+    "verificar:f13": "tsx scripts/verificar-f13.ts",
+    "import:atracciones": "tsx scripts/import-atracciones.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"

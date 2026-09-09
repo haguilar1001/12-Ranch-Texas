@@ -149,10 +149,12 @@ export async function editarAtraccion(id: string, cambios: EntradaAtraccion): Pr
   if (!fila.ok) return { ok: false, error: fila.error };
 
   const filaActiva = cambios.fila_activa ?? false;
-  // Encender la fila sin cupo ni duración deja al visitante sin saber cuánto falta.
-  if (filaActiva && (!fila.cupo || !fila.minutos)) {
-    return { ok: false, error: "Para activar la fila indica cuántas personas entran por tanda y cuántos minutos dura." };
-  }
+  // La fila sirve igual sin cupo ni duración: el visitante ve su número y su posición.
+  // Lo único que se pierde es el estimado de minutos, así que se avisa y no se bloquea.
+  const avisoFila =
+    filaActiva && (!fila.cupo || !fila.minutos)
+      ? "La fila queda activa, pero sin cupo por tanda y minutos no se le muestra al visitante cuánto falta."
+      : undefined;
 
   await prisma.atraccion.update({
     where: { id },
@@ -182,7 +184,7 @@ export async function editarAtraccion(id: string, cambios: EntradaAtraccion): Pr
     },
   });
   revalidatePath(RUTA);
-  return { ok: true };
+  return { ok: true, aviso: avisoFila };
 }
 
 /**
