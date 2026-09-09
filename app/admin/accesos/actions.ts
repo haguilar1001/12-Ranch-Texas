@@ -46,6 +46,19 @@ export interface EntradaAtraccion {
   /** Al crear: también genera su punto de control (el lector de la atracción). */
   crear_punto?: boolean;
   tipo_regla?: string;
+  // --- Fila virtual
+  fila_activa?: boolean;
+  cupo_por_tanda?: string | number | null;
+  minutos_por_tanda?: string | number | null;
+}
+
+/** Valida la configuración de la fila. Sin cupo y minutos no se estima la espera. */
+function validarFila(e: EntradaAtraccion): { ok: true; cupo: number | null; minutos: number | null } | { ok: false; error: string } {
+  const cupo = entero(e.cupo_por_tanda, 1, 1000);
+  if (cupo === "error") return { ok: false, error: "El cupo por tanda debe ser un entero mayor a 0." };
+  const minutos = entero(e.minutos_por_tanda, 1, 600);
+  if (minutos === "error") return { ok: false, error: "Los minutos por tanda deben ser un entero entre 1 y 600." };
+  return { ok: true, cupo, minutos };
 }
 
 export async function crearAtraccion(e: EntradaAtraccion): Promise<Resultado> {
@@ -70,6 +83,9 @@ export async function crearAtraccion(e: EntradaAtraccion): Promise<Resultado> {
 
   const regla: Regla = REGLAS.includes(e.tipo_regla as Regla) ? (e.tipo_regla as Regla) : "reingreso";
 
+  const fila = validarFila(e);
+  if (!fila.ok) return { ok: false, error: fila.error };
+
   const a = await prisma.$transaction(async (tx) => {
     const atr = await tx.atraccion.create({
       data: {
@@ -78,6 +94,9 @@ export async function crearAtraccion(e: EntradaAtraccion): Promise<Resultado> {
         edad_minima: edad,
         estatura_minima: estatura,
         requiere_consentimiento: e.requiere_consentimiento,
+        fila_activa: e.fila_activa ?? false,
+        cupo_por_tanda: fila.cupo,
+        minutos_por_tanda: fila.minutos,
         creado_por: s.id,
       },
     });
@@ -126,6 +145,15 @@ export async function editarAtraccion(id: string, cambios: EntradaAtraccion): Pr
   const estatura = entero(cambios.estatura_minima, 30, 250);
   if (estatura === "error") return { ok: false, error: "La estatura mínima debe estar en centímetros, entre 30 y 250." };
 
+  const fila = validarFila(cambios);
+  if (!fila.ok) return { ok: false, error: fila.error };
+
+  const filaActiva = cambios.fila_activa ?? false;
+  // Encender la fila sin cupo ni duración deja al visitante sin saber cuánto falta.
+  if (filaActiva && (!fila.cupo || !fila.minutos)) {
+    return { ok: false, error: "Para activar la fila indica cuántas personas entran por tanda y cuántos minutos dura." };
+  }
+
   await prisma.atraccion.update({
     where: { id },
     data: {
@@ -134,6 +162,9 @@ export async function editarAtraccion(id: string, cambios: EntradaAtraccion): Pr
       edad_minima: edad,
       estatura_minima: estatura,
       requiere_consentimiento: cambios.requiere_consentimiento,
+      fila_activa: filaActiva,
+      cupo_por_tanda: fila.cupo,
+      minutos_por_tanda: fila.minutos,
       actualizado_por: s.id,
     },
   });
@@ -144,7 +175,11 @@ export async function editarAtraccion(id: string, cambios: EntradaAtraccion): Pr
       nombre: antes.nombre, edad_minima: antes.edad_minima, estatura_minima: antes.estatura_minima,
       requiere_consentimiento: antes.requiere_consentimiento,
     },
-    datos_despues: { nombre, edad_minima: edad, estatura_minima: estatura, requiere_consentimiento: cambios.requiere_consentimiento },
+    datos_despues: {
+      nombre, edad_minima: edad, estatura_minima: estatura,
+      requiere_consentimiento: cambios.requiere_consentimiento,
+      fila_activa: filaActiva, cupo_por_tanda: fila.cupo, minutos_por_tanda: fila.minutos,
+    },
   });
   revalidatePath(RUTA);
   return { ok: true };

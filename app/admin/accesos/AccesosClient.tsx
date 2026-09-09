@@ -14,6 +14,10 @@ export interface AtraccionVista {
   edad_minima: number | null;
   estatura_minima: number | null;
   requiere_consentimiento: boolean;
+  fila_activa: boolean;
+  cupo_por_tanda: number | null;
+  minutos_por_tanda: number | null;
+  enFilaAhora: number;
   activa: boolean;
   puntos: number;
   entradasHoy: number;
@@ -56,10 +60,12 @@ const th = "px-3 py-2 text-xs uppercase text-ranch-marron/60";
 type FormAtraccion = {
   nombre: string; descripcion: string; edad_minima: string; estatura_minima: string;
   requiere_consentimiento: boolean; tipo_regla: string;
+  fila_activa: boolean; cupo_por_tanda: string; minutos_por_tanda: string;
 };
 const ATRACCION_VACIA: FormAtraccion = {
   nombre: "", descripcion: "", edad_minima: "", estatura_minima: "",
   requiere_consentimiento: true, tipo_regla: "reingreso",
+  fila_activa: false, cupo_por_tanda: "", minutos_por_tanda: "",
 };
 
 type FormPunto = {
@@ -73,7 +79,7 @@ const PUNTO_VACIO: FormPunto = {
 
 export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"atracciones" | "puntos">("atracciones");
+  const [tab, setTab] = useState<"atracciones" | "puntos" | "fila">("atracciones");
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -109,7 +115,7 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
       </div>
 
       <nav className="mb-4 flex flex-wrap gap-2">
-        {([["atracciones", "Atracciones"], ["puntos", "Puntos de control"]] as const).map(([id, label]) => (
+        {([["atracciones", "Atracciones"], ["puntos", "Puntos de control"], ["fila", "Fila virtual"]] as const).map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -226,6 +232,9 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
                                     edad_minima: a.edad_minima === null ? "" : String(a.edad_minima),
                                     estatura_minima: a.estatura_minima === null ? "" : String(a.estatura_minima),
                                     requiere_consentimiento: a.requiere_consentimiento, tipo_regla: "reingreso",
+                                    fila_activa: a.fila_activa,
+                                    cupo_por_tanda: a.cupo_por_tanda === null ? "" : String(a.cupo_por_tanda),
+                                    minutos_por_tanda: a.minutos_por_tanda === null ? "" : String(a.minutos_por_tanda),
                                   })}
                                 >✏️ Editar</button>
                                 <button className={botonSec} disabled={busy} onClick={() => correr(() => cambiarEstadoAtraccion(a.id, !a.activa), a.activa ? "Atracción desactivada." : "Atracción activada.")}>
@@ -373,6 +382,93 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
               </tbody>
             </table>
           </div>
+        </>
+      )}
+
+      {/* ------------------------------------------------------- FILA VIRTUAL */}
+      {tab === "fila" && (
+        <>
+          <p className="mb-3 text-sm text-ranch-marron/60">
+            Reemplaza la lista de papel: el visitante separa su turno con el QR de su manilla y consulta
+            desde el celular cuántos van adelante, en vez de quedarse parado esperando a que lo llamen.
+            El operario la maneja desde <a href="/escaneo/fila" className="underline">Escaneo → Fila</a>.
+          </p>
+
+          <div className={`overflow-x-auto ${card}`}>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-ranch-crema/60">
+                <tr>
+                  <th className={th}>Atracción</th>
+                  <th className={`${th} text-center`}>Fila</th>
+                  <th className={`${th} text-center`}>Entran por tanda</th>
+                  <th className={`${th} text-center`}>Minutos por tanda</th>
+                  <th className={`${th} text-right`}>En fila ahora</th>
+                  {puedeEditar && <th className={th}></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {atracciones.filter((a) => a.activa).map((a) => {
+                  const ed = edicionAtr?.id === a.id ? edicionAtr : null;
+                  return (
+                    <tr key={a.id} className="border-t border-ranch-marron/10">
+                      <td className="px-3 py-2 font-semibold text-ranch-marron">{a.nombre}</td>
+                      <td className="px-3 py-2 text-center">
+                        {ed ? (
+                          <input type="checkbox" className="h-4 w-4" checked={ed.fila_activa} onChange={(e) => setEdicionAtr({ ...ed, fila_activa: e.target.checked })} />
+                        ) : a.fila_activa ? (
+                          <span className="rounded-full bg-ranch-verde/15 px-2 py-0.5 text-xs font-semibold text-ranch-verde">Activa</span>
+                        ) : (
+                          <span className="text-xs text-ranch-marron/40">No</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center text-ranch-marron/70">
+                        {ed ? (
+                          <input className={`${input} w-20 text-center`} inputMode="numeric" placeholder="8" value={ed.cupo_por_tanda} onChange={(e) => setEdicionAtr({ ...ed, cupo_por_tanda: e.target.value })} />
+                        ) : (a.cupo_por_tanda ?? "—")}
+                      </td>
+                      <td className="px-3 py-2 text-center text-ranch-marron/70">
+                        {ed ? (
+                          <input className={`${input} w-20 text-center`} inputMode="numeric" placeholder="10" value={ed.minutos_por_tanda} onChange={(e) => setEdicionAtr({ ...ed, minutos_por_tanda: e.target.value })} />
+                        ) : (a.minutos_por_tanda ? `${a.minutos_por_tanda} min` : "—")}
+                      </td>
+                      <td className="px-3 py-2 text-right font-black text-ranch-marron">{a.enFilaAhora || "—"}</td>
+                      {puedeEditar && (
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {ed ? (
+                              <>
+                                <button className={botonSec} disabled={busy} onClick={async () => { if (await correr(() => editarAtraccion(a.id, ed), "Fila actualizada.")) setEdicionAtr(null); }}>Guardar</button>
+                                <button className={botonSec} onClick={() => setEdicionAtr(null)}>Cancelar</button>
+                              </>
+                            ) : (
+                              <button
+                                className={botonSec}
+                                onClick={() => setEdicionAtr({
+                                  id: a.id, nombre: a.nombre, descripcion: a.descripcion ?? "",
+                                  edad_minima: a.edad_minima === null ? "" : String(a.edad_minima),
+                                  estatura_minima: a.estatura_minima === null ? "" : String(a.estatura_minima),
+                                  requiere_consentimiento: a.requiere_consentimiento, tipo_regla: "reingreso",
+                                  fila_activa: a.fila_activa,
+                                  cupo_por_tanda: a.cupo_por_tanda === null ? "" : String(a.cupo_por_tanda),
+                                  minutos_por_tanda: a.minutos_por_tanda === null ? "" : String(a.minutos_por_tanda),
+                                })}
+                              >✏️ Configurar</button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-3 text-xs text-ranch-marron/50">
+            La espera que ve el visitante sale de estos dos números: si entran 8 por tanda y la tanda dura
+            10 minutos, quien tiene 16 personas adelante espera unos 20 minutos. Sin ellos no se muestra
+            estimado — preferimos no decir nada antes que inventar un número.
+          </p>
         </>
       )}
 

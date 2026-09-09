@@ -17,6 +17,40 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F10 | Reorganización por módulos + maestros de operación (Atracciones, Personal, Animales, Equipos) | 🟡 Boceto en revisión |
 | F11 | Animales: alimentación (dieta individual/grupal + bitácora + kardex) y ubicación con historial | ✅ Completada (faltan datos reales de recintos) |
 | F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
+| F13 | Atracciones editables + fila virtual (el visitante separa turno con su QR) | ✅ Completada |
+
+## F13 — Fila virtual (completada, verificada)
+
+Responde a: *"atracciones donde la gente hoy se anota en una lista, le dan un turno, y tiene que
+estar pendiente"*. Lo que se quita no es la fila: es el **tener que estar pendiente**.
+
+- [x] **Atracciones y puntos de control editables** (`/admin/accesos`, supervisor+): antes solo se
+      tocaban por seed o base de datos, y el seed únicamente inserta si la tabla está vacía — por eso
+      producción quedó con 3 atracciones de prueba en vez de las 9 reales.
+      Al crear una atracción se genera su lector; desactivarla desactiva sus lectores; y no deja
+      desactivar el último punto de entrada al parque, que es el que mide el aforo.
+- [x] **Fila virtual por atracción** (`fila_activa`, `cupo_por_tanda`, `minutos_por_tanda`):
+      migración `20260909150000_fila_virtual`, tabla `turnos_fila` con consecutivo por día y atracción.
+- [x] **Pantalla del visitante** (`/fila/[payload]`, PÚBLICA desde el QR de la manilla, sin login):
+      separa turno, ve cuántos van adelante y cuánto falta, y la página **se actualiza sola**. Si la
+      atracción exige consentimiento y no lo ha firmado, se lo recuerda **mientras espera** — que es
+      justo el rato muerto que este módulo aprovecha.
+- [x] **Pantalla del operario** (`/escaneo/fila`, control_acceso+): llamar al siguiente, marcar
+      atendido o que no se presentó, y **anotar a quien no tiene celular** escaneando su manilla.
+- [x] La espera se calcula por **personas, no por turnos**: una familia de 4 ocupa 4 puestos en los
+      karts. Sin cupo ni duración configurados **no se muestra estimado** — antes que inventar un
+      número, no se dice nada.
+- [x] Un turno **llamado sigue ocupando cupo** hasta que se cierra: todavía no se ha subido.
+- [x] Una manilla solo puede tener **un turno abierto por atracción**, para que nadie taponee la fila.
+- [x] Verificado con `npm run verificar:f13` (**22 comprobaciones**, todas verdes) y **102 tests**
+      (14 nuevos), typecheck limpio, build OK.
+
+Pendiente (del responsable):
+- **Cuáles atracciones van con fila**, y para cada una cuántas personas entran por tanda y cuántos
+  minutos dura. Se configura en `/admin/accesos` → pestaña **Fila virtual**.
+- Decidir **a dónde apunta el QR impreso en la manilla**: hoy el visitante llega a la fila por
+  `/fila/<payload>`, pero la manilla imprime el QR del consentimiento. Falta un menú o un QR que
+  lleve a ambos.
 
 ## F12 — Caja lista para operación real (completada, verificada)
 

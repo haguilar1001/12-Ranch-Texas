@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
-import { inicioDelDiaOperativo } from "@/lib/tiempo";
+import { inicioDelDiaOperativo, fechaBogota } from "@/lib/tiempo";
 import AccesosClient from "./AccesosClient";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,11 @@ export default async function AccesosPage() {
       include: {
         puntos_control: { select: { id: true } },
         _count: { select: { consentimientos: true } },
+        // Cuántos esperan ahora mismo en la fila de hoy.
+        turnos_fila: {
+          where: { fecha_operativa: fechaBogota(), estado: { in: ["esperando", "llamado"] } },
+          select: { id: true },
+        },
       },
     }),
     prisma.puntoControl.findMany({
@@ -55,6 +60,10 @@ export default async function AccesosPage() {
     edad_minima: a.edad_minima,
     estatura_minima: a.estatura_minima,
     requiere_consentimiento: a.requiere_consentimiento,
+    fila_activa: a.fila_activa,
+    cupo_por_tanda: a.cupo_por_tanda,
+    minutos_por_tanda: a.minutos_por_tanda,
+    enFilaAhora: a.turnos_fila.length,
     activa: a.activa,
     puntos: a.puntos_control.length,
     entradasHoy: a.puntos_control.reduce((acc, p) => acc + (conteo.get(p.id) ?? 0), 0),

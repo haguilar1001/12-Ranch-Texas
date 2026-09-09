@@ -388,6 +388,7 @@ model Manilla {
   accesos         Acceso[]
   consentimientos Consentimiento[]
   impresiones     Impresion[]
+  turnos_fila     TurnoFila[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -401,6 +402,15 @@ model Manilla {
 
 // ------------------------- ACCESO -------------------------
 
+// Estado de un turno en la fila virtual de una atracción.
+enum EstadoTurnoFila {
+  esperando
+  llamado
+  atendido
+  no_se_presento
+  cancelado
+}
+
 model Atraccion {
   id                      String  @id @default(uuid())
   nombre                  String
@@ -410,9 +420,16 @@ model Atraccion {
   requiere_consentimiento Boolean @default(false)
   activa                  Boolean @default(true)
 
+  // --- Fila virtual: reemplaza la lista de papel donde la gente se anota y tiene
+  // que quedarse parada esperando a que la llamen.
+  fila_activa       Boolean @default(false)
+  cupo_por_tanda    Int? // cuántas personas entran por vuelta (p. ej. 8 karts)
+  minutos_por_tanda Int? // cuánto dura una vuelta; con el cupo se estima la espera
+
   puntos_control  PuntoControl[]
   consentimientos Consentimiento[]
   textos          TextoConsentimiento[]
+  turnos_fila     TurnoFila[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -420,6 +437,39 @@ model Atraccion {
   actualizado_por String?
 
   @@map("atracciones")
+}
+
+/**
+ * Un puesto en la fila de una atracción, atado a la manilla del visitante.
+ * El consecutivo se reinicia cada día operativo y por atracción, que es como se
+ * canta en voz alta ("va el 41").
+ */
+model TurnoFila {
+  id              String          @id @default(uuid())
+  atraccion_id    String
+  manilla_id      String
+  numero          Int
+  fecha_operativa String // YYYY-MM-DD en Bogotá; junto al número forma el consecutivo del día
+  personas        Int             @default(1)
+  estado          EstadoTurnoFila @default(esperando)
+  tomado_en       DateTime        @default(now())
+  llamado_en      DateTime?
+  cerrado_en      DateTime? // atendido, no se presentó o cancelado
+  motivo          String?
+
+  atraccion Atraccion @relation(fields: [atraccion_id], references: [id])
+  manilla   Manilla   @relation(fields: [manilla_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@unique([atraccion_id, fecha_operativa, numero])
+  @@index([atraccion_id, estado])
+  @@index([manilla_id])
+  @@index([fecha_operativa])
+  @@map("turnos_fila")
 }
 
 model PuntoControl {
