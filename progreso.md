@@ -48,9 +48,10 @@ estar pendiente"*. Lo que se quita no es la fila: es el **tener que estar pendie
 Pendiente (del responsable):
 - **Cuáles atracciones van con fila**, y para cada una cuántas personas entran por tanda y cuántos
   minutos dura. Se configura en `/admin/accesos` → pestaña **Fila virtual**.
-- Decidir **a dónde apunta el QR impreso en la manilla**: hoy el visitante llega a la fila por
-  `/fila/<payload>`, pero la manilla imprime el QR del consentimiento. Falta un menú o un QR que
-  lleve a ambos.
+- [x] **Menú del visitante** (`/m/[payload]`, público): a esto apunta ahora el QR impreso en la
+      manilla. Muestra el turno activo arriba (lo más urgente), si le faltan firmas, y las dos
+      entradas: fila y consentimientos. Se resolvió así porque en una banda de 2,84 cm no caben
+      dos QR distintos; la tirilla dice "TURNOS Y CONSENTIMIENTOS".
 
 ## F12 — Caja lista para operación real (completada, verificada)
 

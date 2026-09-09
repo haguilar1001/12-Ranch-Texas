@@ -52,7 +52,7 @@ export default async function ImprimirVentaPage({ params }: { params: Promise<{ 
         emitida,
         valida,
         qr: await qrDataUrl(payload),
-        qrConsent: await qrDataUrl(`${origin}/consentimiento/${payload}`),
+        qrVisitante: await qrDataUrl(`${origin}/m/${payload}`),
       });
       if (m.estado === "activa" && !anulada) {
         zpls.push(construirZpl({
@@ -122,9 +122,9 @@ export default async function ImprimirVentaPage({ params }: { params: Promise<{ 
               Conserve su manilla. Términos y condiciones aplican. El reingreso es válido el mismo día.
             </p>
             <div className="mt-1 border-t border-ranch-marron/15 pt-1">
-              <p className="text-[8px] font-bold text-ranch-marron/70">FIRMA DE CONSENTIMIENTO (karts / motocross)</p>
-              <Image src={it.qrConsent} alt={`Consentimiento ${it.consecutivo}`} width={90} height={90} className="mx-auto" unoptimized />
-              <p className="text-[7px] text-ranch-marron/50">Escanea con tu celular para firmar</p>
+              <p className="text-[8px] font-bold text-ranch-marron/70">TURNOS Y CONSENTIMIENTOS</p>
+              <Image src={it.qrVisitante} alt={`Menú manilla ${it.consecutivo}`} width={90} height={90} className="mx-auto" unoptimized />
+              <p className="text-[7px] text-ranch-marron/50">Escanea con tu celular: separa turno y firma</p>
             </div>
           </div>
         ))}
