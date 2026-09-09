@@ -80,14 +80,22 @@ export default async function Home() {
     ["🚪", "Escaneo", "Control de acceso", "/escaneo", tieneRol(s.rol, "control_acceso")],
   ] as [string, string, string, string, boolean][]).filter((x) => x[4]);
 
-  const modulos = ([
-    ["📊", "Ventas", "Indicadores, reportes y comparativos", "/admin/dashboard", tieneRol(s.rol, "consulta")],
-    ["🎡", "Accesos y atracciones", "Atracciones, consentimiento, conteo diario", "/admin/accesos", tieneRol(s.rol, "consulta")],
-    ["👷", "Personal", "Empleados, áreas y cargos", "/admin/personal", tieneRol(s.rol, "supervisor")],
+  const parque = ([
+    ["🎡", "Accesos y atracciones", "Condiciones y conteo del día", "/admin/accesos", tieneRol(s.rol, "consulta")],
     ["🐄", "Animales", "Inventario, ubicación y alimentación", "/admin/animales", puedeOperarGranja(s.rol)],
     ["🔧", "Equipos", "Inventario y mantenimientos", "/admin/equipos", tieneRol(s.rol, "supervisor")],
-    ["🧾", "Gastos y P&G", "Rubros, presupuesto, resultado", "/admin/gastos", tieneRol(s.rol, "supervisor")],
-    ["⚙️", "Administración", "Reportes y maestros", "/admin", tieneRol(s.rol, "consulta")],
+    ["👷", "Personal", "Empleados, áreas y cargos", "/admin/personal", tieneRol(s.rol, "supervisor")],
+  ] as [string, string, string, string, boolean][]).filter((x) => x[4]);
+
+  const reportes = ([
+    ["📊", "Ventas", "Indicadores del día y del mes", "/admin/dashboard", tieneRol(s.rol, "consulta")],
+    ["📈", "Comparativo", "Año vs. año contra el histórico", "/admin/reportes/comparativo", tieneRol(s.rol, "consulta")],
+    ["🎁", "Atenciones", "Lo que no se cobró y quién lo autorizó", "/admin/reportes/cortesias", tieneRol(s.rol, "supervisor")],
+    ["🧾", "Gastos y P&G", "Presupuesto vs. ejecutado", "/admin/reportes/gastos", tieneRol(s.rol, "consulta")],
+  ] as [string, string, string, string, boolean][]).filter((x) => x[4]);
+
+  const administracion = ([
+    ["⚙️", "Administración", "Maestros y reportes", "/admin", tieneRol(s.rol, "consulta")],
   ] as [string, string, string, string, boolean][]).filter((x) => x[4]);
 
   return (
@@ -153,11 +161,27 @@ export default async function Home() {
             </div>
           </section>
         )}
-        {modulos.length > 0 && (
-          <section>
-            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ranch-marron/50">Módulos</h2>
+        {parque.length > 0 && (
+          <section className="mb-6">
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ranch-marron/50">Parque</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {modulos.map((x) => <MenuButton key={x[3]} icon={x[0]} label={x[1]} desc={x[2]} href={x[3]} />)}
+              {parque.map((x) => <MenuButton key={x[3]} icon={x[0]} label={x[1]} desc={x[2]} href={x[3]} />)}
+            </div>
+          </section>
+        )}
+        {reportes.length > 0 && (
+          <section className="mb-6">
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ranch-marron/50">Reportes</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {reportes.map((x) => <MenuButton key={x[3]} icon={x[0]} label={x[1]} desc={x[2]} href={x[3]} />)}
+            </div>
+          </section>
+        )}
+        {administracion.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ranch-marron/50">Administración</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {administracion.map((x) => <MenuButton key={x[3]} icon={x[0]} label={x[1]} desc={x[2]} href={x[3]} />)}
             </div>
           </section>
         )}

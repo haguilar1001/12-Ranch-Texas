@@ -32,7 +32,33 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
   const [nuevo, setNuevo] = useState({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [editNombre, setEditNombre] = useState<{ id: string; v: string } | null>(null);
+  const [edicion, setEdicion] = useState<
+    { id: string; nombre: string; edad_min: string; edad_max: string; orden: string } | null
+  >(null);
+
+  function abrirEdicion(t: Tipo) {
+    setEdicion({
+      id: t.id,
+      nombre: t.nombre,
+      edad_min: t.edad_min === null ? "" : String(t.edad_min),
+      edad_max: t.edad_max === null ? "" : String(t.edad_max),
+      orden: String(t.orden),
+    });
+  }
+
+  async function guardarEdicion() {
+    if (!edicion) return;
+    setBusy(true);
+    const r = await editarTipo(edicion.id, {
+      nombre: edicion.nombre,
+      edad_min: edicion.edad_min === "" ? null : edicion.edad_min,
+      edad_max: edicion.edad_max === "" ? null : edicion.edad_max,
+      orden: parseInt(edicion.orden, 10) || 0,
+    });
+    setBusy(false);
+    aviso(r, "Tipo actualizado.");
+    if (r.ok) setEdicion(null);
+  }
   const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
   const [verHist, setVerHist] = useState<string | null>(null);
 
@@ -103,16 +129,28 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
                 <tr key={t.id} className={`border-t border-ranch-marron/10 align-top ${!t.activo ? "opacity-50" : ""}`}>
                   {/* Nombre */}
                   <td className="py-2">
-                    {editNombre?.id === t.id ? (
-                      <span className="flex gap-1">
-                        <input value={editNombre.v} onChange={(e) => setEditNombre({ id: t.id, v: e.target.value })} className="w-32 rounded border px-1 py-0.5" />
-                        <button onClick={async () => { aviso(await editarTipo(t.id, { nombre: editNombre.v }), "Nombre actualizado."); setEditNombre(null); }} className="text-ranch-verde">✓</button>
-                        <button onClick={() => setEditNombre(null)} className="text-red-500">✕</button>
+                    {edicion?.id === t.id ? (
+                      <span className="flex flex-col gap-1">
+                        <input
+                          value={edicion.nombre}
+                          onChange={(e) => setEdicion({ ...edicion, nombre: e.target.value })}
+                          placeholder="Nombre"
+                          className="w-36 rounded border px-1 py-0.5"
+                        />
+                        <span className="flex items-center gap-1 text-[10px] text-ranch-marron/50">
+                          orden
+                          <input
+                            value={edicion.orden}
+                            onChange={(e) => setEdicion({ ...edicion, orden: e.target.value.replace(/D/g, "") })}
+                            inputMode="numeric"
+                            title="Posición en la pantalla de taquilla"
+                            className="w-12 rounded border px-1 py-0.5 text-center"
+                          />
+                        </span>
                       </span>
                     ) : (
                       <span>
-                        <strong className="text-ranch-marron">{t.nombre}</strong>{" "}
-                        <button onClick={() => setEditNombre({ id: t.id, v: t.nombre })} className="text-ranch-marron/40 hover:text-ranch-marron">✏️</button>
+                        <strong className="text-ranch-marron">{t.nombre}</strong>
                         <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
                       </span>
                     )}
@@ -152,7 +190,27 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
                   </td>
 
                   {/* Edad */}
-                  <td className="text-xs text-ranch-marron/60">{rangoEdad(t.edad_min, t.edad_max)}</td>
+                  <td className="text-xs text-ranch-marron/60">
+                    {edicion?.id === t.id ? (
+                      <span className="flex items-center gap-1">
+                        <input
+                          value={edicion.edad_min}
+                          onChange={(e) => setEdicion({ ...edicion, edad_min: e.target.value.replace(/D/g, "") })}
+                          inputMode="numeric" placeholder="mín"
+                          className="w-12 rounded border px-1 py-0.5 text-center"
+                        />
+                        <span className="text-ranch-marron/40">–</span>
+                        <input
+                          value={edicion.edad_max}
+                          onChange={(e) => setEdicion({ ...edicion, edad_max: e.target.value.replace(/D/g, "") })}
+                          inputMode="numeric" placeholder="máx"
+                          className="w-12 rounded border px-1 py-0.5 text-center"
+                        />
+                      </span>
+                    ) : (
+                      rangoEdad(t.edad_min, t.edad_max)
+                    )}
+                  </td>
 
                   {/* Estado */}
                   <td>
@@ -163,7 +221,16 @@ export default function TarifasClient({ tipos }: { tipos: Tipo[] }) {
                       {t.activo ? "Activo" : "Inactivo"}
                     </button>
                   </td>
-                  <td></td>
+                  <td className="text-right">
+                    {edicion?.id === t.id ? (
+                      <span className="flex justify-end gap-1">
+                        <button onClick={guardarEdicion} disabled={busy} className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50">Guardar</button>
+                        <button onClick={() => setEdicion(null)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs text-ranch-marron">Cancelar</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => abrirEdicion(t)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60">✏️ Editar</button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {tipos.flatMap((t) =>
