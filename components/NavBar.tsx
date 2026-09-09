@@ -73,9 +73,9 @@ export default async function NavBar() {
           <img src="/logo.png" alt="Ranch Texas" className="h-9 w-auto" />
         </Link>
 
-        <NavLinks grupos={grupos} />
+        <NavLinks grupos={grupos} usuario={{ nombre: s.nombre, rol: s.rol }} />
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex items-center gap-3 md:ml-auto">
           <Link href="/perfil" title="Mi cuenta" className="hidden text-right text-xs leading-tight text-ranch-marron/60 hover:text-ranch-marron sm:block">
             {s.nombre}<br />
             <span className="text-ranch-marron/40">{s.rol}</span>
