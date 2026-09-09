@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verificarPayload } from "@/lib/qr/firma";
 import { fechaBogota } from "@/lib/tiempo";
 import { personasAdelante, posicion, esperaEstimada, textoEspera, estaCerrado, type TurnoEnFila } from "@/lib/fila/calculo";
+import { describirRestricciones } from "@/lib/accesos/restricciones";
 import FilaClient from "./FilaClient";
 
 export const dynamic = "force-dynamic";
@@ -79,8 +80,7 @@ export default async function FilaPage({ params }: { params: Promise<{ payload: 
       id: a.id,
       nombre: a.nombre,
       descripcion: a.descripcion,
-      edad_minima: a.edad_minima,
-      estatura_minima: a.estatura_minima,
+      restricciones: describirRestricciones(a),
       requiere_consentimiento: a.requiere_consentimiento,
       firmado: firmadas.has(a.id),
       personasEnFila,

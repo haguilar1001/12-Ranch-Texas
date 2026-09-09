@@ -8,8 +8,7 @@ export interface AtraccionFila {
   id: string;
   nombre: string;
   descripcion: string | null;
-  edad_minima: number | null;
-  estatura_minima: number | null;
+  restricciones: string | null;
   requiere_consentimiento: boolean;
   firmado: boolean;
   personasEnFila: number;
@@ -139,13 +138,7 @@ export default function FilaClient({
                 <p className="mt-1 text-sm text-ranch-marron/70">
                   {a.personasEnFila === 0 ? "Sin fila" : `${a.personasEnFila} en fila`} · espera {a.esperaSiEntroAhora}
                 </p>
-                {(a.edad_minima || a.estatura_minima) && (
-                  <p className="text-xs text-ranch-marron/45">
-                    {a.edad_minima ? `Desde ${a.edad_minima} años` : ""}
-                    {a.edad_minima && a.estatura_minima ? " · " : ""}
-                    {a.estatura_minima ? `Mínimo ${a.estatura_minima} cm` : ""}
-                  </p>
-                )}
+                {a.restricciones && <p className="text-xs text-ranch-marron/45">{a.restricciones}</p>}
               </div>
               {a.llamando !== null && (
                 <div className="text-right">

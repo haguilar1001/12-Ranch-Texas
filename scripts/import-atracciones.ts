@@ -18,6 +18,7 @@
 import "dotenv/config";
 import * as XLSX from "xlsx";
 import { PrismaClient } from "@prisma/client";
+import { leerRango } from "../lib/accesos/restricciones";
 
 const prisma = new PrismaClient();
 const POR = "import-atracciones";
@@ -38,7 +39,21 @@ const TILDES: Record<string, string> = {
   salon: "Salón",
 };
 
+/**
+ * Nombres que el reglamento escribe distinto del listado general. Sin esto el
+ * importador los tomaría por atracciones nuevas: crearía duplicados y desactivaría
+ * las originales.
+ */
+const NOMBRES: Record<string, string> = {
+  mariokarts: "Mario Karts",
+  playgroun: "Play Ground",
+  motocroos: "Motocross", // errata en el reglamento
+};
+
 function titulo(nombre: string): string {
+  const directo = NOMBRES[nombre.trim().toLowerCase()];
+  if (directo) return directo;
+
   return nombre
     .trim()
     .toLowerCase()
@@ -51,48 +66,100 @@ function titulo(nombre: string): string {
     .join(" ");
 }
 
-/** Clave para emparejar sin importar mayúsculas, tildes ni plural simple. */
+/**
+ * Clave para emparejar sin importar mayúsculas, tildes, espacios ni plural simple.
+ * Los espacios se ignoran porque el mismo parque escribe "Mariokarts" y "Mario Karts".
+ */
 function clave(nombre: string): string {
   return nombre
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/s\b/g, ""); // "areneros" ≡ "arenero"
+    .replace(/[^a-z0-9]+/g, "")
+    .replace(/s$/, ""); // "areneros" ≡ "arenero"
 }
 
 const esSi = (v: unknown): boolean => String(v ?? "").trim().toUpperCase().startsWith("S");
 
 interface FilaExcel {
   nombre: string;
-  restricciones: boolean;
   consentimiento: boolean;
   turno: boolean;
+  estatura_minima: number | null;
+  estatura_maxima: number | null;
+  peso_minimo: number | null;
+  peso_maximo: number | null;
+  edad_minima: number | null;
+  edad_maxima: number | null;
+  /** Lo que el reglamento dice en palabras (acompañamiento de menores). */
+  nota: string | null;
 }
 
-function leerExcel(ruta: string): FilaExcel[] {
+/** Busca una columna por su nombre en el encabezado. -1 si el Excel no la trae. */
+function columna(encabezado: unknown[], ...alias: string[]): number {
+  const norm = (s: unknown) =>
+    String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  return encabezado.findIndex((c) => alias.some((a) => norm(c).includes(norm(a))));
+}
+
+function leerExcel(ruta: string): { filas: FilaExcel[]; conRestricciones: boolean } {
   const wb = XLSX.readFile(ruta);
   const hoja = wb.Sheets[wb.SheetNames[0]];
   const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: "" }) as unknown[][];
+  const enc = filas[0] ?? [];
 
-  return filas
-    .slice(1) // encabezado
-    .filter((f) => String(f[0] ?? "").trim().length > 0)
-    .map((f) => ({
-      nombre: titulo(String(f[0])),
-      restricciones: esSi(f[1]),
-      consentimiento: esSi(f[2]),
-      turno: esSi(f[3]),
-    }));
+  // Las columnas se ubican por NOMBRE, no por posición: el archivo creció de 4 a 8
+  // columnas y puede volver a cambiar de orden.
+  const cAtraccion = Math.max(0, columna(enc, "ATRACCION"));
+  const cConsent = columna(enc, "CONSENTIMIENTO");
+  const cTurno = columna(enc, "TURNO");
+  const cEstatura = columna(enc, "ESTATURA");
+  const cPeso = columna(enc, "PESO");
+  const cEdad = columna(enc, "EDAD");
+
+  const conRestricciones = cEstatura >= 0 || cPeso >= 0 || cEdad >= 0;
+
+  const datos = filas
+    .slice(1)
+    .filter((f) => String(f[cAtraccion] ?? "").trim().length > 0)
+    .map((f) => {
+      const estatura = cEstatura >= 0 ? leerRango(f[cEstatura], "min") : { min: null, max: null, nota: null };
+      // La columna se llama "Peso max kg": un número suelto es tope.
+      const peso = cPeso >= 0 ? leerRango(f[cPeso], "max") : { min: null, max: null, nota: null };
+      const edad = cEdad >= 0 ? leerRango(f[cEdad], "min") : { min: null, max: null, nota: null };
+
+      // Lo que no es un número (el acompañamiento de menores) se conserva como texto
+      // para que el visitante y el operario lo vean, aunque la app no lo verifique.
+      const notas = [estatura.nota, peso.nota, edad.nota].filter(Boolean) as string[];
+
+      return {
+        nombre: titulo(String(f[cAtraccion])),
+        consentimiento: cConsent >= 0 ? esSi(f[cConsent]) : false,
+        turno: cTurno >= 0 ? esSi(f[cTurno]) : false,
+        estatura_minima: estatura.min,
+        estatura_maxima: estatura.max,
+        peso_minimo: peso.min,
+        peso_maximo: peso.max,
+        edad_minima: edad.min,
+        edad_maxima: edad.max,
+        nota: notas.length ? notas.join(" · ") : null,
+      };
+    });
+
+  return { filas: datos, conRestricciones };
 }
 
 async function main() {
   const ruta = process.argv[2] ?? RUTA_POR_DEFECTO;
   console.log(`\n🎡 Importando atracciones desde:\n   ${ruta}\n`);
 
-  const delExcel = leerExcel(ruta);
+  const { filas: delExcel, conRestricciones } = leerExcel(ruta);
   if (delExcel.length === 0) throw new Error("El Excel no tiene atracciones.");
+  console.log(
+    conRestricciones
+      ? "  Formato con restricciones (estatura, peso, edad)\n"
+      : "  Formato básico: sin columnas de estatura, peso ni edad\n",
+  );
 
   const existentes = await prisma.atraccion.findMany();
   const porClave = new Map(existentes.map((a) => [clave(a.nombre), a]));
@@ -111,6 +178,19 @@ async function main() {
       requiere_consentimiento: at.consentimiento,
       fila_activa: at.turno,
       activa: true,
+      // Solo se pisan las restricciones si el Excel trae esas columnas: con el
+      // formato viejo se conserva lo que ya esté cargado en la app.
+      ...(conRestricciones
+        ? {
+            estatura_minima: at.estatura_minima,
+            estatura_maxima: at.estatura_maxima,
+            peso_minimo: at.peso_minimo,
+            peso_maximo: at.peso_maximo,
+            edad_minima: at.edad_minima,
+            edad_maxima: at.edad_maxima,
+            descripcion: at.nota,
+          }
+        : {}),
     };
 
     if (previa) {
@@ -151,17 +231,30 @@ async function main() {
 
   const conConsentimiento = delExcel.filter((a) => a.consentimiento);
   const conTurno = delExcel.filter((a) => a.turno);
-  const conRestriccion = delExcel.filter((a) => a.restricciones);
+  const conRestriccion = delExcel.filter(
+    (a) => a.estatura_minima || a.estatura_maxima || a.peso_minimo || a.peso_maximo || a.edad_minima || a.edad_maxima || a.nota,
+  );
 
   console.log(`\n  ✓ ${delExcel.length} atracciones (${creadas} nuevas, ${actualizadas} actualizadas)`);
   console.log(`  ✓ ${conConsentimiento.length} exigen consentimiento`);
   console.log(`  ✓ ${conTurno.length} con fila virtual`);
   if (sobrantes.length) console.log(`  ✓ ${sobrantes.length} desactivadas por no estar en el listado`);
 
-  console.log(`\n  ⚠ PENDIENTE: ${conRestriccion.length} tienen restricción según reglamento, pero el`);
-  console.log(`    Excel no dice cuál (la hoja "Reglamentos" viene vacía). Falta cargar edad y`);
-  console.log(`    estatura mínimas en /admin/accesos:`);
-  console.log(`    ${conRestriccion.map((a) => a.nombre).join(", ")}`);
+  if (conRestricciones) {
+    console.log(`\n  ✓ ${conRestriccion.length} con restricciones cargadas:`);
+    for (const a of conRestriccion) {
+      const partes = [
+        a.estatura_minima || a.estatura_maxima ? `${a.estatura_minima ?? "?"}–${a.estatura_maxima ?? "?"} cm` : null,
+        a.peso_minimo || a.peso_maximo ? `${a.peso_minimo ?? "?"}–${a.peso_maximo ?? "?"} kg` : null,
+        a.edad_minima || a.edad_maxima ? `${a.edad_minima ?? "?"}–${a.edad_maxima ?? "?"} años` : null,
+        a.nota,
+      ].filter(Boolean);
+      console.log(`      ${a.nombre}: ${partes.join(" · ")}`);
+    }
+  } else {
+    console.log(`\n  ⚠ El Excel no trae columnas de estatura, peso ni edad, así que esas`);
+    console.log(`    restricciones no se cargaron. Se conservan las que ya estén en la app.`);
+  }
 
   console.log(`\n  ⚠ PENDIENTE: las ${conTurno.length} con fila necesitan cuántas personas entran por`);
   console.log(`    tanda y cuántos minutos dura, o el visitante no verá cuánto falta.`);

@@ -416,7 +416,11 @@ model Atraccion {
   nombre                  String
   descripcion             String?
   edad_minima             Int?
+  edad_maxima             Int?
   estatura_minima         Int? // cm
+  estatura_maxima         Int? // cm — hay atracciones con tope: en Motocross no cabe alguien muy alto
+  peso_minimo             Int? // kg
+  peso_maximo             Int? // kg
   requiere_consentimiento Boolean @default(false)
   activa                  Boolean @default(true)
 

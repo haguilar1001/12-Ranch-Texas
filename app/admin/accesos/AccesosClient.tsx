@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { describirRango } from "@/lib/accesos/restricciones";
 import {
   crearAtraccion, editarAtraccion, cambiarEstadoAtraccion,
   crearPunto, editarPunto, cambiarEstadoPunto,
@@ -12,7 +13,11 @@ export interface AtraccionVista {
   nombre: string;
   descripcion: string | null;
   edad_minima: number | null;
+  edad_maxima: number | null;
   estatura_minima: number | null;
+  estatura_maxima: number | null;
+  peso_minimo: number | null;
+  peso_maximo: number | null;
   requiere_consentimiento: boolean;
   fila_activa: boolean;
   cupo_por_tanda: number | null;
@@ -168,8 +173,9 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
               <thead className="bg-ranch-crema/60">
                 <tr>
                   <th className={th}>Atracción</th>
-                  <th className={`${th} text-center`}>Edad mín.</th>
-                  <th className={`${th} text-center`}>Estatura mín.</th>
+                  <th className={`${th} text-center`}>Estatura</th>
+                  <th className={`${th} text-center`}>Peso</th>
+                  <th className={`${th} text-center`}>Edad</th>
                   <th className={`${th} text-center`}>Consentimiento</th>
                   <th className={`${th} text-center`}>Lectores</th>
                   <th className={`${th} text-right`}>Entradas hoy</th>
@@ -194,13 +200,16 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
                       </td>
                       <td className="px-3 py-2 text-center text-ranch-marron/70">
                         {ed ? (
-                          <input className={`${input} w-16 text-center`} inputMode="numeric" value={ed.edad_minima} onChange={(e) => setEdicionAtr({ ...ed, edad_minima: e.target.value })} />
-                        ) : (a.edad_minima != null ? `${a.edad_minima} años` : "—")}
+                          <input className={`${input} w-16 text-center`} inputMode="numeric" placeholder="mín" value={ed.estatura_minima} onChange={(e) => setEdicionAtr({ ...ed, estatura_minima: e.target.value })} />
+                        ) : (describirRango({ min: a.estatura_minima, max: a.estatura_maxima, nota: null }, "cm") ?? "—")}
+                      </td>
+                      <td className="px-3 py-2 text-center text-ranch-marron/70">
+                        {describirRango({ min: a.peso_minimo, max: a.peso_maximo, nota: null }, "kg") ?? "—"}
                       </td>
                       <td className="px-3 py-2 text-center text-ranch-marron/70">
                         {ed ? (
-                          <input className={`${input} w-16 text-center`} inputMode="numeric" value={ed.estatura_minima} onChange={(e) => setEdicionAtr({ ...ed, estatura_minima: e.target.value })} />
-                        ) : (a.estatura_minima != null ? `${a.estatura_minima} cm` : "—")}
+                          <input className={`${input} w-16 text-center`} inputMode="numeric" placeholder="mín" value={ed.edad_minima} onChange={(e) => setEdicionAtr({ ...ed, edad_minima: e.target.value })} />
+                        ) : (describirRango({ min: a.edad_minima, max: a.edad_maxima, nota: null }, "años") ?? "—")}
                       </td>
                       <td className="px-3 py-2 text-center">
                         {ed ? (
@@ -249,7 +258,7 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
                   );
                 })}
                 {atracciones.length === 0 && (
-                  <tr><td colSpan={puedeEditar ? 7 : 6} className="px-3 py-6 text-center text-ranch-marron/50">No hay atracciones. Crea la primera arriba.</td></tr>
+                  <tr><td colSpan={puedeEditar ? 8 : 7} className="px-3 py-6 text-center text-ranch-marron/50">No hay atracciones. Crea la primera arriba.</td></tr>
                 )}
               </tbody>
             </table>
