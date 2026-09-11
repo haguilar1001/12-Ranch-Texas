@@ -115,6 +115,9 @@ interface CambiosTipo {
   edad_min?: number | string | null;
   edad_max?: number | string | null;
   orden?: number;
+  /** Emoji ("🤠") o ruta de imagen ("/logos/campbell.png"); vacío = sin icono. */
+  icono?: string | null;
+  requiere_carnet?: boolean;
 }
 
 export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resultado> {
@@ -157,13 +160,29 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     data.orden = cambios.orden;
   }
 
+  if (cambios.icono !== undefined) {
+    const icono = cambios.icono?.trim() ?? "";
+    if (icono.length > 80) return { ok: false, error: "El icono debe ser un emoji o una ruta corta (máx. 80 caracteres)." };
+    // Solo se admite un emoji o una ruta interna: nada de URLs externas ni HTML.
+    if (icono && icono.startsWith("/") === false && /[<>"'\\]/.test(icono)) {
+      return { ok: false, error: "El icono debe ser un emoji o una ruta que empiece por / (por ejemplo /logos/campbell.png)." };
+    }
+    data.icono = icono || null;
+  }
+
+  if (cambios.requiere_carnet !== undefined) data.requiere_carnet = !!cambios.requiere_carnet;
+
   await prisma.tipoVisitante.update({ where: { id }, data });
   await registrarAuditoria({
     usuario_id: s.id, entidad: "tipo_visitante", entidad_id: id, accion: "editar",
-    datos_antes: { nombre: tipo.nombre, requiere_pago: tipo.requiere_pago, edad_min: tipo.edad_min, edad_max: tipo.edad_max, orden: tipo.orden },
+    datos_antes: {
+      nombre: tipo.nombre, requiere_pago: tipo.requiere_pago, edad_min: tipo.edad_min,
+      edad_max: tipo.edad_max, orden: tipo.orden, icono: tipo.icono, requiere_carnet: tipo.requiere_carnet,
+    },
     datos_despues: JSON.parse(JSON.stringify(cambios)),
   });
   revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
   return { ok: true };
 }
 
@@ -290,6 +309,91 @@ export async function cambiarEstadoMotivo(id: string, activo: boolean): Promise<
 
   await prisma.motivoCortesia.update({ where: { id }, data: { activo, actualizado_por: s.id } });
   await registrarAuditoria({ usuario_id: s.id, entidad: "motivo_cortesia", entidad_id: id, accion: activo ? "activar" : "desactivar" });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}
+
+// ====================================================== AUTORIZADORES DE CORTESÍA
+// Quiénes pueden autorizar una cortesía o un descuento. Es un catálogo aparte de los
+// usuarios de la app: el gerente o el dueño autorizan sin tener que entrar al sistema.
+// Nada se borra: se desactiva, y las ventas viejas conservan a quien firmó.
+
+export async function crearAutorizador(nombre: string, cargo: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador puede gestionar los autorizadores." };
+
+  const limpio = nombre?.trim();
+  if (!limpio) return { ok: false, error: "El nombre del autorizador es obligatorio." };
+
+  const repetido = await prisma.autorizadorCortesia.findFirst({ where: { nombre: { equals: limpio, mode: "insensitive" } } });
+  if (repetido) {
+    return {
+      ok: false,
+      error: repetido.activo
+        ? `"${repetido.nombre}" ya está en el catálogo.`
+        : `"${repetido.nombre}" ya existe pero está inactivo: actívalo en vez de crearlo de nuevo.`,
+    };
+  }
+
+  const a = await prisma.autorizadorCortesia.create({
+    data: { nombre: limpio, cargo: cargo?.trim() || null, creado_por: s.id },
+  });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "autorizador_cortesia", entidad_id: a.id, accion: "crear",
+    datos_despues: { nombre: limpio, cargo: cargo?.trim() || null },
+  });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}
+
+export async function editarAutorizador(id: string, nombre: string, cargo: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador." };
+
+  const limpio = nombre?.trim();
+  if (!limpio) return { ok: false, error: "El nombre no puede quedar vacío." };
+
+  const antes = await prisma.autorizadorCortesia.findUnique({ where: { id } });
+  if (!antes) return { ok: false, error: "Autorizador no encontrado." };
+
+  const repetido = await prisma.autorizadorCortesia.findFirst({
+    where: { nombre: { equals: limpio, mode: "insensitive" }, id: { not: id } },
+  });
+  if (repetido) return { ok: false, error: `Ya existe otro autorizador llamado "${repetido.nombre}".` };
+
+  await prisma.autorizadorCortesia.update({
+    where: { id },
+    data: { nombre: limpio, cargo: cargo?.trim() || null, actualizado_por: s.id },
+  });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "autorizador_cortesia", entidad_id: id, accion: "editar",
+    datos_antes: { nombre: antes.nombre, cargo: antes.cargo },
+    datos_despues: { nombre: limpio, cargo: cargo?.trim() || null },
+  });
+  revalidatePath("/admin/tarifas");
+  revalidatePath("/taquilla");
+  return { ok: true };
+}
+
+export async function cambiarEstadoAutorizador(id: string, activo: boolean): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo un administrador." };
+
+  const a = await prisma.autorizadorCortesia.findUnique({ where: { id } });
+  if (!a) return { ok: false, error: "Autorizador no encontrado." };
+
+  // Sin autorizadores activos, taquilla no puede registrar cortesías ni descuentos.
+  if (!activo) {
+    const activos = await prisma.autorizadorCortesia.count({ where: { activo: true } });
+    if (activos <= 1) return { ok: false, error: "Debe quedar al menos un autorizador activo: taquilla lo necesita para cortesías y descuentos." };
+  }
+
+  await prisma.autorizadorCortesia.update({ where: { id }, data: { activo, actualizado_por: s.id } });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "autorizador_cortesia", entidad_id: id, accion: activo ? "activar" : "desactivar",
+  });
   revalidatePath("/admin/tarifas");
   revalidatePath("/taquilla");
   return { ok: true };

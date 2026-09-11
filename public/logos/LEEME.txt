@@ -1,0 +1,8 @@
+Logos institucionales que salen en las tarjetas de taquilla.
+
+campbell.png  →  logo de la Fundación Campbell (tipo "Funcionario Campbell").
+                 PNG cuadrado con fondo transparente, 128x128 o más.
+
+Si el archivo no está, la tarjeta muestra las iniciales del tipo en vez del logo:
+nunca se ve rota. Para apuntar otro tipo a un logo, edita su icono en
+/admin/tarifas y escribe la ruta (por ejemplo /logos/campbell.png).

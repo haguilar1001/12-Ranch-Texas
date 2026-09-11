@@ -36,7 +36,7 @@ export default async function TaquillaPage() {
     );
   }
 
-  const [tiposRaw, medios, motivos, supervisores] = await Promise.all([
+  const [tiposRaw, medios, motivos, autorizadores] = await Promise.all([
     prisma.tipoVisitante.findMany({
       where: { activo: true },
       orderBy: { orden: "asc" },
@@ -44,9 +44,10 @@ export default async function TaquillaPage() {
     }),
     prisma.medioPago.findMany({ where: { activo: true }, orderBy: { orden: "asc" } }),
     prisma.motivoCortesia.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
-    prisma.usuario.findMany({
-      where: { activo: true, rol: { in: ["supervisor", "administrador"] } },
-      select: { id: true, nombre: true },
+    // Catálogo editable en /admin/tarifas: no todos son usuarios de la app.
+    prisma.autorizadorCortesia.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true, cargo: true },
       orderBy: { nombre: "asc" },
     }),
   ]);
@@ -57,6 +58,8 @@ export default async function TaquillaPage() {
     codigo: t.codigo,
     requiere_pago: t.requiere_pago,
     valor: t.tarifas[0]?.valor ?? 0,
+    icono: t.icono,
+    requiere_carnet: t.requiere_carnet,
   }));
 
   return (
@@ -66,7 +69,7 @@ export default async function TaquillaPage() {
       tipos={tipos}
       medios={medios.map((m) => ({ id: m.id, nombre: m.nombre, es_efectivo: m.es_efectivo }))}
       motivos={motivos.map((m) => ({ id: m.id, nombre: m.nombre }))}
-      supervisores={supervisores}
+      autorizadores={autorizadores}
     />
   );
 }

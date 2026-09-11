@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../db";
-import { calcularTotales, resolverValorCobrado, validarVenta, type LineaVenta } from "./calculo";
+import { calcularTotales, esCortesia, resolverValorCobrado, validarVenta, type LineaVenta } from "./calculo";
 import { firmarUuid } from "../qr/firma";
 import { finDelDiaOperativo, formatearFechaHoraBogota } from "../tiempo";
 import { textoManilla, type DatosManilla } from "../impresion";
@@ -71,6 +71,8 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
           cantidad_asistentes: totales.cantidad_asistentes,
           comprador_nombre: entrada.comprador_nombre?.trim() || null,
           comprador_documento: entrada.comprador_documento?.trim() || null,
+          comprador_celular: entrada.comprador_celular?.trim() || null,
+          comprador_email: entrada.comprador_email?.trim() || null,
           creado_por: ctx.usuarioId,
           pagos: { create: (entrada.pagos ?? []).map((p) => ({ medio_pago_id: p.medio_pago_id, monto: p.monto, creado_por: ctx.usuarioId })) },
         },
@@ -95,6 +97,11 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
           },
         });
 
+        // Los bebés entran en brazos y no llevan manilla: cuentan como asistentes
+        // para el aforo, pero no se les imprime ni se les genera un QR que escanear.
+        const esBebe = info?.codigo === "bebe";
+        if (esBebe) continue;
+
         for (let k = 0; k < l.cantidad; k++) {
           correlativo++;
           const uuid = randomUUID();
@@ -106,7 +113,7 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
               consecutivo: `${numero}-${correlativo}`,
               venta_detalle_id: det.id,
               tipo_visitante_id: l.tipo_visitante_id,
-              es_bebe: info?.codigo === "bebe",
+              es_bebe: false,
               vencimiento,
               creado_por: ctx.usuarioId,
             },
@@ -121,7 +128,7 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
             cajero: ctx.usuarioNombre,
             emitida: formatearFechaHoraBogota(manilla.creado_en),
             valida: formatearFechaHoraBogota(vencimiento),
-            esCortesia: l.tipo_linea !== "pago",
+            esCortesia: esCortesia(l.tipo_linea),
           };
           await tx.impresion.create({
             data: { manilla_id: manilla.id, tipo: "manilla", payload: textoManilla(datos), estado: "pendiente", creado_por: ctx.usuarioId },

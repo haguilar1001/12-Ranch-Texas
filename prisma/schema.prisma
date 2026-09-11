@@ -43,6 +43,7 @@ enum TipoLineaVenta {
   pago
   atencion
   invitacion
+  cortesia
 }
 
 enum TipoMovCaja {
@@ -217,6 +218,13 @@ model TipoVisitante {
   orden         Int     @default(0)
   activo        Boolean @default(true)
 
+  /// Cara del tipo en taquilla: un emoji ("🤠") o la ruta de una imagen ("/logos/campbell.png").
+  icono String?
+
+  /// El visitante debe mostrar carnet para acceder a esta tarifa. En taquilla sale
+  /// un * junto al nombre y el aviso al pie de la rejilla.
+  requiere_carnet Boolean @default(false)
+
   tarifas  Tarifa[]
   detalle  VentaDetalle[]
   manillas Manilla[]
@@ -265,6 +273,27 @@ model MotivoCortesia {
   @@map("motivos_cortesia")
 }
 
+/// Quién puede autorizar una cortesía o un descuento. Es un catálogo aparte de los
+/// usuarios de la app: el gerente o el dueño autorizan sin tener que entrar al sistema.
+/// `VentaDetalle.autorizado_por` guarda el id de aquí (las ventas viejas guardan un
+/// id de usuario, y el reporte resuelve el nombre en las dos tablas).
+model AutorizadorCortesia {
+  id     String  @id @default(uuid())
+  nombre String
+  cargo  String?
+  activo Boolean @default(true)
+
+  /// Si vino de un usuario de la app, para no duplicarlo al sembrar el catálogo.
+  usuario_id String? @unique
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@map("autorizadores_cortesia")
+}
+
 model MedioPago {
   id          String  @id @default(uuid())
   nombre      String
@@ -304,6 +333,8 @@ model Venta {
   // Datos opcionales del comprador (configurable)
   comprador_nombre    String?
   comprador_documento String?
+  comprador_celular   String?
+  comprador_email     String?
 
   turno   TurnoCaja      @relation(fields: [turno_id], references: [id])
   usuario Usuario        @relation(fields: [usuario_id], references: [id])

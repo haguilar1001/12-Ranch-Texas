@@ -6,7 +6,7 @@
 
 import { prisma } from "../db";
 
-export type TipoCortesia = "atencion" | "invitacion" | "descuento";
+export type TipoCortesia = "atencion" | "invitacion" | "cortesia" | "descuento";
 
 export interface LineaCortesia {
   fecha: Date;
@@ -102,7 +102,7 @@ export async function relacionCortesias(
       },
       // Cortesía, o línea de pago con descuento.
       OR: [
-        { tipo_linea: { in: ["atencion", "invitacion"] } },
+        { tipo_linea: { in: ["atencion", "invitacion", "cortesia"] } },
         { AND: [{ tipo_linea: "pago" }, { valor_cobrado: { lt: prisma.ventaDetalle.fields.valor_lista } }] },
       ],
     },
@@ -121,12 +121,16 @@ export async function relacionCortesias(
     orderBy: { creado_en: "desc" },
   });
 
-  // Los "autorizado_por" son ids de usuario; se resuelven a nombre en un solo viaje.
+  // "autorizado_por" guarda hoy un id del catálogo de autorizadores; las ventas
+  // anteriores al catálogo guardan un id de usuario. Se buscan en las dos tablas.
   const idsAutoriza = [...new Set(detalle.map((d) => d.autorizado_por).filter((x): x is string => !!x))];
-  const usuarios = idsAutoriza.length
-    ? await prisma.usuario.findMany({ where: { id: { in: idsAutoriza } }, select: { id: true, nombre: true } })
-    : [];
-  const nombrePorId = new Map(usuarios.map((u) => [u.id, u.nombre]));
+  const [autorizadores, usuarios] = idsAutoriza.length
+    ? await Promise.all([
+        prisma.autorizadorCortesia.findMany({ where: { id: { in: idsAutoriza } }, select: { id: true, nombre: true } }),
+        prisma.usuario.findMany({ where: { id: { in: idsAutoriza } }, select: { id: true, nombre: true } }),
+      ])
+    : [[], []];
+  const nombrePorId = new Map([...usuarios, ...autorizadores].map((u) => [u.id, u.nombre]));
 
   const permitido = filtros?.tipos;
 

@@ -2,7 +2,14 @@
 // Funciones PURAS (sin BD) para poder probarlas y reutilizarlas en cliente y servidor.
 // Regla dura: todo en enteros COP. Los totales del encabezado deben poder recalcularse desde el detalle.
 
-export type TipoLinea = "pago" | "atencion" | "invitacion";
+export type TipoLinea = "pago" | "atencion" | "invitacion" | "cortesia";
+
+/** Los tres tipos que no cobran. Se validan igual: valor 0, motivo y autorización. */
+export const TIPOS_CORTESIA: TipoLinea[] = ["atencion", "invitacion", "cortesia"];
+
+export function esCortesia(tipo: TipoLinea): boolean {
+  return TIPOS_CORTESIA.includes(tipo);
+}
 
 export interface LineaVenta {
   tipo_visitante_id: string;
@@ -79,7 +86,7 @@ export function validarVenta(lineas: LineaVenta[], pagos: Pago[]): ResultadoVali
     if (!esEnteroNoNeg(l.valor_cobrado)) errores.push(`${et}: valor cobrado inválido.`);
     if (l.valor_cobrado > l.valor_lista) errores.push(`${et}: el valor cobrado no puede superar el de lista.`);
 
-    if (l.tipo_linea === "atencion" || l.tipo_linea === "invitacion") {
+    if (esCortesia(l.tipo_linea)) {
       if (l.valor_cobrado !== 0) errores.push(`${et}: una cortesía (${l.tipo_linea}) debe cobrar 0.`);
       if (!l.motivo_cortesia_id) errores.push(`${et}: la cortesía requiere motivo.`);
       if (!l.autorizado_por) errores.push(`${et}: la cortesía requiere autorización.`);

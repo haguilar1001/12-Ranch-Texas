@@ -25,7 +25,9 @@
     "verificar:f12": "tsx scripts/verificar-f12.ts",
     "verificar:f13": "tsx scripts/verificar-f13.ts",
     "import:atracciones": "tsx scripts/import-atracciones.ts",
-    "import:personal": "tsx scripts/import-personal.ts"
+    "import:personal": "tsx scripts/import-personal.ts",
+    "iconos:tipos": "tsx scripts/iconos-tipos-visitante.ts",
+    "limpiar:taquilla": "tsx scripts/limpiar-taquilla.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"

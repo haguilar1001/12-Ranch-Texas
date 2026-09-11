@@ -12,11 +12,13 @@ const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "
 const ETIQUETA: Record<TipoCortesia, string> = {
   atencion: "Atención",
   invitacion: "Invitación",
+  cortesia: "Cortesía",
   descuento: "Descuento",
 };
 const COLOR: Record<TipoCortesia, string> = {
   atencion: "bg-ranch-dorado/25 text-ranch-marron",
   invitacion: "bg-ranch-verde/15 text-ranch-verde",
+  cortesia: "bg-ranch-marron/15 text-ranch-marron",
   descuento: "bg-amber-100 text-amber-700",
 };
 

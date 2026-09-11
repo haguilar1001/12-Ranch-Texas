@@ -24,6 +24,8 @@ export interface EntradaVenta {
   pagos: EntradaPago[];
   comprador_nombre?: string;
   comprador_documento?: string;
+  comprador_celular?: string;
+  comprador_email?: string;
 }
 
 export type ResultadoVenta =

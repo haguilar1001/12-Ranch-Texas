@@ -2,7 +2,7 @@ import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias } from "@/lib/reportes/cortesias";
 import { formatearFechaHoraCortaBogota } from "@/lib/tiempo";
 
-const ETIQUETA: Record<string, string> = { atencion: "Atencion", invitacion: "Invitacion", descuento: "Descuento" };
+const ETIQUETA: Record<string, string> = { atencion: "Atencion", invitacion: "Invitacion", cortesia: "Cortesia", descuento: "Descuento" };
 
 export async function GET(req: Request) {
   const s = await obtenerSesion();

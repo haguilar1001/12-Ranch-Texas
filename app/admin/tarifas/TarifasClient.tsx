@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import IconoTipo from "@/components/IconoTipo";
 import { formatearCOP } from "@/lib/dinero/cop";
 import {
   crearTipo, editarTipo, cambiarEstadoTipo, cambiarTarifa,
   crearMotivo, editarMotivo, cambiarEstadoMotivo,
+  crearAutorizador, editarAutorizador, cambiarEstadoAutorizador,
 } from "./actions";
 
 interface HistLinea { valor: number; desde: string; hasta: string | null; motivo: string }
@@ -18,9 +20,20 @@ interface Tipo {
   edad_max: number | null;
   orden: number;
   activo: boolean;
+  icono: string | null;
+  requiere_carnet: boolean;
   valorVigente: number;
   vigenteDesde: string;
   historial: HistLinea[];
+}
+
+export interface Autorizador {
+  id: string;
+  nombre: string;
+  cargo: string | null;
+  activo: boolean;
+  /** Vino de un usuario de la app al sembrar el catálogo. */
+  esUsuario: boolean;
 }
 
 const rangoEdad = (min: number | null, max: number | null) => {
@@ -38,13 +51,17 @@ export interface Motivo {
   usos: number;
 }
 
-export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motivos: Motivo[] }) {
+export default function TarifasClient({
+  tipos, motivos, autorizadores,
+}: {
+  tipos: Tipo[]; motivos: Motivo[]; autorizadores: Autorizador[];
+}) {
   const router = useRouter();
   const [nuevo, setNuevo] = useState({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [edicion, setEdicion] = useState<
-    { id: string; nombre: string; edad_min: string; edad_max: string; orden: string } | null
+    { id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string; requiere_carnet: boolean } | null
   >(null);
 
   function abrirEdicion(t: Tipo) {
@@ -54,6 +71,8 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
       edad_min: t.edad_min === null ? "" : String(t.edad_min),
       edad_max: t.edad_max === null ? "" : String(t.edad_max),
       orden: String(t.orden),
+      icono: t.icono ?? "",
+      requiere_carnet: t.requiere_carnet,
     });
   }
 
@@ -65,6 +84,8 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
       edad_min: edicion.edad_min === "" ? null : edicion.edad_min,
       edad_max: edicion.edad_max === "" ? null : edicion.edad_max,
       orden: parseInt(edicion.orden, 10) || 0,
+      icono: edicion.icono,
+      requiere_carnet: edicion.requiere_carnet,
     });
     setBusy(false);
     aviso(r, "Tipo actualizado.");
@@ -74,6 +95,8 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
   const [nuevoMotivo, setNuevoMotivo] = useState("");
   const [editMotivo, setEditMotivo] = useState<{ id: string; v: string } | null>(null);
+  const [nuevoAutorizador, setNuevoAutorizador] = useState({ nombre: "", cargo: "" });
+  const [editAutorizador, setEditAutorizador] = useState<{ id: string; nombre: string; cargo: string } | null>(null);
   const [verHist, setVerHist] = useState<string | null>(null);
 
   const aviso = (r: { ok: boolean; error?: string }, exito: string) => {
@@ -145,12 +168,31 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
                   <td className="py-2">
                     {edicion?.id === t.id ? (
                       <span className="flex flex-col gap-1">
+                        <span className="flex items-center gap-1">
+                          <IconoTipo icono={edicion.icono || null} nombre={edicion.nombre} className="!h-9 !w-9" />
+                          <input
+                            value={edicion.nombre}
+                            onChange={(e) => setEdicion({ ...edicion, nombre: e.target.value })}
+                            placeholder="Nombre"
+                            className="w-36 rounded border px-1 py-0.5"
+                          />
+                        </span>
                         <input
-                          value={edicion.nombre}
-                          onChange={(e) => setEdicion({ ...edicion, nombre: e.target.value })}
-                          placeholder="Nombre"
-                          className="w-36 rounded border px-1 py-0.5"
+                          value={edicion.icono}
+                          onChange={(e) => setEdicion({ ...edicion, icono: e.target.value })}
+                          placeholder="Icono: 🤠 o /logos/campbell.png"
+                          title="Un emoji, o la ruta de un logo dentro de /public"
+                          className="w-52 rounded border px-1 py-0.5 text-xs"
                         />
+                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
+                          <input
+                            type="checkbox"
+                            checked={edicion.requiere_carnet}
+                            onChange={(e) => setEdicion({ ...edicion, requiere_carnet: e.target.checked })}
+                            className="h-3.5 w-3.5"
+                          />
+                          Debe presentar carnet
+                        </label>
                         <span className="flex items-center gap-1 text-[10px] text-ranch-marron/50">
                           orden
                           <input
@@ -163,9 +205,17 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
                         </span>
                       </span>
                     ) : (
-                      <span>
-                        <strong className="text-ranch-marron">{t.nombre}</strong>
-                        <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
+                      <span className="flex items-center gap-2">
+                        <IconoTipo icono={t.icono} nombre={t.nombre} className="!h-9 !w-9" />
+                        <span>
+                          <strong className="text-ranch-marron">{t.nombre}</strong>
+                          {t.requiere_carnet && (
+                            <span title="Debe presentar carnet" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
+                              * carnet
+                            </span>
+                          )}
+                          <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
+                        </span>
                       </span>
                     )}
                   </td>
@@ -372,9 +422,125 @@ export default function TarifasClient({ tipos, motivos }: { tipos: Tipo[]; motiv
         </table>
       </section>
 
+      {/* Autorizadores — alimentan el selector "Autoriza…" de cortesías y descuentos. */}
+      <section className="mt-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
+        <h2 className="mb-1 font-bold text-ranch-marron">Autorizados para dar cortesías</h2>
+        <p className="mb-3 text-xs text-ranch-marron/55">
+          Quienes pueden aprobar una cortesía o un descuento. No tienen que ser usuarios de la app: el
+          cajero elige aquí quién autorizó, y ese nombre queda en la relación de lo no cobrado.
+        </p>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input
+            value={nuevoAutorizador.nombre}
+            onChange={(e) => setNuevoAutorizador({ ...nuevoAutorizador, nombre: e.target.value })}
+            placeholder="Nombre y apellido"
+            className="flex-1 rounded-lg border border-ranch-marron/30 px-3 py-2 text-sm"
+          />
+          <input
+            value={nuevoAutorizador.cargo}
+            onChange={(e) => setNuevoAutorizador({ ...nuevoAutorizador, cargo: e.target.value })}
+            placeholder="Cargo (opcional)"
+            className="flex-1 rounded-lg border border-ranch-marron/30 px-3 py-2 text-sm"
+          />
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              const r = await crearAutorizador(nuevoAutorizador.nombre, nuevoAutorizador.cargo);
+              setBusy(false);
+              if (r.ok) setNuevoAutorizador({ nombre: "", cargo: "" });
+              aviso(r, "Autorizador agregado.");
+            }}
+            className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema disabled:opacity-50"
+          >
+            Agregar
+          </button>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase text-ranch-marron/50">
+              <th className="py-1">Persona</th>
+              <th className="py-1">Cargo</th>
+              <th className="py-1 text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {autorizadores.map((a) => (
+              <tr key={a.id} className={`border-t border-ranch-marron/10 ${a.activo ? "" : "opacity-50"}`}>
+                <td className="py-2">
+                  {editAutorizador?.id === a.id ? (
+                    <input
+                      value={editAutorizador.nombre}
+                      onChange={(e) => setEditAutorizador({ ...editAutorizador, nombre: e.target.value })}
+                      className="w-48 rounded border border-ranch-marron/30 px-2 py-1"
+                    />
+                  ) : (
+                    <span className="font-semibold text-ranch-marron">
+                      {a.nombre}
+                      {a.esUsuario && (
+                        <span title="También es usuario de la app" className="ml-1 text-[10px] font-normal text-ranch-marron/40">· usuario</span>
+                      )}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 text-xs text-ranch-marron/60">
+                  {editAutorizador?.id === a.id ? (
+                    <input
+                      value={editAutorizador.cargo}
+                      onChange={(e) => setEditAutorizador({ ...editAutorizador, cargo: e.target.value })}
+                      placeholder="Cargo"
+                      className="w-40 rounded border border-ranch-marron/30 px-2 py-1"
+                    />
+                  ) : (
+                    a.cargo || "—"
+                  )}
+                </td>
+                <td className="py-2">
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {editAutorizador?.id === a.id ? (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            const r = await editarAutorizador(a.id, editAutorizador.nombre, editAutorizador.cargo);
+                            setBusy(false);
+                            aviso(r, "Autorizador actualizado.");
+                            if (r.ok) setEditAutorizador(null);
+                          }}
+                          className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50"
+                        >Guardar</button>
+                        <button onClick={() => setEditAutorizador(null)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs text-ranch-marron">Cancelar</button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setEditAutorizador({ id: a.id, nombre: a.nombre, cargo: a.cargo ?? "" })}
+                          className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60"
+                        >✏️ Editar</button>
+                        <button
+                          disabled={busy}
+                          onClick={async () => aviso(await cambiarEstadoAutorizador(a.id, !a.activo), a.activo ? "Autorizador desactivado." : "Autorizador activado.")}
+                          className={`rounded px-2 py-0.5 text-xs font-semibold ${a.activo ? "bg-ranch-verde/15 text-ranch-verde" : "bg-red-100 text-red-700"}`}
+                        >{a.activo ? "Activo" : "Inactivo"}</button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {autorizadores.length === 0 && (
+              <tr><td colSpan={3} className="py-4 text-center text-ranch-marron/50">No hay autorizadores. Agrega el primero arriba.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
       <p className="mt-4 text-xs text-ranch-marron/50">
-        Nota: nada se borra. Para retirar un tipo o un motivo, desactívalo (deja de aparecer en taquilla
-        pero conserva su historial).
+        Nota: nada se borra. Para retirar un tipo, un motivo o un autorizador, desactívalo (deja de
+        aparecer en taquilla pero conserva su historial).
       </p>
     </main>
   );
