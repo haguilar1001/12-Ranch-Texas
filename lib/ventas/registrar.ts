@@ -9,12 +9,25 @@ import type { ContextoVenta, EntradaVenta, ResultadoVenta } from "./tipos";
 const PARQUE = "Ranch Texas";
 
 /**
+ * Corrección: la venta nueva reemplaza a `ventaId`, que queda anulada junto con sus
+ * manillas dentro de la MISMA transacción. O quedan las dos caras, o no queda ninguna.
+ */
+export interface CorreccionVenta {
+  ventaId: string;
+  motivo: string;
+}
+
+/**
  * Núcleo de registro de una venta de taquilla. PURO respecto de la sesión/HTTP: recibe el
  * contexto (cajero + turno) ya resuelto. Recalcula precios desde la tarifa vigente, valida,
  * y crea en una transacción: encabezado + detalle + una manilla por asistente + cola de impresión.
  * Testeable directamente contra la BD.
  */
-export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Promise<ResultadoVenta> {
+export async function crearVenta(
+  ctx: ContextoVenta,
+  entrada: EntradaVenta,
+  correccion?: CorreccionVenta,
+): Promise<ResultadoVenta> {
   if (!entrada.lineas?.length) return { ok: false, error: "La venta no tiene líneas." };
 
   const ids = [...new Set(entrada.lineas.map((l) => l.tipo_visitante_id))];
@@ -57,12 +70,36 @@ export async function crearVenta(ctx: ContextoVenta, entrada: EntradaVenta): Pro
 
   try {
     const res = await prisma.$transaction(async (tx) => {
+      // Corrección: primero se cae la original (con sus manillas) y después nace la nueva.
+      if (correccion) {
+        const ahora = new Date();
+        await tx.venta.update({
+          where: { id: correccion.ventaId },
+          data: {
+            estado: "anulada",
+            motivo_anulacion: correccion.motivo,
+            anulada_por: ctx.usuarioId,
+            anulada_en: ahora,
+            actualizado_por: ctx.usuarioId,
+          },
+        });
+        await tx.manilla.updateMany({
+          where: { venta_detalle: { venta_id: correccion.ventaId }, estado: { not: "anulada" } },
+          data: { estado: "anulada", anulada_en: ahora, anulada_por: ctx.usuarioId, motivo_anulacion: correccion.motivo },
+        });
+        // Las manillas anuladas no se imprimen: se sacan de la cola si seguían pendientes.
+        await tx.impresion.deleteMany({
+          where: { manilla: { venta_detalle: { venta_id: correccion.ventaId } }, estado: "pendiente" },
+        });
+      }
+
       const agg = await tx.venta.aggregate({ where: { turno_id: ctx.turnoId }, _max: { numero_venta: true } });
       const numero = (agg._max.numero_venta ?? 0) + 1;
 
       const venta = await tx.venta.create({
         data: {
           turno_id: ctx.turnoId,
+          corrige_venta_id: correccion?.ventaId ?? null,
           usuario_id: ctx.usuarioId,
           numero_venta: numero,
           total_lista: totales.total_lista,

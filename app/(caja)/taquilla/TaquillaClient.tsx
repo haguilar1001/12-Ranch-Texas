@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { registrarVenta } from "./actions";
+import { useRouter } from "next/navigation";
+import { registrarVenta, corregirVenta } from "./actions";
 import IconoTipo from "@/components/IconoTipo";
 import type { EntradaVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
@@ -34,19 +35,77 @@ interface FilaPago { key: number; medio_pago_id: string; monto: string }
 /** Descuento aplicado a un tipo de visitante: cuánto se cobra por unidad, con motivo y quién autoriza. */
 interface Descuento { valor: string; motivo: string; autoriza: string }
 
+/** Venta que se está corrigiendo: llega con sus líneas, pagos y comprador ya cargados. */
+export interface VentaACorregir {
+  id: string;
+  numero: number;
+  cajeroOriginal: string;
+  lineas: {
+    tipo_visitante_id: string;
+    cantidad: number;
+    tipo_linea: "pago" | "atencion" | "invitacion" | "cortesia";
+    valor_lista: number;
+    valor_cobrado: number;
+    motivo_cortesia_id: string | null;
+    motivo_descuento: string | null;
+    autorizado_por: string | null;
+  }[];
+  pagos: { medio_pago_id: string; monto: number }[];
+  comprador: { nombre: string; documento: string; celular: string; email: string };
+}
+
 export default function TaquillaClient({
-  cajero, caja, tipos, medios, motivos, autorizadores,
+  cajero, caja, tipos, medios, motivos, autorizadores, correccion,
 }: {
-  cajero: string; caja: string; tipos: Tipo[]; medios: Medio[]; motivos: Motivo[]; autorizadores: Autorizador[];
+  cajero: string; caja: string; tipos: Tipo[]; medios: Medio[]; motivos: Motivo[];
+  autorizadores: Autorizador[]; correccion?: VentaACorregir | null;
 }) {
-  const [cant, setCant] = useState<Record<string, number>>({});
-  const [descuentos, setDescuentos] = useState<Record<string, Descuento>>({});
-  const [comprador, setComprador] = useState({ nombre: "", documento: "", celular: "", email: "" });
-  const [cortesias, setCortesias] = useState<Cortesia[]>([]);
-  const [pagos, setPagos] = useState<FilaPago[]>([{ key: 1, medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+  const [cant, setCant] = useState<Record<string, number>>(() => {
+    const inicial: Record<string, number> = {};
+    for (const l of correccion?.lineas ?? []) {
+      if (l.tipo_linea === "pago") inicial[l.tipo_visitante_id] = (inicial[l.tipo_visitante_id] ?? 0) + l.cantidad;
+    }
+    return inicial;
+  });
+  const [descuentos, setDescuentos] = useState<Record<string, Descuento>>(() => {
+    const inicial: Record<string, Descuento> = {};
+    for (const l of correccion?.lineas ?? []) {
+      if (l.tipo_linea !== "pago" || l.valor_cobrado >= l.valor_lista) continue;
+      inicial[l.tipo_visitante_id] = {
+        valor: String(l.valor_cobrado),
+        motivo: l.motivo_descuento ?? "",
+        autoriza: l.autorizado_por ?? "",
+      };
+    }
+    return inicial;
+  });
+  const [comprador, setComprador] = useState(
+    correccion?.comprador ?? { nombre: "", documento: "", celular: "", email: "" },
+  );
+  const [cortesias, setCortesias] = useState<Cortesia[]>(() =>
+    (correccion?.lineas ?? [])
+      .filter((l) => l.tipo_linea !== "pago")
+      .map((l, i) => ({
+        key: -(i + 1),
+        tipo_visitante_id: l.tipo_visitante_id,
+        cantidad: l.cantidad,
+        tipo_linea: l.tipo_linea as Cortesia["tipo_linea"],
+        motivo_cortesia_id: l.motivo_cortesia_id ?? "",
+        autorizado_por: l.autorizado_por ?? "",
+      })),
+  );
+  const [motivoCorreccion, setMotivoCorreccion] = useState("");
+  const [pagos, setPagos] = useState<FilaPago[]>(() =>
+    correccion?.pagos.length
+      ? correccion.pagos.map((p, i) => ({ key: -(i + 1), medio_pago_id: p.medio_pago_id, monto: String(p.monto) }))
+      : [{ key: 1, medio_pago_id: medios[0]?.id ?? "", monto: "" }],
+  );
+  /** Con cuánto paga el cliente en efectivo. Solo sirve para calcular el vuelto. */
+  const [recibido, setRecibido] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ultimaVenta, setUltimaVenta] = useState<{ id: string; numero: number } | null>(null);
+  const router = useRouter();
   const keyRef = useRef(2);
   const nextKey = () => keyRef.current++;
 
@@ -86,6 +145,14 @@ export default function TaquillaClient({
   );
   const totalPagado = pagosLimpios.reduce((a, p) => a + p.monto, 0);
   const faltante = totales.total_cobrado - totalPagado;
+
+  // Vuelto: cuenta aparte, solo para el cajero. Lo que se registra como pago es lo que
+  // QUEDA en la caja; el billete con el que paga el cliente y la devuelta no se guardan,
+  // porque si no el arqueo físico dejaría de cuadrar contra el sistema.
+  const efectivoIds = useMemo(() => new Set(medios.filter((m) => m.es_efectivo).map((m) => m.id)), [medios]);
+  const totalEfectivo = pagosLimpios.filter((p) => efectivoIds.has(p.medio_pago_id)).reduce((a, p) => a + p.monto, 0);
+  const recibidoNum = parseCOP(recibido);
+  const vuelto = recibidoNum - totalEfectivo;
 
   const validacion = useMemo(() => validarVenta(lineas, pagosLimpios), [lineas, pagosLimpios]);
   const puedeVender = lineas.length > 0 && validacion.ok && !enviando;
@@ -131,6 +198,7 @@ export default function TaquillaClient({
   function limpiar() {
     setCant({}); setCortesias([]); setDescuentos({}); setComprador({ nombre: "", documento: "", celular: "", email: "" });
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+    setRecibido("");
   }
 
   function alternarDescuento(tipoId: string, valorLista: number) {
@@ -169,15 +237,25 @@ export default function TaquillaClient({
       .filter((l) => tipoPorId.get(l.tipo_visitante_id)?.codigo === "bebe")
       .reduce((a, l) => a + l.cantidad, 0);
     const manillas = asistentes - bebes;
-    const r = await registrarVenta(entrada);
+    const r = correccion
+      ? await corregirVenta(correccion.id, entrada, motivoCorreccion)
+      : await registrarVenta(entrada);
     setEnviando(false);
     if (r.ok) {
       const detalle = bebes > 0
         ? `${asistentes} asistentes · ${manillas} manillas (${bebes} bebé${bebes > 1 ? "s" : ""} sin manilla)`
         : `${manillas} manillas`;
-      setResultado({ ok: true, texto: `Venta #${r.numero_venta} registrada · ${detalle}.` });
+      setResultado({
+        ok: true,
+        texto: correccion
+          ? `Venta #${correccion.numero} corregida: queda anulada y la reemplaza la #${r.numero_venta} · ${detalle}.`
+          : `Venta #${r.numero_venta} registrada · ${detalle}.`,
+      });
       setUltimaVenta({ id: r.venta_id, numero: r.numero_venta });
       limpiar();
+      // Corrigiendo ya no hay nada que hacer en esta URL (la venta original quedó
+      // anulada): se pasa a la venta nueva, que es la que hay que imprimir.
+      if (correccion) router.replace(`/imprimir/venta/${r.venta_id}`);
     } else {
       setResultado({ ok: false, texto: r.error });
       setUltimaVenta(null);
@@ -189,11 +267,31 @@ export default function TaquillaClient({
   return (
     <main className="mx-auto max-w-7xl p-4">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-black text-ranch-marron">Taquilla</h1>
+        <h1 className="text-2xl font-black text-ranch-marron">
+          {correccion ? `Corregir venta #${correccion.numero}` : "Taquilla"}
+        </h1>
         <p className="rounded-full bg-white px-3 py-1 text-sm text-ranch-marron/70 ring-1 ring-ranch-marron/10">
           🏛️ {caja} · 👤 {cajero}
         </p>
       </header>
+
+      {correccion && (
+        <div className="mb-4 rounded-2xl border-2 border-ranch-dorado bg-ranch-dorado/10 p-3">
+          <p className="text-sm font-semibold text-ranch-marron">
+            ✏️ Estás corrigiendo la venta #{correccion.numero} de {correccion.cajeroOriginal}.
+          </p>
+          <p className="mb-2 text-xs text-ranch-marron/70">
+            Al guardar, esa venta y sus manillas quedan anuladas y nacen unas nuevas con lo que dejes
+            aquí. Las manillas que ya se imprimieron hay que recogerlas.
+          </p>
+          <input
+            value={motivoCorreccion}
+            onChange={(e) => setMotivoCorreccion(e.target.value)}
+            placeholder="Motivo de la corrección (obligatorio)"
+            className="w-full rounded-lg border border-ranch-marron/30 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         {/* Panel izquierdo: comprador + tipos + cortesías */}
@@ -243,10 +341,16 @@ export default function TaquillaClient({
               return (
                 <div
                   key={t.id}
-                  className={`relative flex flex-col rounded-2xl border-2 bg-white p-3 shadow-sm transition ${
+                  className={`relative flex flex-col rounded-2xl border-2 p-3 shadow-sm transition ${
+                    // Fondo según el tipo de cliente: particular en blanco, convenio con
+                    // carnet en azul. El borde dorado solo marca lo que ya se escogió.
+                    t.requiere_carnet ? "bg-sky-50" : "bg-white"
+                  } ${
                     c > 0
                       ? "border-ranch-dorado ring-2 ring-ranch-dorado/20"
-                      : "border-ranch-marron/15 hover:border-ranch-marron/30 hover:shadow"
+                      : t.requiere_carnet
+                        ? "border-sky-200 hover:border-sky-300 hover:shadow"
+                        : "border-ranch-marron/15 hover:border-ranch-marron/30 hover:shadow"
                   }`}
                 >
                   {c > 0 && (
@@ -337,12 +441,20 @@ export default function TaquillaClient({
             })}
           </div>
 
-          {/* La marca * de las tarjetas se explica aquí, a la vista del cajero. */}
+          {/* Qué significa cada color de tarjeta, a la vista del cajero. */}
           {exigenCarnet && (
-            <p className="flex items-center gap-2 rounded-xl bg-ranch-dorado/10 px-3 py-2 text-sm font-semibold text-ranch-marron">
-              <span className="text-base font-black text-ranch-dorado">*</span>
-              Debe presentar carnet
-            </p>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-ranch-marron/10 bg-white/70 px-3 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-6 shrink-0 rounded border-2 border-ranch-marron/20 bg-white" />
+                <span className="text-ranch-marron/75">Cliente particular</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-6 shrink-0 rounded border-2 border-sky-200 bg-sky-50" />
+                <span className="font-semibold text-ranch-marron">
+                  <span className="text-ranch-dorado">*</span> Debe presentar carnet
+                </span>
+              </span>
+            </div>
           )}
 
           {/* Cortesías */}
@@ -422,6 +534,55 @@ export default function TaquillaClient({
               <span>Pagado {formatearCOP(totalPagado)}</span>
               <span>{faltante > 0 ? `Falta ${formatearCOP(faltante)}` : faltante < 0 ? `Sobra ${formatearCOP(-faltante)}` : "Cuadra ✓"}</span>
             </div>
+
+            {/* Vuelto: cuenta de ayuda para el cajero, no toca la venta ni el cuadre. */}
+            {totalEfectivo > 0 && (
+              <div className="mt-3 border-t border-ranch-marron/10 pt-3">
+                <label className="mb-1 block text-xs font-semibold text-ranch-marron/70">
+                  ¿Con cuánto paga en efectivo?
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    value={recibido ? formatearMiles(recibidoNum) : ""}
+                    onChange={(e) => setRecibido(e.target.value)}
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-right text-sm focus:border-ranch-dorado focus:outline-none"
+                  />
+                  {recibido && (
+                    <button onClick={() => setRecibido("")} className="px-1 text-ranch-marron/50 hover:text-red-600" aria-label="Borrar">✕</button>
+                  )}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {[20000, 50000, 100000, 200000].map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setRecibido(String(b))}
+                      className="rounded bg-ranch-marron/10 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-marron/20"
+                    >
+                      {formatearMiles(b)}
+                    </button>
+                  ))}
+                </div>
+
+                {recibidoNum > 0 && (
+                  vuelto >= 0 ? (
+                    <div className="mt-2 flex items-center justify-between rounded-lg bg-ranch-verde/10 px-3 py-2">
+                      <span className="text-sm font-semibold text-ranch-marron">Vuelto a entregar</span>
+                      <span className="text-2xl font-black text-ranch-verde">{formatearCOP(vuelto)}</span>
+                    </div>
+                  ) : (
+                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Con {formatearCOP(recibidoNum)} no alcanza: faltan {formatearCOP(-vuelto)} del efectivo.
+                    </p>
+                  )
+                )}
+
+                <p className="mt-1 text-[11px] text-ranch-marron/50">
+                  El vuelto no entra a la caja: el pago registrado sigue siendo {formatearCOP(totalEfectivo)}.
+                </p>
+              </div>
+            )}
           </div>
 
           {resultado && (
@@ -444,9 +605,17 @@ export default function TaquillaClient({
             disabled={!puedeVender}
             className="w-full rounded-xl bg-ranch-marron px-4 py-4 text-lg font-bold text-ranch-crema hover:bg-ranch-marron-oscuro disabled:opacity-40"
           >
-            {enviando ? "Registrando…" : "Registrar venta"}
+            {enviando
+              ? correccion ? "Corrigiendo…" : "Registrando…"
+              : correccion ? "Guardar corrección" : "Registrar venta"}
           </button>
-          <button onClick={limpiar} className="w-full rounded-lg border border-ranch-marron/20 px-4 py-2 text-sm text-ranch-marron/70 hover:bg-white">Limpiar</button>
+          {correccion ? (
+            <a href="/caja/ventas" className="block w-full rounded-lg border border-ranch-marron/20 px-4 py-2 text-center text-sm text-ranch-marron/70 hover:bg-white">
+              Cancelar y volver a las ventas
+            </a>
+          ) : (
+            <button onClick={limpiar} className="w-full rounded-lg border border-ranch-marron/20 px-4 py-2 text-sm text-ranch-marron/70 hover:bg-white">Limpiar</button>
+          )}
         </aside>
       </div>
     </main>

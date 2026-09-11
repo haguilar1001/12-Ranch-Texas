@@ -83,6 +83,13 @@ export default function ImprimirAcciones({
               Anular venta
             </button>
           </div>
+          {/* Corregir es anular + rehacer: se hace en taquilla con la venta ya cargada. */}
+          <a
+            href={`/taquilla?corrige=${ventaId}`}
+            className="mt-2 inline-block rounded border border-ranch-marron/25 px-3 py-1 text-sm font-semibold text-ranch-marron hover:bg-ranch-crema/60"
+          >
+            ✏️ Corregir venta
+          </a>
         </div>
       )}
 

@@ -336,10 +336,16 @@ model Venta {
   comprador_celular   String?
   comprador_email     String?
 
-  turno   TurnoCaja      @relation(fields: [turno_id], references: [id])
-  usuario Usuario        @relation(fields: [usuario_id], references: [id])
-  detalle VentaDetalle[]
-  pagos   VentaPago[]
+  /// Si esta venta corrige a otra: la original queda anulada y esta la reemplaza.
+  /// Nada se edita en sitio — así el cuadre y la auditoría conservan las dos caras.
+  corrige_venta_id String? @unique
+
+  turno      TurnoCaja      @relation(fields: [turno_id], references: [id])
+  usuario    Usuario        @relation(fields: [usuario_id], references: [id])
+  corrige    Venta?         @relation("CorreccionVenta", fields: [corrige_venta_id], references: [id])
+  correccion Venta?         @relation("CorreccionVenta")
+  detalle    VentaDetalle[]
+  pagos      VentaPago[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
