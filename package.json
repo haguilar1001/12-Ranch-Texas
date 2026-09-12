@@ -27,7 +27,8 @@
     "import:atracciones": "tsx scripts/import-atracciones.ts",
     "import:personal": "tsx scripts/import-personal.ts",
     "iconos:tipos": "tsx scripts/iconos-tipos-visitante.ts",
-    "limpiar:taquilla": "tsx scripts/limpiar-taquilla.ts"
+    "limpiar:taquilla": "tsx scripts/limpiar-taquilla.ts",
+    "demo:cierre": "tsx scripts/demo-cierre.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
