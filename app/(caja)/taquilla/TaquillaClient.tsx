@@ -55,10 +55,12 @@ export interface VentaACorregir {
 }
 
 export default function TaquillaClient({
-  cajero, caja, tipos, medios, motivos, autorizadores, correccion,
+  cajero, caja, tipos, medios, motivos, autorizadores, correccion, puedeCorregir = false,
 }: {
   cajero: string; caja: string; tipos: Tipo[]; medios: Medio[]; motivos: Motivo[];
   autorizadores: Autorizador[]; correccion?: VentaACorregir | null;
+  /** Solo supervisor y administrador ven el atajo para arreglar una venta ya hecha. */
+  puedeCorregir?: boolean;
 }) {
   const [cant, setCant] = useState<Record<string, number>>(() => {
     const inicial: Record<string, number> = {};
@@ -299,9 +301,20 @@ export default function TaquillaClient({
         <h1 className="text-2xl font-black text-ranch-marron">
           {correccion ? `Corregir venta #${correccion.numero}` : "Taquilla"}
         </h1>
-        <p className="rounded-full bg-white px-3 py-1 text-sm text-ranch-marron/70 ring-1 ring-ranch-marron/10">
-          🏛️ {caja} · 👤 {cajero}
-        </p>
+        <div className="flex items-center gap-2">
+          {/* Atajo para arreglar una venta ya hecha, sin salir a buscarla en el menú. */}
+          {puedeCorregir && !correccion && (
+            <a
+              href="/caja/ventas"
+              className="rounded-full border-2 border-ranch-dorado px-3 py-1 text-sm font-semibold text-ranch-marron hover:bg-ranch-dorado/10"
+            >
+              ✏️ Corregir una venta
+            </a>
+          )}
+          <p className="rounded-full bg-white px-3 py-1 text-sm text-ranch-marron/70 ring-1 ring-ranch-marron/10">
+            🏛️ {caja} · 👤 {cajero}
+          </p>
+        </div>
       </header>
 
       {correccion && (

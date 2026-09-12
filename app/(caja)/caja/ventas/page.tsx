@@ -48,7 +48,7 @@ export default async function VentasDelTurnoPage({
   if (!turno) {
     return (
       <main className="mx-auto max-w-3xl p-4">
-        <h1 className="mb-2 text-2xl font-black text-ranch-marron">Ventas del turno</h1>
+        <h1 className="mb-2 text-2xl font-black text-ranch-marron">Ventas del turno — corregir y reimprimir</h1>
         {turnosAbiertos.length > 0 ? (
           <>
             <p className="mb-3 text-sm text-ranch-marron/70">No tienes turno propio abierto. Turnos abiertos ahora:</p>
@@ -94,7 +94,7 @@ export default async function VentasDelTurnoPage({
   return (
     <main className="mx-auto max-w-5xl p-4">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-black text-ranch-marron">Ventas del turno</h1>
+        <h1 className="text-2xl font-black text-ranch-marron">Ventas del turno — corregir y reimprimir</h1>
         <p className="rounded-full bg-white px-3 py-1 text-sm text-ranch-marron/70 ring-1 ring-ranch-marron/10">
           🏛️ {turno.caja.nombre} · 👤 {cajeroTurno}
         </p>

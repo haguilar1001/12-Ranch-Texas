@@ -142,6 +142,7 @@ export default async function TaquillaPage({
       motivos={motivos.map((m) => ({ id: m.id, nombre: m.nombre }))}
       autorizadores={autorizadores}
       correccion={correccion}
+      puedeCorregir={tieneRol(s.rol, "supervisor")}
     />
   );
 }

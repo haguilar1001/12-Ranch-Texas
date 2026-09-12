@@ -25,7 +25,7 @@ export default async function NavBar() {
       enlaces: [
         ["🎟️", "Taquilla", "/taquilla", "Vender manillas", cajero],
         ["💵", "Caja y turno", "/caja/turno", "Abrir, movimientos y cierre", cajero],
-        ["🧾", "Ventas del turno", "/caja/ventas", "Consultar, reimprimir y corregir", cajero],
+        ["🧾", "Ventas — corregir y reimprimir", "/caja/ventas", "Buscar una venta ya hecha y arreglarla", cajero],
         ["🚪", "Escaneo", "/escaneo", "Control de acceso en puerta", control],
         ["🎢", "Fila de atracciones", "/escaneo/fila", "Llamar turnos y marcar atendidos", control],
       ],
