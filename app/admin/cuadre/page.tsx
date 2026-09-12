@@ -82,9 +82,10 @@ export default async function CuadreDiaPage({ searchParams }: { searchParams: Pr
               <span>{formatearCOP(c.efectivoRecaudado)}</span>
             </div>
             <p className="mt-1 text-xs text-ranch-marron/50">El arqueo del cajón (base, contado, diferencia) se hace por turno, en su cuadre.</p>
-            {(c.cortesias > 0 || c.anuladas > 0) && (
+            {(c.cortesias > 0 || c.descuentos > 0 || c.anuladas > 0) && (
               <div className="mt-2 border-t border-ranch-marron/15 pt-2">
-                {c.cortesias > 0 && <Fila k="Cortesías/descuentos (no cobrado)" v={formatearCOP(c.cortesias)} />}
+                {c.cortesias > 0 && <Fila k="Cortesías (entraron gratis)" v={formatearCOP(c.cortesias)} />}
+                {c.descuentos > 0 && <Fila k="Descuentos de tarifa (no cobrado)" v={formatearCOP(c.descuentos)} />}
                 {c.anuladas > 0 && <Fila k="Ventas anuladas" v={String(c.anuladas)} />}
               </div>
             )}

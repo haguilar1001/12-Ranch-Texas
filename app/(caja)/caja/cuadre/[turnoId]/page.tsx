@@ -71,10 +71,11 @@ export default async function CuadrePage({ params }: { params: Promise<{ turnoId
           </>
         )}
 
-        {(resumen.cortesias > 0 || resumen.anuladas > 0) && (
+        {(resumen.cortesias > 0 || resumen.descuentos > 0 || resumen.anuladas > 0) && (
           <>
             <h2 className="mt-3 border-b border-ranch-marron/15 pb-1 text-sm font-bold text-ranch-marron">Otros</h2>
-            {resumen.cortesias > 0 && <Fila k="Cortesías/descuentos (no cobrado)" v={formatearCOP(resumen.cortesias)} />}
+            {resumen.cortesias > 0 && <Fila k="Cortesías (entraron gratis)" v={formatearCOP(resumen.cortesias)} />}
+            {resumen.descuentos > 0 && <Fila k="Descuentos de tarifa (no cobrado)" v={formatearCOP(resumen.descuentos)} />}
             {resumen.anuladas > 0 && <Fila k="Ventas anuladas" v={String(resumen.anuladas)} />}
           </>
         )}

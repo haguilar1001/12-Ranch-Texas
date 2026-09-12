@@ -109,7 +109,8 @@ export default function CajaAbierta({
           <div className="flex justify-between text-ranch-marron/70"><span>+ Otros ingresos</span><span>{formatearCOP(resumen.otrosIngresos)}</span></div>
           <div className="flex justify-between text-ranch-marron/70"><span>− Egresos</span><span>{formatearCOP(resumen.egresos)}</span></div>
           <div className="flex justify-between font-bold text-ranch-marron"><span>Efectivo esperado</span><span>{formatearCOP(resumen.esperadoEfectivo)}</span></div>
-          {resumen.cortesias > 0 && <div className="flex justify-between text-ranch-dorado"><span>Cortesías/descuentos (no cobrado)</span><span>{formatearCOP(resumen.cortesias)}</span></div>}
+          {resumen.cortesias > 0 && <div className="flex justify-between text-ranch-dorado"><span>Cortesías (entraron gratis)</span><span>{formatearCOP(resumen.cortesias)}</span></div>}
+          {resumen.descuentos > 0 && <div className="flex justify-between text-ranch-dorado"><span>Descuentos de tarifa</span><span>{formatearCOP(resumen.descuentos)}</span></div>}
           {resumen.anuladas > 0 && <div className="flex justify-between text-red-600"><span>Ventas anuladas</span><span>{resumen.anuladas}</span></div>}
         </div>
       </section>

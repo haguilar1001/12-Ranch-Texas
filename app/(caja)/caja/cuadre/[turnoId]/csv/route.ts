@@ -35,7 +35,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ turnoId
     ["Diferencia", String(turno.diferencia ?? "")],
     ["Observación", turno.observacion_cierre ?? ""],
     [],
-    ["Cortesías/descuentos (no cobrado)", String(r.cortesias)],
+    ["Cortesías (entraron gratis)", String(r.cortesias)],
+    ["Descuentos de tarifa (no cobrado)", String(r.descuentos)],
     ["Ventas anuladas", String(r.anuladas)],
   ];
 

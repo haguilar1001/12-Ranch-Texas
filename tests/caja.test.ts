@@ -26,7 +26,8 @@ describe("cierre de caja", () => {
 describe("cuadre diario consolidado (por fecha de venta)", () => {
   const entrada = (over: Partial<EntradaTurnoDia>): EntradaTurnoDia => ({
     turnoId: "t", caja: "Caja 1", usuario: "Ana", estado: "cerrado", abiertoEn: "", cerradoEn: null,
-    numVentas: 0, totalVentas: 0, asistentes: 0, cortesias: 0, ventasPorMedio: [], ventasPorTipo: [],
+    numVentas: 0, totalVentas: 0, asistentes: 0, cortesias: 0, descuentos: 0,
+    ventasPorMedio: [], ventasPorTipo: [],
     ventasEfectivo: 0, otrosIngresos: 0, egresos: 0, ...over,
   });
 

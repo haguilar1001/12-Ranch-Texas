@@ -9,7 +9,10 @@ export interface ResumenTurno {
   numVentas: number;
   totalVentas: number;
   asistentes: number;
-  cortesias: number; // valor no cobrado (cortesías + descuentos)
+  /** Valor no cobrado por cortesías: entraron gratis. */
+  cortesias: number;
+  /** Valor no cobrado por rebaja de tarifa: el grupo sí pagó, solo que menos. */
+  descuentos: number;
   anuladas: number;
   ventasPorMedio: LineaMedio[];
   ventasPorTipo: LineaTipo[];
@@ -46,12 +49,19 @@ export async function resumenTurno(turnoId: string): Promise<ResumenTurno> {
     ? await prisma.ventaDetalle.findMany({ where: { venta_id: { in: ventaIds } }, include: { tipo_visitante: true } })
     : [];
   const tipoAcc = new Map<string, LineaTipo>();
+  let cortesias = 0;
+  let descuentos = 0;
   for (const d of detalle) {
     const k = d.tipo_visitante.nombre;
     const acc = tipoAcc.get(k) ?? { tipo: k, cantidad: 0, total: 0 };
     acc.cantidad += d.cantidad;
     acc.total += d.valor_cobrado * d.cantidad;
     tipoAcc.set(k, acc);
+
+    // Lo no cobrado se separa: la cortesía entró gratis, el descuento sí pagó (menos).
+    const noCobrado = (d.valor_lista - d.valor_cobrado) * d.cantidad;
+    if (d.tipo_linea === "pago") descuentos += noCobrado;
+    else cortesias += noCobrado;
   }
 
   const movs = await prisma.movimientoCaja.groupBy({ by: ["tipo"], where: { turno_id: turnoId }, _sum: { monto: true } });
@@ -63,7 +73,8 @@ export async function resumenTurno(turnoId: string): Promise<ResumenTurno> {
     numVentas: ventas.length,
     totalVentas: ventas.reduce((a, v) => a + v.total_cobrado, 0),
     asistentes: ventas.reduce((a, v) => a + v.cantidad_asistentes, 0),
-    cortesias: ventas.reduce((a, v) => a + v.total_descuento, 0),
+    cortesias,
+    descuentos,
     anuladas,
     ventasPorMedio,
     ventasPorTipo: [...tipoAcc.values()],

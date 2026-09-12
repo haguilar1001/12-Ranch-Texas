@@ -20,6 +20,8 @@ export interface EntradaTurnoDia {
   totalVentas: number;
   asistentes: number;
   cortesias: number;
+  /** Rebajas de tarifa: el grupo sí pagó, solo que menos. */
+  descuentos: number;
   ventasPorMedio: LineaMedio[];
   ventasPorTipo: LineaTipo[];
   ventasEfectivo: number;
@@ -47,6 +49,7 @@ export interface ConsolidadoDia {
   totalVentas: number;
   asistentes: number;
   cortesias: number;
+  descuentos: number;
   anuladas: number;
   ventasPorMedio: LineaMedio[];
   ventasPorTipo: LineaTipo[];
@@ -71,6 +74,7 @@ export function consolidarDia(fecha: string, entradas: EntradaTurnoDia[], anulad
     totalVentas: 0,
     asistentes: 0,
     cortesias: 0,
+    descuentos: 0,
     anuladas,
     ventasPorMedio: [],
     ventasPorTipo: [],
@@ -89,6 +93,7 @@ export function consolidarDia(fecha: string, entradas: EntradaTurnoDia[], anulad
     acc.totalVentas += e.totalVentas;
     acc.asistentes += e.asistentes;
     acc.cortesias += e.cortesias;
+    acc.descuentos += e.descuentos;
     acc.ventasEfectivo += e.ventasEfectivo;
     acc.otrosIngresos += e.otrosIngresos;
     acc.egresos += e.egresos;
@@ -135,6 +140,7 @@ interface AccTurno {
   totalVentas: number;
   asistentes: number;
   cortesias: number;
+  descuentos: number;
   medio: Map<string, LineaMedio>;
   tipo: Map<string, LineaTipo>;
   ventasEfectivo: number;
@@ -153,7 +159,7 @@ export async function cuadreDiario(fecha: string): Promise<ConsolidadoDia> {
       select: {
         total_cobrado: true, total_descuento: true, cantidad_asistentes: true, turno_id: true,
         pagos: { select: { monto: true, medio_pago_id: true } },
-        detalle: { select: { cantidad: true, valor_cobrado: true, tipo_visitante: { select: { nombre: true } } } },
+        detalle: { select: { cantidad: true, valor_cobrado: true, valor_lista: true, tipo_linea: true, tipo_visitante: { select: { nombre: true } } } },
       },
     }),
     prisma.venta.count({ where: { creado_en: rango, estado: "anulada" } }),
@@ -166,7 +172,7 @@ export async function cuadreDiario(fecha: string): Promise<ConsolidadoDia> {
   const ensure = (id: string): AccTurno => {
     let a = porTurno.get(id);
     if (!a) {
-      a = { numVentas: 0, totalVentas: 0, asistentes: 0, cortesias: 0, medio: new Map(), tipo: new Map(), ventasEfectivo: 0, otrosIngresos: 0, egresos: 0 };
+      a = { numVentas: 0, totalVentas: 0, asistentes: 0, cortesias: 0, descuentos: 0, medio: new Map(), tipo: new Map(), ventasEfectivo: 0, otrosIngresos: 0, egresos: 0 };
       porTurno.set(id, a);
     }
     return a;
@@ -177,7 +183,6 @@ export async function cuadreDiario(fecha: string): Promise<ConsolidadoDia> {
     a.numVentas += 1;
     a.totalVentas += v.total_cobrado;
     a.asistentes += v.cantidad_asistentes;
-    a.cortesias += v.total_descuento;
     for (const p of v.pagos) {
       const m = medioMap.get(p.medio_pago_id);
       if (!m) continue;
@@ -192,6 +197,10 @@ export async function cuadreDiario(fecha: string): Promise<ConsolidadoDia> {
       line.cantidad += d.cantidad;
       line.total += d.valor_cobrado * d.cantidad;
       a.tipo.set(k, line);
+      // Lo no cobrado se separa: la cortesía entró gratis, el descuento sí pagó (menos).
+      const noCobrado = (d.valor_lista - d.valor_cobrado) * d.cantidad;
+      if (d.tipo_linea === "pago") a.descuentos += noCobrado;
+      else a.cortesias += noCobrado;
     }
   }
 
@@ -224,6 +233,7 @@ export async function cuadreDiario(fecha: string): Promise<ConsolidadoDia> {
       totalVentas: a.totalVentas,
       asistentes: a.asistentes,
       cortesias: a.cortesias,
+      descuentos: a.descuentos,
       ventasPorMedio: [...a.medio.values()],
       ventasPorTipo: [...a.tipo.values()],
       ventasEfectivo: a.ventasEfectivo,
