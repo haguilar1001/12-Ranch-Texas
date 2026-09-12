@@ -100,8 +100,6 @@ export default function TaquillaClient({
       ? correccion.pagos.map((p, i) => ({ key: -(i + 1), medio_pago_id: p.medio_pago_id, monto: String(p.monto) }))
       : [{ key: 1, medio_pago_id: medios[0]?.id ?? "", monto: "" }],
   );
-  /** Con cuánto paga el cliente en efectivo. Solo sirve para calcular el vuelto. */
-  const [recibido, setRecibido] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ultimaVenta, setUltimaVenta] = useState<{ id: string; numero: number } | null>(null);
@@ -144,17 +142,31 @@ export default function TaquillaClient({
     [pagos],
   );
   const totalPagado = pagosLimpios.reduce((a, p) => a + p.monto, 0);
-  const faltante = totales.total_cobrado - totalPagado;
 
-  // Vuelto: cuenta aparte, solo para el cajero. Lo que se registra como pago es lo que
-  // QUEDA en la caja; el billete con el que paga el cliente y la devuelta no se guardan,
-  // porque si no el arqueo físico dejaría de cuadrar contra el sistema.
+  // El cajero escribe lo que le ENTREGAN. Si el efectivo se pasa del total, la diferencia
+  // es el vuelto: sale de la caja otra vez, así que no se registra como pago. Lo que se
+  // guarda es lo que QUEDA en el cajón, que es contra lo que cuadra el arqueo de la noche.
   const efectivoIds = useMemo(() => new Set(medios.filter((m) => m.es_efectivo).map((m) => m.id)), [medios]);
-  const totalEfectivo = pagosLimpios.filter((p) => efectivoIds.has(p.medio_pago_id)).reduce((a, p) => a + p.monto, 0);
-  const recibidoNum = parseCOP(recibido);
-  const vuelto = recibidoNum - totalEfectivo;
+  const pagosAjustados = useMemo(() => {
+    let porDevolver = Math.max(0, totalPagado - totales.total_cobrado);
+    const ajustados = pagosLimpios.map((p) => ({ ...p }));
+    // Se devuelve de las líneas de efectivo, de la última hacia atrás.
+    for (let i = ajustados.length - 1; i >= 0 && porDevolver > 0; i--) {
+      if (!efectivoIds.has(ajustados[i].medio_pago_id)) continue;
+      const quita = Math.min(ajustados[i].monto, porDevolver);
+      ajustados[i].monto -= quita;
+      porDevolver -= quita;
+    }
+    return ajustados.filter((p) => p.monto > 0);
+  }, [pagosLimpios, totalPagado, totales.total_cobrado, efectivoIds]);
 
-  const validacion = useMemo(() => validarVenta(lineas, pagosLimpios), [lineas, pagosLimpios]);
+  const totalEnCaja = pagosAjustados.reduce((a, p) => a + p.monto, 0);
+  const vuelto = totalPagado - totalEnCaja;
+  const faltante = totales.total_cobrado - totalEnCaja;
+  /** Sobró plata que no es efectivo: una transferencia o un datáfono tiene que ir exacto. */
+  const sobraElectronico = faltante < 0;
+
+  const validacion = useMemo(() => validarVenta(lineas, pagosAjustados), [lineas, pagosAjustados]);
   const puedeVender = lineas.length > 0 && validacion.ok && !enviando;
 
   function setCantidad(id: string, delta: number) {
@@ -181,6 +193,16 @@ export default function TaquillaClient({
     setCortesias((prev) => prev.filter((c) => c.key !== key));
   }
 
+  const hayEfectivo = pagos.some((p) => efectivoIds.has(p.medio_pago_id));
+
+  /** Los botones de billete llenan la primera línea de efectivo con lo que entregó el cliente. */
+  function ponerEnEfectivo(monto: number) {
+    setPagos((prev) => {
+      const i = prev.findIndex((p) => efectivoIds.has(p.medio_pago_id));
+      return i < 0 ? prev : prev.map((p, k) => (k === i ? { ...p, monto: String(monto) } : p));
+    });
+  }
+
   function pagoExacto() {
     const efectivo = medios.find((m) => m.es_efectivo) ?? medios[0];
     setPagos([{ key: nextKey(), medio_pago_id: efectivo?.id ?? "", monto: String(totales.total_cobrado) }]);
@@ -198,7 +220,6 @@ export default function TaquillaClient({
   function limpiar() {
     setCant({}); setCortesias([]); setDescuentos({}); setComprador({ nombre: "", documento: "", celular: "", email: "" });
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
-    setRecibido("");
   }
 
   function alternarDescuento(tipoId: string, valorLista: number) {
@@ -225,7 +246,8 @@ export default function TaquillaClient({
         valor_cobrado: l.valor_cobrado < l.valor_lista ? l.valor_cobrado : null,
         motivo_descuento: l.motivo_descuento ?? null,
       })),
-      pagos: pagosLimpios,
+      // Lo que de verdad entra a la caja: el vuelto ya está descontado.
+      pagos: pagosAjustados,
       comprador_nombre: comprador.nombre,
       comprador_documento: comprador.documento,
       comprador_celular: comprador.celular,
@@ -530,58 +552,50 @@ export default function TaquillaClient({
                 </div>
               ))}
             </div>
-            <div className={`mt-2 flex justify-between text-sm ${faltante === 0 ? "text-ranch-verde" : "text-ranch-marron/70"}`}>
-              <span>Pagado {formatearCOP(totalPagado)}</span>
-              <span>{faltante > 0 ? `Falta ${formatearCOP(faltante)}` : faltante < 0 ? `Sobra ${formatearCOP(-faltante)}` : "Cuadra ✓"}</span>
+            {/* Billetes frecuentes: llenan la línea de efectivo de un toque. */}
+            {hayEfectivo && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {[20000, 50000, 100000, 200000].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => ponerEnEfectivo(b)}
+                    className="rounded bg-ranch-marron/10 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-marron/20"
+                  >
+                    {formatearMiles(b)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-2 flex justify-between text-sm text-ranch-marron/70">
+              <span>Entregan {formatearCOP(totalPagado)}</span>
+              {faltante > 0 ? (
+                <span>Falta {formatearCOP(faltante)}</span>
+              ) : sobraElectronico ? (
+                <span className="text-amber-700">Sobra {formatearCOP(-faltante)}</span>
+              ) : (
+                <span className="text-ranch-verde">Cuadra ✓</span>
+              )}
             </div>
 
-            {/* Vuelto: cuenta de ayuda para el cajero, no toca la venta ni el cuadre. */}
-            {totalEfectivo > 0 && (
-              <div className="mt-3 border-t border-ranch-marron/10 pt-3">
-                <label className="mb-1 block text-xs font-semibold text-ranch-marron/70">
-                  ¿Con cuánto paga en efectivo?
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={recibido ? formatearMiles(recibidoNum) : ""}
-                    onChange={(e) => setRecibido(e.target.value)}
-                    inputMode="numeric"
-                    placeholder="0"
-                    className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-right text-sm focus:border-ranch-dorado focus:outline-none"
-                  />
-                  {recibido && (
-                    <button onClick={() => setRecibido("")} className="px-1 text-ranch-marron/50 hover:text-red-600" aria-label="Borrar">✕</button>
-                  )}
+            {/* El vuelto es la plata que vuelve a salir: no se registra como pago. */}
+            {vuelto > 0 && (
+              <div className="mt-2 rounded-lg bg-ranch-verde/10 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-ranch-marron">Vuelto a entregar</span>
+                  <span className="text-2xl font-black text-ranch-verde">{formatearCOP(vuelto)}</span>
                 </div>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {[20000, 50000, 100000, 200000].map((b) => (
-                    <button
-                      key={b}
-                      onClick={() => setRecibido(String(b))}
-                      className="rounded bg-ranch-marron/10 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-marron/20"
-                    >
-                      {formatearMiles(b)}
-                    </button>
-                  ))}
-                </div>
-
-                {recibidoNum > 0 && (
-                  vuelto >= 0 ? (
-                    <div className="mt-2 flex items-center justify-between rounded-lg bg-ranch-verde/10 px-3 py-2">
-                      <span className="text-sm font-semibold text-ranch-marron">Vuelto a entregar</span>
-                      <span className="text-2xl font-black text-ranch-verde">{formatearCOP(vuelto)}</span>
-                    </div>
-                  ) : (
-                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                      Con {formatearCOP(recibidoNum)} no alcanza: faltan {formatearCOP(-vuelto)} del efectivo.
-                    </p>
-                  )
-                )}
-
-                <p className="mt-1 text-[11px] text-ranch-marron/50">
-                  El vuelto no entra a la caja: el pago registrado sigue siendo {formatearCOP(totalEfectivo)}.
+                <p className="mt-0.5 text-[11px] text-ranch-marron/55">
+                  Entra a la caja {formatearCOP(totalEnCaja)}.
                 </p>
               </div>
+            )}
+
+            {sobraElectronico && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Sobran {formatearCOP(-faltante)} que no son efectivo: un datáfono o una transferencia
+                tienen que ir por el valor exacto, porque de ahí no se devuelve vuelto.
+              </p>
             )}
           </div>
 
