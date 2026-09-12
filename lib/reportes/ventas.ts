@@ -66,7 +66,7 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
     ? await prisma.ventaDetalle.findMany({ where: { venta_id: { in: ids } }, include: { tipo_visitante: true } })
     : [];
   const tipoAcc = new Map<string, { tipo: string; cantidad: number; cortesias: number; total: number }>();
-  const claseAcc = new Map<string, { clase: string; personas: number; noCobrado: number }>();
+  const claseAcc = new Map<string, { clase: string; personas: number; noCobrado: number; orden: number }>();
   let personasCortesia = 0;
 
   for (const d of detalle) {
@@ -81,9 +81,20 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
     }
     tipoAcc.set(d.tipo_visitante.nombre, acc);
 
-    // Cómo entró: pagando o por cortesía, y cuánto se dejó de cobrar en cada clase.
-    const clase = CLASE[d.tipo_linea] ?? d.tipo_linea;
-    const c = claseAcc.get(clase) ?? { clase, personas: 0, noCobrado: 0 };
+    // Cómo entró. Tres familias, y en ese orden se muestran:
+    //   0) pagando de verdad
+    //   1) con un tipo de tarifa gratis (bono redimido, bebé): no es cortesía de nadie,
+    //      así que no se mezcla con las pagadas ni con lo que alguien autorizó regalar
+    //   2) por cortesía, que sí lleva motivo y autorización
+    const gratisPorTarifa = !esCortesia && d.valor_lista === 0;
+    const clase = esCortesia
+      ? CLASE[d.tipo_linea] ?? d.tipo_linea
+      : gratisPorTarifa
+        ? d.tipo_visitante.nombre
+        : "Pagadas";
+    const orden = esCortesia ? 2 : gratisPorTarifa ? 1 : 0;
+
+    const c = claseAcc.get(clase) ?? { clase, personas: 0, noCobrado: 0, orden };
     c.personas += d.cantidad;
     c.noCobrado += (d.valor_lista - d.valor_cobrado) * d.cantidad;
     claseAcc.set(clase, c);
@@ -115,10 +126,10 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
     pctCortesias: totalLista ? (valorNoCobrado / totalLista) * 100 : 0,
     personasCortesia,
     porTipo: [...tipoAcc.values()].sort((a, b) => b.total - a.total || b.cantidad - a.cantidad),
-    // Las pagadas primero, luego las cortesías por lo que costaron.
-    porClase: [...claseAcc.values()].sort((a, b) =>
-      a.clase === "Pagadas" ? -1 : b.clase === "Pagadas" ? 1 : b.noCobrado - a.noCobrado,
-    ),
+    // Pagadas, luego las gratis por tarifa, y al final las cortesías por lo que costaron.
+    porClase: [...claseAcc.values()]
+      .sort((a, b) => a.orden - b.orden || b.noCobrado - a.noCobrado || b.personas - a.personas)
+      .map(({ clase, personas, noCobrado }) => ({ clase, personas, noCobrado })),
     porMedio: porMedio.sort((a, b) => b.total - a.total),
     porDiaSemana: diaAcc.map((total, i) => ({ dia: NOMBRES_DIA[i], total })).filter((d) => d.total > 0),
     porHora: [...horaAcc.entries()].map(([hora, total]) => ({ hora, total })).sort((a, b) => a.hora - b.hora),
