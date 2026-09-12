@@ -14,11 +14,23 @@ export interface IndicadoresVentas {
   ticketPromedio: number;
   valorNoCobrado: number; // cortesías + descuentos
   pctCortesias: number; // sobre el valor lista
-  porTipo: { tipo: string; cantidad: number; total: number }[];
+  /** Personas que entraron por cortesía (atención + invitación + cortesía). */
+  personasCortesia: number;
+  /** `cortesias` son las personas de ese tipo que NO pagaron por ser cortesía. */
+  porTipo: { tipo: string; cantidad: number; cortesias: number; total: number }[];
+  /** Cómo entró la gente: pagando, o por cada clase de cortesía. */
+  porClase: { clase: string; personas: number; noCobrado: number }[];
   porMedio: { medio: string; total: number }[];
   porDiaSemana: { dia: string; total: number }[];
   porHora: { hora: number; total: number }[];
 }
+
+const CLASE: Record<string, string> = {
+  pago: "Pagadas",
+  atencion: "Atenciones",
+  invitacion: "Invitaciones",
+  cortesia: "Cortesías",
+};
 
 export interface FiltrosVentas {
   cajaId?: string;
@@ -53,12 +65,28 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
   const detalle = ids.length
     ? await prisma.ventaDetalle.findMany({ where: { venta_id: { in: ids } }, include: { tipo_visitante: true } })
     : [];
-  const tipoAcc = new Map<string, { tipo: string; cantidad: number; total: number }>();
+  const tipoAcc = new Map<string, { tipo: string; cantidad: number; cortesias: number; total: number }>();
+  const claseAcc = new Map<string, { clase: string; personas: number; noCobrado: number }>();
+  let personasCortesia = 0;
+
   for (const d of detalle) {
-    const acc = tipoAcc.get(d.tipo_visitante.nombre) ?? { tipo: d.tipo_visitante.nombre, cantidad: 0, total: 0 };
+    const acc = tipoAcc.get(d.tipo_visitante.nombre) ?? { tipo: d.tipo_visitante.nombre, cantidad: 0, cortesias: 0, total: 0 };
     acc.cantidad += d.cantidad;
     acc.total += d.valor_cobrado * d.cantidad;
+
+    const esCortesia = d.tipo_linea !== "pago";
+    if (esCortesia) {
+      acc.cortesias += d.cantidad;
+      personasCortesia += d.cantidad;
+    }
     tipoAcc.set(d.tipo_visitante.nombre, acc);
+
+    // Cómo entró: pagando o por cortesía, y cuánto se dejó de cobrar en cada clase.
+    const clase = CLASE[d.tipo_linea] ?? d.tipo_linea;
+    const c = claseAcc.get(clase) ?? { clase, personas: 0, noCobrado: 0 };
+    c.personas += d.cantidad;
+    c.noCobrado += (d.valor_lista - d.valor_cobrado) * d.cantidad;
+    claseAcc.set(clase, c);
   }
 
   // Por medio de pago
@@ -85,7 +113,12 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
     ticketPromedio: ventas.length ? Math.round(ingreso / ventas.length) : 0,
     valorNoCobrado,
     pctCortesias: totalLista ? (valorNoCobrado / totalLista) * 100 : 0,
-    porTipo: [...tipoAcc.values()].sort((a, b) => b.total - a.total),
+    personasCortesia,
+    porTipo: [...tipoAcc.values()].sort((a, b) => b.total - a.total || b.cantidad - a.cantidad),
+    // Las pagadas primero, luego las cortesías por lo que costaron.
+    porClase: [...claseAcc.values()].sort((a, b) =>
+      a.clase === "Pagadas" ? -1 : b.clase === "Pagadas" ? 1 : b.noCobrado - a.noCobrado,
+    ),
     porMedio: porMedio.sort((a, b) => b.total - a.total),
     porDiaSemana: diaAcc.map((total, i) => ({ dia: NOMBRES_DIA[i], total })).filter((d) => d.total > 0),
     porHora: [...horaAcc.entries()].map(([hora, total]) => ({ hora, total })).sort((a, b) => a.hora - b.hora),

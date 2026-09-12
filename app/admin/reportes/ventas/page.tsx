@@ -66,17 +66,59 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
         <Kpi label="Ventas" valor={String(ind.numVentas)} />
         <Kpi label="Ingreso total" valor={formatearCOP(ind.ingreso)} />
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} />
-        <Kpi label="% cortesías/desc." valor={`${ind.pctCortesias.toFixed(1)}%`} />
+        <Kpi label="Entradas de cortesía" valor={String(ind.personasCortesia)} />
         <Kpi label="Valor no cobrado" valor={formatearCOP(ind.valorNoCobrado)} />
+        <Kpi label="% cortesías/desc." valor={`${ind.pctCortesias.toFixed(1)}%`} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className="rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
           <h2 className="mb-2 font-bold text-ranch-marron">Por tipo de visitante</h2>
-          <table className="w-full text-sm"><tbody>
-            {ind.porTipo.map((t) => <tr key={t.tipo} className="border-t border-ranch-marron/10"><td className="py-1">{t.tipo} ({t.cantidad})</td><td className="py-1 text-right">{formatearCOP(t.total)}</td></tr>)}
-            {ind.porTipo.length === 0 && <tr><td className="py-1 text-ranch-marron/40">Sin datos.</td></tr>}
-          </tbody></table>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs uppercase text-ranch-marron/45">
+                <th className="pb-1 text-left font-semibold">Tipo</th>
+                <th className="pb-1 text-right font-semibold">Entradas</th>
+                <th className="pb-1 text-right font-semibold">Cortesía</th>
+                <th className="pb-1 text-right font-semibold">Ingreso</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ind.porTipo.map((t) => (
+                <tr key={t.tipo} className="border-t border-ranch-marron/10">
+                  <td className="py-1">{t.tipo}</td>
+                  <td className="py-1 text-right tabular-nums">{t.cantidad}</td>
+                  <td className="py-1 text-right tabular-nums text-ranch-dorado">{t.cortesias || <span className="text-ranch-marron/25">—</span>}</td>
+                  <td className="py-1 text-right tabular-nums">{formatearCOP(t.total)}</td>
+                </tr>
+              ))}
+              {ind.porTipo.length === 0 && <tr><td className="py-1 text-ranch-marron/40">Sin datos.</td></tr>}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
+          <h2 className="mb-1 font-bold text-ranch-marron">Cómo entraron</h2>
+          <p className="mb-2 text-xs text-ranch-marron/50">Personas por clase de entrada, y lo que se dejó de cobrar en cada una.</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs uppercase text-ranch-marron/45">
+                <th className="pb-1 text-left font-semibold">Clase</th>
+                <th className="pb-1 text-right font-semibold">Personas</th>
+                <th className="pb-1 text-right font-semibold">No cobrado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ind.porClase.map((c) => (
+                <tr key={c.clase} className="border-t border-ranch-marron/10">
+                  <td className="py-1">{c.clase}</td>
+                  <td className="py-1 text-right font-semibold tabular-nums">{c.personas}</td>
+                  <td className="py-1 text-right tabular-nums">{c.noCobrado > 0 ? formatearCOP(c.noCobrado) : <span className="text-ranch-marron/25">—</span>}</td>
+                </tr>
+              ))}
+              {ind.porClase.length === 0 && <tr><td className="py-1 text-ranch-marron/40">Sin datos.</td></tr>}
+            </tbody>
+          </table>
         </section>
         <section className="rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
           <h2 className="mb-2 font-bold text-ranch-marron">Por medio de pago</h2>
