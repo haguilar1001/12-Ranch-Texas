@@ -16,11 +16,10 @@
 //   npm run import:atracciones
 //   npm run import:atracciones -- "D:\ruta\otro.xlsx"
 import "dotenv/config";
+import { prisma } from "../lib/db";
 import * as XLSX from "xlsx";
-import { PrismaClient } from "@prisma/client";
 import { leerRango } from "../lib/accesos/restricciones";
 
-const prisma = new PrismaClient();
 const POR = "import-atracciones";
 const RUTA_POR_DEFECTO = "D:/Escritorio/Atracciones Ranch.xlsx";
 

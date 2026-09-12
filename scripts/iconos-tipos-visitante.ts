@@ -7,9 +7,9 @@
 //   npm run iconos:tipos            → muestra qué cambiaría
 //   npm run iconos:tipos -- --confirmar
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/db";
+import { mayus } from "../lib/db/mayusculas";
 
-const prisma = new PrismaClient();
 const CONFIRMAR = process.argv.includes("--confirmar");
 
 /** minúsculas, sin tildes, sin paréntesis y sin espacios de más. */
@@ -64,7 +64,8 @@ async function main() {
     sinPlan.delete(p.clave);
 
     const data: Record<string, unknown> = {};
-    if (t.nombre !== p.nombre) data.nombre = p.nombre;
+    // Los nombres se guardan en mayúsculas, así que la comparación va en mayúsculas.
+    if (mayus(t.nombre) !== mayus(p.nombre)) data.nombre = p.nombre;
     if (t.icono !== p.icono) data.icono = p.icono;
     if (t.requiere_carnet !== p.carnet) data.requiere_carnet = p.carnet;
 

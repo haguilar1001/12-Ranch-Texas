@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db";
+import { prisma, type Tx } from "@/lib/db";
 import { obtenerSesion, tieneRol, puedeOperarGranja } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
 import { aBase, costoCOP, type AlimentoUnidad } from "@/lib/animales/unidades";
@@ -400,7 +400,7 @@ export async function cambiarEstadoAlimento(id: string, activo: boolean): Promis
 }
 
 /** Recalcula la existencia del alimento desde su kardex (nunca se escribe a mano). */
-async function recalcularExistencia(tx: Prisma.TransactionClient, alimentoId: string, usuarioId: string): Promise<number> {
+async function recalcularExistencia(tx: Tx, alimentoId: string, usuarioId: string): Promise<number> {
   const movs = await tx.movimientoAlimento.findMany({
     where: { alimento_id: alimentoId },
     select: { tipo: true, cantidad_base: true, fecha: true },

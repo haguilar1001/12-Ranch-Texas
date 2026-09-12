@@ -1,12 +1,12 @@
 import "dotenv/config";
-import { PrismaClient, Rol } from "@prisma/client";
+import { prisma } from "../lib/db";
+import { Rol } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
 
 // Crea (o actualiza la contraseña de) un usuario. Idempotente por `usuario`.
 // Uso: tsx scripts/crear-usuario.ts <usuario> <password> [rol] [nombre]
 //   rol: administrador | supervisor | cajero | control_acceso | granja | consulta  (por defecto administrador)
 
-const prisma = new PrismaClient();
 const ROLES = ["administrador", "supervisor", "cajero", "control_acceso", "granja", "consulta"];
 
 async function main() {

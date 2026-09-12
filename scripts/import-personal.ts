@@ -17,11 +17,10 @@
 //   npm run import:personal
 //   npm run import:personal -- "D:\ruta\otra-nomina.xlsx"
 import "dotenv/config";
+import { prisma } from "../lib/db";
 import * as XLSX from "xlsx";
-import { PrismaClient } from "@prisma/client";
 import { consolidarNomina, FACTOR_PRESTACIONAL } from "../lib/personal/costo";
 
-const prisma = new PrismaClient();
 const POR = "import-personal";
 const RUTA_POR_DEFECTO = "D:/Escritorio/8 NOMINA DIVERSIONES AGOSTO 2026.xlsx";
 

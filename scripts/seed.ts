@@ -1,10 +1,10 @@
 import "dotenv/config";
-import { PrismaClient, NivelRubro, TipoReglaAcceso } from "@prisma/client";
+import { prisma } from "../lib/db";
+import { NivelRubro, TipoReglaAcceso } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
 import { filasDimFecha } from "./gen-dim-fecha";
 import { CONSENTIMIENTO_TITULO, CONSENTIMIENTO_CUERPO, CONSENTIMIENTO_VERSION } from "./consentimiento-texto";
 
-const prisma = new PrismaClient();
 const DEMO = process.argv.includes("--demo");
 const POR = "seed";
 const VIGENTE_DESDE = new Date("2020-01-01T00:00:00.000Z");

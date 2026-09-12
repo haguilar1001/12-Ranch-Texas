@@ -49,7 +49,7 @@ export default function UsuariosClient({ miId, usuarios }: { miId: string; usuar
         <h2 className="mb-3 font-bold text-ranch-marron">Crear usuario</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre completo" className="rounded-lg border border-ranch-marron/30 px-3 py-2" />
-          <input value={nuevo.usuario} onChange={(e) => setNuevo({ ...nuevo, usuario: e.target.value })} placeholder="Usuario o correo" className="rounded-lg border border-ranch-marron/30 px-3 py-2" />
+          <input value={nuevo.usuario} onChange={(e) => setNuevo({ ...nuevo, usuario: e.target.value })} placeholder="Usuario o correo" className="sin-mayusculas rounded-lg border border-ranch-marron/30 px-3 py-2" />
           <select value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value })} className="rounded-lg border border-ranch-marron/30 px-3 py-2">
             {PERFILES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>

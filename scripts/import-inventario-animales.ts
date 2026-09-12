@@ -12,9 +12,8 @@
 //
 //   npx tsx scripts/import-inventario-animales.ts
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/db";
 
-const prisma = new PrismaClient();
 const POR = "import-inventario";
 
 // ---------------------------------------------------------------- CENSO (Excel)

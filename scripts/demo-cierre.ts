@@ -6,11 +6,10 @@
 //
 //   npm run demo:cierre
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/db";
 import { crearVenta } from "../lib/ventas/registrar";
 import type { EntradaLinea } from "../lib/ventas/tipos";
 
-const prisma = new PrismaClient();
 
 async function main() {
   const url = process.env.DATABASE_URL ?? "";

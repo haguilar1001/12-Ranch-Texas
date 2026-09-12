@@ -5,9 +5,8 @@
 //
 //   npx tsx scripts/seed-boceto.ts
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/db";
 
-const prisma = new PrismaClient();
 const POR = "seed-boceto";
 
 // ---------------------------------------------------------------- PERSONAL

@@ -9,3 +9,37 @@
 body {
   @apply bg-ranch-crema text-ranch-marron;
 }
+
+/*
+ * Los datos del parque se guardan en MAYÚSCULAS (ver lib/db/mayusculas.ts), así que
+ * lo que el cajero teclea se ve en mayúsculas desde el primer momento: lo que ve en
+ * pantalla es exactamente lo que va a quedar guardado.
+ *
+ * Es solo presentación: el valor del input no cambia, lo sube el servidor al guardar.
+ * Se deja por fuera lo que NO va en mayúsculas — correo, clave, usuario de ingreso —
+ * y lo que no es texto libre (números, fechas, el buscador). Para excluir un campo
+ * puntual basta ponerle la clase `sin-mayusculas`.
+ */
+input[type="text"],
+input[type="tel"],
+input:not([type]),
+textarea {
+  text-transform: uppercase;
+}
+
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="search"],
+.sin-mayusculas,
+.sin-mayusculas input,
+.sin-mayusculas textarea {
+  text-transform: none;
+}
+
+/* El texto largo de los consentimientos se lee, no se grita. */
+.texto-legal,
+.texto-legal * {
+  text-transform: none;
+}
