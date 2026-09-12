@@ -93,11 +93,15 @@ export default async function CierreDiaPage({
               <tr><td colSpan={4} className="border border-ranch-marron/25 px-3 py-6 text-center text-ranch-marron/50">Ese día no hubo ventas.</td></tr>
             )}
 
-            <Fila concepto="Totales" cantidad={r.totalCantidad} unitario={null} total={r.totalLista} fuerte />
-            <Fila concepto="Descuentos" cantidad={null} unitario={null} total={-r.descuentos} />
-            <Fila concepto="Total venta día" cantidad={null} unitario={null} total={r.totalVenta} fuerte />
+            <Fila concepto="Total venta día" cantidad={r.totalCantidad} unitario={null} total={r.totalVenta} fuerte />
           </tbody>
         </table>
+        {r.descuentoTotal > 0 && (
+          <p className="mt-1 text-xs text-ranch-marron/55">
+            Los valores unitarios ya vienen netos. A tarifa plena el día habría sido {formatearCOP(r.totalLista)}:
+            se rebajaron {formatearCOP(r.descuentoTotal)}, con el detalle abajo.
+          </p>
+        )}
 
         {/* Agrupación por tipo de manilla */}
         <h2 className="mb-2 mt-6 font-bold uppercase text-ranch-marron">Manillas por tipo</h2>
@@ -129,6 +133,47 @@ export default async function CierreDiaPage({
             Las personas superan las manillas en {(r.totalCantidad - r.totalManillas).toLocaleString("es-CO")}: los bebés
             entran en brazos y no llevan manilla.
           </p>
+        )}
+
+        {/* Descuentos: control de caja, no de cortesías. Quién autorizó cobrar por debajo. */}
+        {r.descuentos.length > 0 && (
+          <>
+            <h2 className="mb-2 mt-6 font-bold uppercase text-ranch-marron">Descuentos autorizados</h2>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ranch-crema">
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-left font-bold uppercase text-ranch-marron">Concepto</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-left font-bold uppercase text-ranch-marron">Motivo</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-left font-bold uppercase text-ranch-marron">Autoriza</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Pers.</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Lista</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Cobrado</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">No cobrado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.descuentos.map((d, i) => (
+                  <tr key={i}>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/85">{d.concepto}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/85">{d.motivo}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/70">{d.autoriza}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">{d.personas}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums text-ranch-marron/60">{formatearCOP(d.valorLista)}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">{formatearCOP(d.valorCobrado)}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">{formatearCOP(d.noCobrado)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-ranch-crema/70 font-bold text-ranch-marron">
+                  <td className="border border-ranch-marron/25 px-3 py-1.5 uppercase" colSpan={3}>Total</td>
+                  <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">
+                    {r.descuentos.reduce((a, d) => a + d.personas, 0)}
+                  </td>
+                  <td className="border border-ranch-marron/25 px-3 py-1.5" colSpan={2}></td>
+                  <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">{formatearCOP(r.descuentoTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
         )}
 
         {/* Respaldo del cierre: contra qué se cuadra la caja. */}

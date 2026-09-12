@@ -84,8 +84,11 @@ const SIN_MOTIVO = "(sin motivo)";
 const SIN_AUTORIZA = "(sin autorización)";
 
 /**
- * Trae el detalle de cortesías y descuentos del período. Una línea de venta entra si es
- * cortesía (atencion/invitacion) o si es de pago pero cobró menos que el valor de lista.
+ * Trae el detalle de CORTESÍAS del período: atenciones, invitaciones y cortesías.
+ *
+ * Los descuentos NO entran aquí aunque también sean plata que no se cobró: una rebaja
+ * de tarifa es una decisión de caja (el grupo pagó, solo que menos) y vive en el informe
+ * de cierre del día, con su motivo y quién la autorizó. Aquí solo lo que entró gratis.
  */
 export async function relacionCortesias(
   desde: Date,
@@ -100,11 +103,7 @@ export async function relacionCortesias(
         ...(filtros?.cajeroId ? { usuario_id: filtros.cajeroId } : {}),
         ...(filtros?.cajaId ? { turno: { caja_id: filtros.cajaId } } : {}),
       },
-      // Cortesía, o línea de pago con descuento.
-      OR: [
-        { tipo_linea: { in: ["atencion", "invitacion", "cortesia"] } },
-        { AND: [{ tipo_linea: "pago" }, { valor_cobrado: { lt: prisma.ventaDetalle.fields.valor_lista } }] },
-      ],
+      tipo_linea: { in: ["atencion", "invitacion", "cortesia"] },
     },
     include: {
       tipo_visitante: { select: { nombre: true } },

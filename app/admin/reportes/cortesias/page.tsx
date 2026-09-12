@@ -84,9 +84,9 @@ export default async function ReporteCortesiasPage({
 
   return (
     <main className="mx-auto max-w-5xl p-4">
-      <h1 className="mb-1 text-2xl font-black text-ranch-marron">Relación de atenciones e invitaciones</h1>
+      <h1 className="mb-1 text-2xl font-black text-ranch-marron">Relación de cortesías</h1>
       <p className="mb-4 text-sm text-ranch-marron/60">
-        Todo lo que salió del parque sin cobrarse: cortesías y descuentos, con su motivo y quién los autorizó.
+        Quién entró gratis, con qué motivo y quién lo autorizó. Las rebajas de tarifa no salen aquí: esas son del cierre del día, en "Descuentos autorizados".
       </p>
 
       <form className="mb-4 flex flex-wrap gap-2 text-sm">
@@ -159,7 +159,7 @@ export default async function ReporteCortesiasPage({
               </tr>
             ))}
             {r.lineas.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-ranch-marron/50">No hubo cortesías ni descuentos en el período.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-6 text-center text-ranch-marron/50">No hubo cortesías en el período.</td></tr>
             )}
           </tbody>
         </table>

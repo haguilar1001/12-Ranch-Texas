@@ -47,7 +47,7 @@ export default async function NavBar() {
         ["📊", "Dashboard de ventas", "/admin/dashboard", "Indicadores del día", consulta],
         ["📋", "Reporte de ventas", "/admin/reportes/ventas", "Por tipo, medio, día y hora", consulta],
         ["📈", "Comparativo año vs año", "/admin/reportes/comparativo", "Contra la venta histórica", consulta],
-        ["🎁", "Atenciones e invitaciones", "/admin/reportes/cortesias", "Lo que no se cobró y quién lo autorizó", supervisor],
+        ["🎁", "Cortesías", "/admin/reportes/cortesias", "Quién entró gratis y quién lo autorizó", supervisor],
         ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
         ["📄", "Cierre del día", "/admin/reportes/cierre", "Informe para firmar e imprimir", supervisor],
         ["💰", "Cuadre diario", "/admin/cuadre", "Consolidado de todos los turnos", supervisor],

@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const r = await relacionCortesias(inicio, fin, { cajaId, cajeroId });
 
   const filas: string[][] = [
-    [`Relacion de atenciones e invitaciones ${mes}/${anio}`],
+    [`Relacion de cortesias ${mes}/${anio}`],
     ["Valor no cobrado", String(r.totalNoCobrado)],
     ["Personas", String(r.totalPersonas)],
     ["Registros", String(r.lineas.length)],

@@ -46,14 +46,42 @@ describe("informe de cierre del día", () => {
     expect(r.ventas.map((v) => v.valorUnitario).sort()).toEqual([54000, 60000]);
   });
 
-  it("el descuento no toca el concepto: baja en su propia línea", () => {
+  it("dos grupos con la misma rebaja se juntan; con rebajas distintas, no", () => {
     const r = resumirCierre([
-      linea({ cantidad: 10, valor_cobrado: 50000 }), // $10.000 menos cada uno
+      linea({ cantidad: 10, valor_cobrado: 45000, motivo_descuento: "Colegio", autoriza: "Ana" }),
+      linea({ cantidad: 6, valor_cobrado: 45000, motivo_descuento: "Colegio", autoriza: "Ana" }),
+      linea({ cantidad: 4, valor_cobrado: 50000, motivo_descuento: "Convenio", autoriza: "Luis" }),
     ]);
-    expect(r.ventas[0].valorUnitario).toBe(60000);
-    expect(r.ventas[0].valorTotal).toBe(600_000);
-    expect(r.descuentos).toBe(100_000);
+    expect(r.ventas.map((v) => [v.valorUnitario, v.cantidad])).toEqual([
+      [45000, 16],
+      [50000, 4],
+    ]);
+    expect(r.totalVenta).toBe(920_000);
+    expect(r.descuentos.map((d) => [d.motivo, d.personas, d.noCobrado])).toEqual([
+      ["Colegio", 16, 240_000],
+      ["Convenio", 4, 40_000],
+    ]);
+  });
+
+  it("un descuento sin motivo ni autorización queda marcado, no escondido", () => {
+    const r = resumirCierre([linea({ cantidad: 1, valor_cobrado: 30000 })]);
+    expect(r.descuentos[0]).toMatchObject({ motivo: "(sin motivo)", autoriza: "(sin autorización)" });
+  });
+
+  it("el grupo con rebaja queda en su renglón, con el neto en el unitario", () => {
+    const r = resumirCierre([
+      linea({ cantidad: 10, valor_cobrado: 50000, motivo_descuento: "Grupo escolar", autoriza: "Ana" }),
+    ]);
+    expect(r.ventas[0].valorUnitario).toBe(50000);
+    expect(r.ventas[0].valorTotal).toBe(500_000);
+    // El total del informe ya es lo que entró: no hay nada que restar abajo.
     expect(r.totalVenta).toBe(500_000);
+    expect(r.totalLista).toBe(600_000);
+    expect(r.descuentoTotal).toBe(100_000);
+    expect(r.descuentos).toEqual([
+      { concepto: "Adulto", motivo: "Grupo escolar", autoriza: "Ana", personas: 10,
+        valorLista: 60000, valorCobrado: 50000, noCobrado: 100_000 },
+    ]);
   });
 
   it("las cortesías suman personas pero no plata, agrupadas por clase", () => {
@@ -108,7 +136,7 @@ describe("informe de cierre del día", () => {
     const r = resumirCierre([]);
     expect(r).toMatchObject({
       ventas: [], sinCobro: [], totalCantidad: 0, totalLista: 0,
-      descuentos: 0, totalVenta: 0, porManilla: [], totalManillas: 0,
+      descuentoTotal: 0, descuentos: [], totalVenta: 0, porManilla: [], totalManillas: 0,
     });
   });
 
