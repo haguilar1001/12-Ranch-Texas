@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resumirCierre, type LineaCierre } from "../lib/reportes/cierre";
+import { resumirCierre, matrizPorCaja, type LineaCierre } from "../lib/reportes/cierre";
 
 const linea = (p: Partial<LineaCierre>): LineaCierre => ({
   tipo_visitante: "Adulto",
@@ -166,5 +166,93 @@ describe("informe de cierre del día", () => {
     // 780 personas, todas con manilla porque no hubo bebés.
     expect(r.totalManillas).toBe(780);
     expect(r.porManilla.reduce((a, g) => a + g.asistentes, 0)).toBe(780);
+  });
+});
+
+describe("cierre con una columna por caja", () => {
+  const enCaja = (caja: string, p: Partial<LineaCierre>) => linea({ caja, ...p });
+
+  it("reparte cada concepto entre las cajas y cuadra por fila y por columna", () => {
+    const m = matrizPorCaja([
+      enCaja("Caja 1", { tipo_visitante: "Adulto", cantidad: 10 }),
+      enCaja("Caja 2", { tipo_visitante: "Adulto", cantidad: 4 }),
+      enCaja("Caja 2", { tipo_visitante: "Niño", cantidad: 6 }),
+    ]);
+
+    expect(m.cajas).toEqual(["Caja 1", "Caja 2"]);
+
+    const adulto = m.filas.find((f) => f.concepto === "Adulto")!;
+    expect(adulto.celdas).toEqual([
+      { cantidad: 10, valorTotal: 600_000 },
+      { cantidad: 4, valorTotal: 240_000 },
+    ]);
+    expect(adulto.cantidad).toBe(14);
+    expect(adulto.valorTotal).toBe(840_000);
+
+    // Los totales por columna y el gran total cuadran con las filas.
+    expect(m.totalPorCaja).toEqual([
+      { cantidad: 10, valorTotal: 600_000 },
+      { cantidad: 10, valorTotal: 600_000 },
+    ]);
+    expect(m.totalValor).toBe(1_200_000);
+    expect(m.totalValor).toBe(m.filas.reduce((a, f) => a + f.valorTotal, 0));
+    expect(m.totalCantidad).toBe(m.filas.reduce((a, f) => a + f.cantidad, 0));
+  });
+
+  it("una caja sin ese concepto queda en cero, no se corre la columna", () => {
+    const m = matrizPorCaja([
+      enCaja("Caja 1", { tipo_visitante: "Adulto", cantidad: 2 }),
+      enCaja("Caja 2", { tipo_visitante: "Niño", cantidad: 3 }),
+    ]);
+    const adulto = m.filas.find((f) => f.concepto === "Adulto")!;
+    expect(adulto.celdas[1]).toEqual({ cantidad: 0, valorTotal: 0 });
+    const nino = m.filas.find((f) => f.concepto === "Niño")!;
+    expect(nino.celdas[0]).toEqual({ cantidad: 0, valorTotal: 0 });
+  });
+
+  it("separa el mismo tipo cuando una caja cobró otra tarifa", () => {
+    const m = matrizPorCaja([
+      enCaja("Caja 1", { cantidad: 2 }),
+      enCaja("Caja 2", { cantidad: 5, valor_cobrado: 45000, motivo_descuento: "Colegio" }),
+    ]);
+    // Ordenadas por lo que pesan en plata, no por la tarifa: 5 × 45.000 va primero.
+    expect(m.filas.map((f) => [f.valorUnitario, f.cantidad])).toEqual([
+      [45000, 5],
+      [60000, 2],
+    ]);
+  });
+
+  it("las cortesías cuentan personas en su caja y no suman plata", () => {
+    const m = matrizPorCaja([
+      enCaja("Caja 1", { tipo_linea: "invitacion", cantidad: 4 }),
+      enCaja("Caja 1", { cantidad: 1 }),
+    ]);
+    const inv = m.filas.find((f) => f.concepto === "Invitaciones")!;
+    expect(inv.cobra).toBe(false);
+    expect(inv.valorTotal).toBe(0);
+    expect(inv.celdas[0].cantidad).toBe(4);
+    expect(m.totalCantidad).toBe(5);
+    expect(m.totalValor).toBe(60_000);
+  });
+
+  it("agrupa igual que el cuadro general: mismos conceptos y mismos totales", () => {
+    const lineas = [
+      enCaja("Caja 1", { tipo_visitante: "Adulto", cantidad: 7 }),
+      enCaja("Caja 2", { tipo_visitante: "Niño", cantidad: 3, valor_cobrado: 45000, motivo_descuento: "Colegio" }),
+      enCaja("Caja 2", { tipo_linea: "atencion", cantidad: 2 }),
+      enCaja("Caja 1", { tipo_visitante: "Bebé", valor_lista: 0, valor_cobrado: 0, cantidad: 1, genera_manilla: false }),
+    ];
+    const general = resumirCierre(lineas);
+    const m = matrizPorCaja(lineas);
+
+    expect(m.totalValor).toBe(general.totalVenta);
+    expect(m.totalCantidad).toBe(general.totalCantidad);
+    expect(m.filas.length).toBe(general.ventas.length + general.sinCobro.length);
+  });
+
+  it("un día sin ventas da una matriz vacía", () => {
+    expect(matrizPorCaja([])).toEqual({
+      cajas: [], filas: [], totalPorCaja: [], totalCantidad: 0, totalValor: 0,
+    });
   });
 });

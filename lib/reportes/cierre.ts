@@ -21,6 +21,8 @@ export interface LineaCierre {
   genera_manilla: boolean;
   motivo_descuento?: string | null;
   autoriza?: string | null;
+  /** Caja donde se hizo la venta. Solo se usa para el cuadro por columnas. */
+  caja?: string;
 }
 
 export interface FilaCierre {
@@ -78,6 +80,90 @@ const SIN_MOTIVO = "(sin motivo)";
 const SIN_AUTORIZA = "(sin autorización)";
 
 /**
+ * A qué concepto del informe pertenece una línea, y a qué valor unitario.
+ * Vive aparte para que el cuadro general y el cuadro por caja agrupen IGUAL:
+ * si uno cambia de criterio, el otro no se queda atrás.
+ */
+export function conceptoDe(l: LineaCierre): { concepto: string; valorUnitario: number; cobra: boolean } {
+  if (l.tipo_linea !== "pago") {
+    return { concepto: ETIQUETA_CORTESIA[l.tipo_linea] ?? "Cortesías", valorUnitario: 0, cobra: false };
+  }
+  if (l.valor_cobrado === 0) return { concepto: l.tipo_visitante, valorUnitario: 0, cobra: false };
+  return { concepto: l.tipo_visitante, valorUnitario: l.valor_cobrado, cobra: true };
+}
+
+export interface CeldaCaja {
+  cantidad: number;
+  valorTotal: number;
+}
+
+export interface FilaMatriz {
+  concepto: string;
+  valorUnitario: number;
+  cobra: boolean;
+  /** Mismo orden y longitud que `cajas`. */
+  celdas: CeldaCaja[];
+  cantidad: number;
+  valorTotal: number;
+}
+
+export interface MatrizCajas {
+  /** Solo las cajas que tuvieron movimiento, en orden alfabético. */
+  cajas: string[];
+  filas: FilaMatriz[];
+  totalPorCaja: CeldaCaja[];
+  totalCantidad: number;
+  totalValor: number;
+}
+
+/**
+ * El mismo informe pero con una columna por caja: así se ve de dónde salió cada
+ * concepto cuando hay varias taquillas abiertas. Pura: no toca la BD.
+ */
+export function matrizPorCaja(lineas: LineaCierre[]): MatrizCajas {
+  const SIN_CAJA = "—";
+  const cajas = [...new Set(lineas.map((l) => l.caja ?? SIN_CAJA))].sort((a, b) => a.localeCompare(b, "es"));
+  const indice = new Map(cajas.map((c, i) => [c, i]));
+
+  const vacias = () => cajas.map(() => ({ cantidad: 0, valorTotal: 0 }));
+  const filas = new Map<string, FilaMatriz>();
+  const totalPorCaja = vacias();
+  let totalCantidad = 0;
+  let totalValor = 0;
+
+  for (const l of lineas) {
+    const { concepto, valorUnitario, cobra } = conceptoDe(l);
+    const clave = `${concepto}|${valorUnitario}|${cobra}`;
+    const fila = filas.get(clave) ?? { concepto, valorUnitario, cobra, celdas: vacias(), cantidad: 0, valorTotal: 0 };
+
+    const i = indice.get(l.caja ?? SIN_CAJA)!;
+    const valor = cobra ? l.valor_cobrado * l.cantidad : 0;
+
+    fila.celdas[i].cantidad += l.cantidad;
+    fila.celdas[i].valorTotal += valor;
+    fila.cantidad += l.cantidad;
+    fila.valorTotal += valor;
+    filas.set(clave, fila);
+
+    totalPorCaja[i].cantidad += l.cantidad;
+    totalPorCaja[i].valorTotal += valor;
+    totalCantidad += l.cantidad;
+    totalValor += valor;
+  }
+
+  return {
+    cajas,
+    // Primero lo que cobra, de mayor a menor; después lo que entró sin cobrar.
+    filas: [...filas.values()].sort(
+      (a, b) => Number(b.cobra) - Number(a.cobra) || b.valorTotal - a.valorTotal || b.cantidad - a.cantidad,
+    ),
+    totalPorCaja,
+    totalCantidad,
+    totalValor,
+  };
+}
+
+/**
  * Arma el informe a partir de las líneas del día. Pura: no toca la BD.
  *
  * Criterio de agrupación:
@@ -103,29 +189,19 @@ export function resumirCierre(lineas: LineaCierre[]): CierreDia {
     const esCortesia = l.tipo_linea !== "pago";
     totalCantidad += l.cantidad;
 
-    if (esCortesia) {
-      const concepto = ETIQUETA_CORTESIA[l.tipo_linea] ?? "Cortesías";
+    const { concepto, valorUnitario, cobra } = conceptoDe(l);
+    if (!cobra) {
       const f = sinCobro.get(concepto) ?? { concepto, cantidad: 0, valorUnitario: 0, valorTotal: 0 };
       f.cantidad += l.cantidad;
       sinCobro.set(concepto, f);
-    } else if (l.valor_cobrado === 0) {
-      // No cobra: entra, genera manilla, pero no suma plata.
-      const f = sinCobro.get(l.tipo_visitante) ?? { concepto: l.tipo_visitante, cantidad: 0, valorUnitario: 0, valorTotal: 0 };
-      f.cantidad += l.cantidad;
-      sinCobro.set(l.tipo_visitante, f);
     } else {
-      const clave = `${l.tipo_visitante}|${l.valor_cobrado}`;
-      const f = ventas.get(clave) ?? {
-        concepto: l.tipo_visitante,
-        cantidad: 0,
-        valorUnitario: l.valor_cobrado,
-        valorTotal: 0,
-      };
+      const clave = `${concepto}|${valorUnitario}`;
+      const f = ventas.get(clave) ?? { concepto, cantidad: 0, valorUnitario, valorTotal: 0 };
       f.cantidad += l.cantidad;
-      f.valorTotal += l.cantidad * l.valor_cobrado;
+      f.valorTotal += l.cantidad * valorUnitario;
       ventas.set(clave, f);
 
-      totalVenta += l.cantidad * l.valor_cobrado;
+      totalVenta += l.cantidad * valorUnitario;
       totalLista += l.cantidad * l.valor_lista;
     }
 
@@ -181,7 +257,7 @@ export interface EncabezadoCierre {
 }
 
 /** Trae las líneas del día (ventas completadas) y arma el informe. */
-export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia & EncabezadoCierre> {
+export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia & EncabezadoCierre & { porCaja: MatrizCajas }> {
   const [detalle, ventasDelDia, pagos] = await Promise.all([
     prisma.ventaDetalle.findMany({
       where: { venta: { estado: "completada", creado_en: { gte: desde, lt: hasta } } },
@@ -193,6 +269,7 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
         motivo_descuento: true,
         autorizado_por: true,
         tipo_visitante: { select: { nombre: true, codigo: true } },
+        venta: { select: { turno: { select: { caja: { select: { nombre: true } } } } } },
       },
     }),
     prisma.venta.findMany({
@@ -220,8 +297,7 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
     : [[], []];
   const nombrePorId = new Map([...usuarios, ...autorizadores].map((u) => [u.id, u.nombre]));
 
-  const resumen = resumirCierre(
-    detalle.map((d) => ({
+  const planas: LineaCierre[] = detalle.map((d) => ({
       tipo_visitante: d.tipo_visitante.nombre,
       tipo_linea: d.tipo_linea,
       cantidad: d.cantidad,
@@ -229,10 +305,12 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
       valor_cobrado: d.valor_cobrado,
       motivo_descuento: d.motivo_descuento,
       autoriza: d.autorizado_por ? nombrePorId.get(d.autorizado_por) ?? null : null,
+      caja: d.venta.turno.caja.nombre,
       // Regla del negocio: el bebé entra en brazos y no lleva manilla.
       genera_manilla: d.tipo_visitante.codigo !== "bebe",
-    })),
-  );
+    }));
+
+  const resumen = resumirCierre(planas);
 
   const porTurno = new Map<string, EncabezadoCierre["turnos"][number]>();
   let completadas = 0;
@@ -263,6 +341,7 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
 
   return {
     ...resumen,
+    porCaja: matrizPorCaja(planas),
     ventasCompletadas: completadas,
     ventasAnuladas: anuladas,
     turnos: [...porTurno.values()].sort((a, b) => b.recaudado - a.recaudado),

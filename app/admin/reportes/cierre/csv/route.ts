@@ -28,6 +28,21 @@ export async function GET(req: Request) {
     ["TOTAL", "", "", r.descuentos.reduce((a, d) => a + d.personas, 0), "", "", r.descuentoTotal],
     ["Valor a tarifa plena", "", "", "", "", "", r.totalLista],
     [],
+    ...(r.porCaja.cajas.length > 1
+      ? [
+          ["Cierre por caja"],
+          ["Concepto", "Vr Unit", ...r.porCaja.cajas.flatMap((c) => [`${c} cant`, `${c} valor`]), "Total cant", "Total valor"],
+          ...r.porCaja.filas.map((f) => [
+            f.concepto,
+            f.cobra ? f.valorUnitario : 0,
+            ...f.celdas.flatMap((c) => [c.cantidad, c.valorTotal]),
+            f.cantidad,
+            f.valorTotal,
+          ]),
+          ["TOTAL", "", ...r.porCaja.totalPorCaja.flatMap((t) => [t.cantidad, t.valorTotal]), r.porCaja.totalCantidad, r.porCaja.totalValor],
+          [],
+        ]
+      : []),
     ["Manillas por tipo", "Manillas", "Personas"],
     ...r.porManilla.map((g) => [g.tipo, g.manillas, g.asistentes]),
     ["TOTAL", r.totalManillas, r.totalCantidad],

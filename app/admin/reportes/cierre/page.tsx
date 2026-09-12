@@ -103,6 +103,67 @@ export default async function CierreDiaPage({
           </p>
         )}
 
+        {/* El mismo cuadro, pero con una columna por caja. Solo si hay más de una. */}
+        {r.porCaja.cajas.length > 1 && (
+          <>
+            <h2 className="mb-2 mt-6 font-bold uppercase text-ranch-marron">Cierre por caja</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[40rem] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-ranch-crema">
+                    <th rowSpan={2} className="border border-ranch-marron/25 px-3 py-1.5 text-left font-bold uppercase text-ranch-marron">Concepto</th>
+                    <th rowSpan={2} className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Vr Unit</th>
+                    {r.porCaja.cajas.map((c) => (
+                      <th key={c} colSpan={2} className="border border-ranch-marron/25 px-3 py-1 text-center font-bold uppercase text-ranch-marron">{c}</th>
+                    ))}
+                    <th colSpan={2} className="border border-ranch-marron/25 bg-ranch-crema/80 px-3 py-1 text-center font-bold uppercase text-ranch-marron">Total</th>
+                  </tr>
+                  <tr className="bg-ranch-crema">
+                    {[...r.porCaja.cajas, "total"].map((c, i) => [
+                      <th key={`${c}-c-${i}`} className="border border-ranch-marron/25 px-2 py-1 text-right text-xs font-semibold uppercase text-ranch-marron/70">Cant</th>,
+                      <th key={`${c}-v-${i}`} className="border border-ranch-marron/25 px-2 py-1 text-right text-xs font-semibold uppercase text-ranch-marron/70">Valor</th>,
+                    ])}
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.porCaja.filas.map((f) => (
+                    <tr key={`${f.concepto}-${f.valorUnitario}-${f.cobra}`}>
+                      <td className="border border-ranch-marron/25 px-3 py-1.5 uppercase text-ranch-marron/85">{f.concepto}</td>
+                      <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">
+                        {f.cobra ? formatearCOP(f.valorUnitario) : "—"}
+                      </td>
+                      {f.celdas.map((celda, i) => [
+                        <td key={`c-${i}`} className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">
+                          {celda.cantidad || <span className="text-ranch-marron/25">—</span>}
+                        </td>,
+                        <td key={`v-${i}`} className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">
+                          {celda.valorTotal > 0 ? formatearCOP(celda.valorTotal) : <span className="text-ranch-marron/25">—</span>}
+                        </td>,
+                      ])}
+                      <td className="border border-ranch-marron/25 bg-ranch-crema/30 px-2 py-1.5 text-right font-semibold tabular-nums">{f.cantidad}</td>
+                      <td className="border border-ranch-marron/25 bg-ranch-crema/30 px-2 py-1.5 text-right font-semibold tabular-nums">
+                        {f.cobra ? formatearCOP(f.valorTotal) : <span className="text-ranch-marron/25">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-ranch-crema/70 font-bold text-ranch-marron">
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 uppercase" colSpan={2}>Total caja</td>
+                    {r.porCaja.totalPorCaja.map((t, i) => [
+                      <td key={`tc-${i}`} className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">{t.cantidad}</td>,
+                      <td key={`tv-${i}`} className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">{formatearCOP(t.valorTotal)}</td>,
+                    ])}
+                    <td className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">{r.porCaja.totalCantidad}</td>
+                    <td className="border border-ranch-marron/25 px-2 py-1.5 text-right tabular-nums">{formatearCOP(r.porCaja.totalValor)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1 text-xs text-ranch-marron/50">
+              Si son muchas cajas, imprime en horizontal para que no se corte.
+            </p>
+          </>
+        )}
+
         {/* Agrupación por tipo de manilla */}
         <h2 className="mb-2 mt-6 font-bold uppercase text-ranch-marron">Manillas por tipo</h2>
         <table className="w-full border-collapse text-sm sm:w-2/3">
