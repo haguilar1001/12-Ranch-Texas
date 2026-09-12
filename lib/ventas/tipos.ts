@@ -22,6 +22,12 @@ export interface EntradaPago {
 export interface EntradaVenta {
   lineas: EntradaLinea[];
   pagos: EntradaPago[];
+  /**
+   * Llave que identifica ESTE intento de registro. La taquilla la genera una vez por
+   * venta y la repite si tiene que reintentar (por ejemplo si se cayó el internet y no
+   * supo si la venta entró). El servidor devuelve la venta ya creada en vez de repetirla.
+   */
+  clave_idempotencia?: string;
   comprador_nombre?: string;
   comprador_documento?: string;
   comprador_celular?: string;
@@ -29,7 +35,8 @@ export interface EntradaVenta {
 }
 
 export type ResultadoVenta =
-  | { ok: true; numero_venta: number; venta_id: string }
+  /** `repetida` avisa que este intento ya estaba grabado: no se creó nada nuevo. */
+  | { ok: true; numero_venta: number; venta_id: string; repetida?: boolean }
   | { ok: false; error: string };
 
 /** Contexto de ejecución de la venta (cajero + turno + caja). */

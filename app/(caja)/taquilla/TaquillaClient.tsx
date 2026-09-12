@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { registrarVenta, corregirVenta } from "./actions";
 import IconoTipo from "@/components/IconoTipo";
-import type { EntradaVenta } from "@/lib/ventas/tipos";
+import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
 import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
 
@@ -34,6 +34,14 @@ interface FilaPago { key: number; medio_pago_id: string; monto: string }
 
 /** Descuento aplicado a un tipo de visitante: cuánto se cobra por unidad, con motivo y quién autoriza. */
 interface Descuento { valor: string; motivo: string; autoriza: string }
+
+/** Si el servidor no contesta en este tiempo, se le avisa al cajero en vez de dejarlo esperando. */
+const ESPERA_MAXIMA_MS = 20_000;
+
+function nuevaClave(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 /** Venta que se está corrigiendo: llega con sus líneas, pagos y comprador ya cargados. */
 export interface VentaACorregir {
@@ -105,9 +113,18 @@ export default function TaquillaClient({
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ultimaVenta, setUltimaVenta] = useState<{ id: string; numero: number } | null>(null);
+  /** Cuando el servidor no contesta (internet caído), se avisa fuerte y se puede reintentar. */
+  const [sinRespuesta, setSinRespuesta] = useState(false);
   const router = useRouter();
   const keyRef = useRef(2);
   const nextKey = () => keyRef.current++;
+
+  /**
+   * Llave de ESTE intento de venta. Se mantiene igual mientras el cajero reintente,
+   * para que el servidor reconozca el reintento y no cree la venta dos veces. Se
+   * renueva cuando la venta queda registrada o cuando se limpia la pantalla.
+   */
+  const claveRef = useRef<string>(nuevaClave());
 
   const tipoPorId = useMemo(() => new Map(tipos.map((t) => [t.id, t])), [tipos]);
 
@@ -229,6 +246,9 @@ export default function TaquillaClient({
   function limpiar() {
     setCant({}); setCortesias([]); setDescuentos({}); setComprador({ nombre: "", documento: "", celular: "", email: "" });
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+    // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
+    claveRef.current = nuevaClave();
+    setSinRespuesta(false);
   }
 
   function alternarDescuento(tipoId: string, valorLista: number) {
@@ -247,7 +267,9 @@ export default function TaquillaClient({
   async function vender() {
     setEnviando(true);
     setResultado(null);
+    setSinRespuesta(false);
     const entrada: EntradaVenta = {
+      clave_idempotencia: claveRef.current,
       lineas: lineas.map((l) => ({
         tipo_visitante_id: l.tipo_visitante_id, cantidad: l.cantidad, tipo_linea: l.tipo_linea,
         motivo_cortesia_id: l.motivo_cortesia_id ?? null, autorizado_por: l.autorizado_por ?? null,
@@ -268,9 +290,23 @@ export default function TaquillaClient({
       .filter((l) => tipoPorId.get(l.tipo_visitante_id)?.codigo === "bebe")
       .reduce((a, l) => a + l.cantidad, 0);
     const manillas = asistentes - bebes;
-    const r = correccion
-      ? await corregirVenta(correccion.id, entrada, motivoCorreccion)
-      : await registrarVenta(entrada);
+
+    // Si el internet se cae, la petición se queda colgada y antes el botón se quedaba
+    // en "Registrando…" para siempre: el cajero entregaba las manillas creyendo que la
+    // venta entró. Ahora se le pone un tope de espera y se avisa.
+    let r: ResultadoVenta;
+    try {
+      r = await Promise.race([
+        correccion ? corregirVenta(correccion.id, entrada, motivoCorreccion) : registrarVenta(entrada),
+        new Promise<never>((_, rechazar) => setTimeout(() => rechazar(new Error("sin respuesta")), ESPERA_MAXIMA_MS)),
+      ]);
+    } catch {
+      setEnviando(false);
+      setSinRespuesta(true);
+      setUltimaVenta(null);
+      return; // No se limpia nada: la venta queda armada para volver a intentarla.
+    }
+
     setEnviando(false);
     if (r.ok) {
       const detalle = bebes > 0
@@ -278,9 +314,11 @@ export default function TaquillaClient({
         : `${manillas} manillas`;
       setResultado({
         ok: true,
-        texto: correccion
-          ? `Venta #${correccion.numero} corregida: queda anulada y la reemplaza la #${r.numero_venta} · ${detalle}.`
-          : `Venta #${r.numero_venta} registrada · ${detalle}.`,
+        texto: r.repetida
+          ? `Esta venta ya estaba registrada con el número #${r.numero_venta}: no se duplicó.`
+          : correccion
+            ? `Venta #${correccion.numero} corregida: queda anulada y la reemplaza la #${r.numero_venta} · ${detalle}.`
+            : `Venta #${r.numero_venta} registrada · ${detalle}.`,
       });
       setUltimaVenta({ id: r.venta_id, numero: r.numero_venta });
       limpiar();
@@ -627,6 +665,21 @@ export default function TaquillaClient({
             )}
           </div>
 
+          {/* El internet se cayó a mitad del registro: hay que decirlo fuerte, porque el
+              cajero está a punto de entregar manillas de una venta que puede no existir. */}
+          {sinRespuesta && (
+            <div className="rounded-xl border-4 border-red-600 bg-red-50 p-3">
+              <p className="font-black text-red-700">⚠ NO SE PUDO CONFIRMAR LA VENTA</p>
+              <p className="mt-1 text-sm text-red-800">
+                El servidor no contestó: seguramente se cayó el internet. <strong>No entregues las manillas todavía.</strong>
+              </p>
+              <p className="mt-1 text-sm text-red-800">
+                Revisa la conexión y vuelve a darle <strong>Registrar venta</strong>. La venta quedó armada tal como
+                estaba y la app no la va a duplicar: si el primer intento sí había entrado, te lo dice y te da su número.
+              </p>
+            </div>
+          )}
+
           {resultado && (
             <p className={`rounded-lg px-3 py-2 text-sm ${resultado.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{resultado.texto}</p>
           )}
@@ -645,11 +698,13 @@ export default function TaquillaClient({
           <button
             onClick={vender}
             disabled={!puedeVender}
-            className="w-full rounded-xl bg-ranch-marron px-4 py-4 text-lg font-bold text-ranch-crema hover:bg-ranch-marron-oscuro disabled:opacity-40"
+            className={`w-full rounded-xl px-4 py-4 text-lg font-bold text-ranch-crema disabled:opacity-40 ${
+              sinRespuesta ? "bg-red-600 hover:bg-red-700" : "bg-ranch-marron hover:bg-ranch-marron-oscuro"
+            }`}
           >
             {enviando
               ? correccion ? "Corrigiendo…" : "Registrando…"
-              : correccion ? "Guardar corrección" : "Registrar venta"}
+              : sinRespuesta ? "Volver a intentar" : correccion ? "Guardar corrección" : "Registrar venta"}
           </button>
           {correccion ? (
             <a href="/caja/ventas" className="block w-full rounded-lg border border-ranch-marron/20 px-4 py-2 text-center text-sm text-ranch-marron/70 hover:bg-white">

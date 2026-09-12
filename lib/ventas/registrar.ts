@@ -30,6 +30,17 @@ export async function crearVenta(
 ): Promise<ResultadoVenta> {
   if (!entrada.lineas?.length) return { ok: false, error: "La venta no tiene líneas." };
 
+  // ¿Este intento ya había entrado? Pasa cuando se cae el internet justo después de
+  // que el servidor grabó: el cajero no vio respuesta y volvió a darle "Registrar".
+  // Se devuelve la venta que ya existe, para no cobrarle dos veces al parque.
+  if (entrada.clave_idempotencia) {
+    const yaEsta = await prisma.venta.findUnique({
+      where: { clave_idempotencia: entrada.clave_idempotencia },
+      select: { id: true, numero_venta: true },
+    });
+    if (yaEsta) return { ok: true, numero_venta: yaEsta.numero_venta, venta_id: yaEsta.id, repetida: true };
+  }
+
   const ids = [...new Set(entrada.lineas.map((l) => l.tipo_visitante_id))];
   const tiposInfo = new Map(
     (await prisma.tipoVisitante.findMany({ where: { id: { in: ids } }, select: { id: true, codigo: true, nombre: true } }))
@@ -99,6 +110,7 @@ export async function crearVenta(
       const venta = await tx.venta.create({
         data: {
           turno_id: ctx.turnoId,
+          clave_idempotencia: entrada.clave_idempotencia ?? null,
           corrige_venta_id: correccion?.ventaId ?? null,
           usuario_id: ctx.usuarioId,
           numero_venta: numero,
@@ -178,6 +190,15 @@ export async function crearVenta(
 
     return { ok: true, numero_venta: res.numero, venta_id: res.venta_id };
   } catch (e) {
+    // Dos peticiones con la MISMA llave a la vez: una ganó la carrera y la otra choca
+    // contra el índice único. No es un error para el cajero: la venta sí quedó.
+    if (entrada.clave_idempotencia && (e as { code?: string })?.code === "P2002") {
+      const yaEsta = await prisma.venta.findUnique({
+        where: { clave_idempotencia: entrada.clave_idempotencia },
+        select: { id: true, numero_venta: true },
+      });
+      if (yaEsta) return { ok: true, numero_venta: yaEsta.numero_venta, venta_id: yaEsta.id, repetida: true };
+    }
     console.error("Error registrando venta:", e);
     return { ok: false, error: "No se pudo registrar la venta. Intenta de nuevo." };
   }

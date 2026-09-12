@@ -336,6 +336,10 @@ model Venta {
   comprador_celular   String?
   comprador_email     String?
 
+  /// Llave que manda la taquilla al registrar. Si el internet se cae y el cajero
+  /// vuelve a darle "Registrar", llega la MISMA llave y la venta no se duplica.
+  clave_idempotencia String? @unique
+
   /// Si esta venta corrige a otra: la original queda anulada y esta la reemplaza.
   /// Nada se edita en sitio — así el cuadre y la auditoría conservan las dos caras.
   corrige_venta_id String? @unique
