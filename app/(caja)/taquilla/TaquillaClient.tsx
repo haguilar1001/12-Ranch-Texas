@@ -195,11 +195,18 @@ export default function TaquillaClient({
 
   const hayEfectivo = pagos.some((p) => efectivoIds.has(p.medio_pago_id));
 
-  /** Los botones de billete llenan la primera línea de efectivo con lo que entregó el cliente. */
-  function ponerEnEfectivo(monto: number) {
+  /**
+   * Los botones de billete SUMAN sobre la línea de efectivo: el cajero va contando lo
+   * que recibe tal cual se lo entregan (dos de veinte = dos toques en 20.000).
+   * `monto` en null vuelve la línea a cero, para cuando se pasó contando.
+   */
+  function sumarEnEfectivo(monto: number | null) {
     setPagos((prev) => {
       const i = prev.findIndex((p) => efectivoIds.has(p.medio_pago_id));
-      return i < 0 ? prev : prev.map((p, k) => (k === i ? { ...p, monto: String(monto) } : p));
+      if (i < 0) return prev;
+      return prev.map((p, k) =>
+        k === i ? { ...p, monto: monto === null ? "" : String(parseCOP(p.monto) + monto) } : p,
+      );
     });
   }
 
@@ -552,18 +559,26 @@ export default function TaquillaClient({
                 </div>
               ))}
             </div>
-            {/* Billetes frecuentes: llenan la línea de efectivo de un toque. */}
+            {/* Los billetes que circulan: se va sumando uno por cada uno que recibe. */}
             {hayEfectivo && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {[20000, 50000, 100000, 200000].map((b) => (
+              <div className="mt-2 flex flex-wrap items-center gap-1">
+                {[10000, 20000, 50000, 100000].map((b) => (
                   <button
                     key={b}
-                    onClick={() => ponerEnEfectivo(b)}
-                    className="rounded bg-ranch-marron/10 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-marron/20"
+                    onClick={() => sumarEnEfectivo(b)}
+                    title={`Sumar un billete de ${formatearCOP(b)}`}
+                    className="rounded bg-ranch-marron/10 px-2 py-1 text-xs font-semibold text-ranch-marron hover:bg-ranch-marron/20 active:scale-95"
                   >
-                    {formatearMiles(b)}
+                    +{formatearMiles(b)}
                   </button>
                 ))}
+                <button
+                  onClick={() => sumarEnEfectivo(null)}
+                  title="Volver el efectivo a cero"
+                  className="rounded px-2 py-1 text-xs font-semibold text-ranch-marron/50 hover:bg-red-50 hover:text-red-600"
+                >
+                  ↺
+                </button>
               </div>
             )}
 
