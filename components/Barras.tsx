@@ -33,7 +33,15 @@ export default function Barras({ datos, vacio = "Sin datos en el periodo." }: { 
         const parte = total > 0 ? (d.valor / total) * 100 : null;
         return (
           <div key={d.etiqueta} className="flex items-center gap-2 text-sm">
-            <span className="w-20 shrink-0 truncate text-right text-ranch-marron/60">{d.etiqueta}</span>
+            {/* La etiqueta manda: con 80 px "BONO COOMEVA" y "BONO COMFAMILIAR"
+                quedaban los dos en "BONO CO…", que es peor que no mostrar nada.
+                El `title` deja ver el nombre completo si aun así no cabe. */}
+            <span
+              title={d.etiqueta}
+              className="w-48 shrink-0 truncate text-right text-ranch-marron/60"
+            >
+              {d.etiqueta}
+            </span>
             <div className="h-4 flex-1 rounded bg-ranch-marron/5">
               <div className="h-4 rounded bg-ranch-dorado" style={{ width: `${(d.valor / max) * 100}%` }} />
             </div>

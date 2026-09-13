@@ -48,7 +48,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const varAnual = variacionPct(comp.totalActual, comp.totalAnterior);
 
   return (
-    <main className="mx-auto max-w-5xl p-4 sm:p-6">
+    <main className="mx-auto max-w-[92rem] p-4 sm:p-6">
       <h1 className="mb-3 text-2xl font-black text-ranch-marron">Dashboard de ventas</h1>
 
       {/* Filtros */}
