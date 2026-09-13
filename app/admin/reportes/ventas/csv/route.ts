@@ -17,6 +17,7 @@ export async function GET(req: Request) {
       anio: url.searchParams.get("anio") ?? undefined,
       mes: url.searchParams.get("mes") ?? undefined,
       fecha: url.searchParams.get("fecha"),
+      dia: url.searchParams.get("dia"),
     },
     fechaBogota(),
   );

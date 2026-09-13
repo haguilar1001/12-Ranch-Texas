@@ -18,7 +18,7 @@ function Kpi({ label, valor }: { label: string; valor: string }) {
   );
 }
 
-export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }> }) {
+export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; dia?: string; caja?: string; cajero?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "consulta")) return <main className="p-6">Sin acceso.</main>;
@@ -28,7 +28,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
   const cajaId = sp.caja || undefined;
   const cajeroId = sp.cajero || undefined;
 
-  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
+  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
 
   const [ind, cajas, cajeros] = await Promise.all([
     indicadoresVentas(periodo.inicio, periodo.fin, { cajaId, cajeroId }),

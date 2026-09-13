@@ -208,3 +208,36 @@ describe("período del informe de cortesías", () => {
     }
   });
 });
+
+// Las URLs son una interfaz: un marcador, una pestaña abierta o la página que el
+// navegador tenía en caché siguen mandando el formato viejo "?anio=&mes=&dia=".
+// Ignorarlo devolvía el mes entero sin avisar: "escojo el día y no cambia nada".
+describe("compatibilidad con el filtro viejo de día", () => {
+  const HOY = "2026-09-13";
+
+  it("entiende el parámetro viejo `dia`", () => {
+    const r = rangoDe({ anio: 2026, mes: 9, dia: 13 }, HOY);
+    expect(r.etiqueta).toBe("13 de septiembre de 2026");
+    expect(r.fecha).toBe("2026-09-13");
+    expect(r.inicio.toISOString()).toBe("2026-09-13T05:00:00.000Z");
+  });
+
+  it("da lo mismo pedirlo con `dia` que con `fecha`", () => {
+    for (const [anio, mes, dia] of [[2026, 2, 20], [2024, 2, 29], [2026, 12, 31]] as const) {
+      const viejo = rangoDe({ anio, mes, dia }, HOY);
+      const nuevo = rangoDe({ fecha: `${anio}-${String(mes).padStart(2, "0")}-${dia}` }, HOY);
+      expect(viejo.clave).toBe(nuevo.clave);
+      expect(viejo.inicio.toISOString()).toBe(nuevo.inicio.toISOString());
+      expect(viejo.fin.toISOString()).toBe(nuevo.fin.toISOString());
+    }
+  });
+
+  it("un `dia` vacío o imposible sigue siendo el mes completo", () => {
+    expect(rangoDe({ anio: 2026, mes: 9, dia: "" }, HOY).dia).toBeNull();
+    expect(rangoDe({ anio: 2026, mes: 2, dia: 31 }, HOY).etiqueta).toBe("febrero 2026");
+  });
+
+  it("`fecha` manda sobre el `dia` viejo si llegan los dos", () => {
+    expect(rangoDe({ fecha: "2026-09-13", anio: 2026, mes: 9, dia: 5 }, HOY).clave).toBe("2026-09-13");
+  });
+});

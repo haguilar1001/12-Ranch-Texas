@@ -100,7 +100,7 @@ function Agrupado({
 export default async function ReporteCortesiasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }>;
+  searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; dia?: string; caja?: string; cajero?: string }>;
 }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
@@ -113,7 +113,7 @@ export default async function ReporteCortesiasPage({
   const cajaId = sp.caja || undefined;
   const cajeroId = sp.cajero || undefined;
 
-  const rango = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
+  const rango = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
 
   const [r, cajas, cajeros] = await Promise.all([
     relacionCortesias(rango.inicio, rango.fin, { cajaId, cajeroId }),

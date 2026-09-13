@@ -67,7 +67,7 @@ function mesCompleto(anio: number, mes: number): Periodo {
  * que nadie pidió es peor que ampliar el rango.
  */
 export function rangoDe(
-  params: { fecha?: string | null; anio?: string | number; mes?: string | number },
+  params: { fecha?: string | null; anio?: string | number; mes?: string | number; dia?: string | number | null },
   hoy: string,
 ): Periodo {
   const n = (v: string | number | null | undefined, porDefecto: number) => {
@@ -102,6 +102,20 @@ export function rangoDe(
 
   const anio = n(params.anio, anioPorDefecto);
   const mes = Math.min(12, Math.max(1, n(params.mes, mesPorDefecto)));
+
+  // `dia` es la forma VIEJA de pedir un día: antes el filtro eran tres desplegables
+  // (día, mes, año) y la URL decía "?anio=2026&mes=9&dia=13". Se sigue entendiendo
+  // porque esas URLs siguen vivas: en un marcador, en una pestaña que el cajero dejó
+  // abierta, o en la página que el navegador tenía en caché cuando salió el cambio.
+  // Sin esto, esas pantallas mandan `dia`, el servidor lo ignora y devuelve el mes
+  // entero — se ve como "escojo el día y no cambia nada", que es justo lo que pasó.
+  if (params.dia !== null && params.dia !== undefined && params.dia !== "") {
+    const dia = n(params.dia, 0);
+    if (dia >= 1 && dia <= diasDelMes(anio, mes)) {
+      return rangoDe({ fecha: `${anio}-${dosDigitos(mes)}-${dosDigitos(dia)}` }, hoy);
+    }
+  }
+
   return mesCompleto(anio, mes);
 }
 

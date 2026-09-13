@@ -26,14 +26,14 @@ function Kpi({ label, valor, sub }: { label: string; valor: string; sub?: string
   );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; dia?: string; caja?: string; cajero?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "consulta")) return <main className="p-6">Sin acceso.</main>;
 
   const hoy = fechaBogota();
   const sp = await searchParams;
-  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
+  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
   const { anio, mes } = periodo;
   const filtros: FiltrosVentas = { cajaId: sp.caja || undefined, cajeroId: sp.cajero || undefined };
 
