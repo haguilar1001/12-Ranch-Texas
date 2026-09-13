@@ -124,7 +124,7 @@ export default async function ReporteCortesiasPage({
   const qs = queryDe(rango, cajaId, cajeroId);
 
   return (
-    <main className="mx-auto max-w-5xl p-4">
+    <main className="mx-auto max-w-[100rem] p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Relación de cortesías</h1>
       <p className="mb-4 text-sm text-ranch-marron/60">
         Quién entró gratis, con qué motivo y quién lo autorizó. Las rebajas de tarifa no salen aquí: esas son del cierre del día, en "Descuentos autorizados".
@@ -175,7 +175,11 @@ export default async function ReporteCortesiasPage({
 
       <h2 className="mb-2 font-bold text-ranch-marron">Detalle</h2>
       <div className="overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
-        <table className="w-full text-left text-sm">
+        {/* Una fila = una línea. Con los textos envueltos, una fila ocupaba tres
+            renglones y la tabla se volvía imposible de barrer con la vista. Si aun
+            así no cabe, el contenedor de arriba la desplaza en horizontal: preferible
+            a partir cada nombre en pedazos. */}
+        <table className="w-full whitespace-nowrap text-left text-sm">
           <thead className="bg-ranch-crema/60 text-xs uppercase text-ranch-marron/60">
             <tr>
               <th className="px-3 py-2">Fecha</th>
