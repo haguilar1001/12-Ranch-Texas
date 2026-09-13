@@ -21,6 +21,8 @@ export interface LineaCortesia {
   no_cobrado: number; // (lista − cobrado) × cantidad
   motivo: string;
   autoriza: string;
+  /** A nombre de quién entró. Lo más importante del informe: a quién se le regaló la entrada. */
+  beneficiario: string;
 }
 
 export interface ResumenCortesias {
@@ -82,6 +84,7 @@ export interface FiltrosCortesias {
 
 const SIN_MOTIVO = "(sin motivo)";
 const SIN_AUTORIZA = "(sin autorización)";
+const SIN_BENEFICIARIO = "(sin nombre)";
 
 /**
  * Trae el detalle de CORTESÍAS del período: atenciones, invitaciones y cortesías.
@@ -112,6 +115,7 @@ export async function relacionCortesias(
         select: {
           creado_en: true,
           numero_venta: true,
+          comprador_nombre: true,
           usuario: { select: { nombre: true } },
           turno: { select: { caja: { select: { nombre: true } } } },
         },
@@ -149,6 +153,9 @@ export async function relacionCortesias(
       valor_lista: d.valor_lista,
       valor_cobrado: d.valor_cobrado,
       no_cobrado: (d.valor_lista - d.valor_cobrado) * d.cantidad,
+      // Si la venta es toda una cortesía, el comprador ES el beneficiario: se usa de respaldo
+      // para las de antes de que existiera el campo.
+      beneficiario: d.beneficiario?.trim() || d.venta.comprador_nombre?.trim() || SIN_BENEFICIARIO,
       motivo: d.motivo_cortesia?.nombre ?? d.motivo_descuento ?? SIN_MOTIVO,
       autoriza: (d.autorizado_por && nombrePorId.get(d.autorizado_por)) || SIN_AUTORIZA,
     });

@@ -28,6 +28,8 @@ interface Cortesia {
   cantidad: number;
   tipo_linea: "invitacion" | "atencion" | "cortesia";
   motivo_cortesia_id: string;
+  /** A nombre de quién entra. El motivo dice por qué; esto dice a quién. */
+  beneficiario: string;
   autorizado_por: string;
 }
 interface FilaPago { key: number; medio_pago_id: string; monto: string }
@@ -55,6 +57,7 @@ export interface VentaACorregir {
     valor_lista: number;
     valor_cobrado: number;
     motivo_cortesia_id: string | null;
+    beneficiario: string | null;
     motivo_descuento: string | null;
     autorizado_por: string | null;
   }[];
@@ -101,6 +104,7 @@ export default function TaquillaClient({
         cantidad: l.cantidad,
         tipo_linea: l.tipo_linea as Cortesia["tipo_linea"],
         motivo_cortesia_id: l.motivo_cortesia_id ?? "",
+        beneficiario: l.beneficiario ?? "",
         autorizado_por: l.autorizado_por ?? "",
       })),
   );
@@ -153,7 +157,8 @@ export default function TaquillaClient({
       if (!t || co.cantidad <= 0) continue;
       ls.push({
         tipo_visitante_id: co.tipo_visitante_id, cantidad: co.cantidad, valor_lista: t.valor, valor_cobrado: 0,
-        tipo_linea: co.tipo_linea, motivo_cortesia_id: co.motivo_cortesia_id || null, autorizado_por: co.autorizado_por || null,
+        tipo_linea: co.tipo_linea, motivo_cortesia_id: co.motivo_cortesia_id || null,
+        beneficiario: co.beneficiario || null, autorizado_por: co.autorizado_por || null,
       });
     }
     return ls;
@@ -197,7 +202,10 @@ export default function TaquillaClient({
   const faltaCelular = comprador.celular.replace(/D/g, "").length < 7;
   const faltaComprador = faltaNombre || faltaCelular;
 
-  const puedeVender = lineas.length > 0 && validacion.ok && !faltaComprador && !enviando;
+  // Una cortesía sin beneficiario no sirve de control: hay que saber quién entró gratis.
+  const faltaBeneficiario = cortesias.some((c) => c.cantidad > 0 && !c.beneficiario.trim());
+
+  const puedeVender = lineas.length > 0 && validacion.ok && !faltaComprador && !faltaBeneficiario && !enviando;
 
   function setCantidad(id: string, delta: number) {
     setCant((prev) => {
@@ -213,7 +221,7 @@ export default function TaquillaClient({
   function agregarCortesia() {
     setCortesias((prev) => [
       ...prev,
-      { key: nextKey(), tipo_visitante_id: tipos[0]?.id ?? "", cantidad: 1, tipo_linea: "invitacion", motivo_cortesia_id: "", autorizado_por: "" },
+      { key: nextKey(), tipo_visitante_id: tipos[0]?.id ?? "", cantidad: 1, tipo_linea: "invitacion", motivo_cortesia_id: "", beneficiario: "", autorizado_por: "" },
     ]);
   }
   function actualizarCortesia(key: number, campo: keyof Cortesia, valor: string | number) {
@@ -283,7 +291,8 @@ export default function TaquillaClient({
       clave_idempotencia: claveRef.current,
       lineas: lineas.map((l) => ({
         tipo_visitante_id: l.tipo_visitante_id, cantidad: l.cantidad, tipo_linea: l.tipo_linea,
-        motivo_cortesia_id: l.motivo_cortesia_id ?? null, autorizado_por: l.autorizado_por ?? null,
+        motivo_cortesia_id: l.motivo_cortesia_id ?? null, beneficiario: l.beneficiario ?? null,
+        autorizado_por: l.autorizado_por ?? null,
         // Solo se manda si de verdad se cobró menos que la tarifa.
         valor_cobrado: l.valor_cobrado < l.valor_lista ? l.valor_cobrado : null,
         motivo_descuento: l.motivo_descuento ?? null,
@@ -569,10 +578,11 @@ export default function TaquillaClient({
               <h2 className="font-bold text-ranch-marron">Cortesías (atención / invitación / cortesía)</h2>
               <button onClick={agregarCortesia} className="rounded-lg bg-ranch-verde px-3 py-1 text-sm font-semibold text-white hover:opacity-90">+ Agregar</button>
             </div>
-            {cortesias.length === 0 && <p className="text-sm text-ranch-marron/50">Sin cortesías. Requieren motivo y autorización.</p>}
+            {cortesias.length === 0 && <p className="text-sm text-ranch-marron/50">Sin cortesías. Requieren beneficiario, motivo y autorización.</p>}
+            {faltaBeneficiario && <p className="mb-2 text-xs font-semibold text-red-600">* Falta el nombre del beneficiario: a nombre de quién entra la cortesía.</p>}
             <div className="space-y-2">
               {cortesias.map((co) => (
-                <div key={co.key} className="grid grid-cols-2 gap-2 rounded-lg bg-ranch-crema/40 p-2 sm:grid-cols-6">
+                <div key={co.key} className="grid grid-cols-2 gap-2 rounded-lg bg-ranch-crema/40 p-2 sm:grid-cols-7">
                   <select value={co.tipo_linea} onChange={(e) => actualizarCortesia(co.key, "tipo_linea", e.target.value)} className="rounded border px-2 py-1 text-sm">
                     <option value="invitacion">Invitación</option>
                     <option value="atencion">Atención</option>
@@ -586,6 +596,13 @@ export default function TaquillaClient({
                     <option value="">Motivo…</option>
                     {motivos.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                   </select>
+                  {/* A nombre de quién entra. El motivo dice POR QUÉ; esto dice A QUIÉN. */}
+                  <input
+                    value={co.beneficiario}
+                    onChange={(e) => actualizarCortesia(co.key, "beneficiario", e.target.value)}
+                    placeholder="Beneficiario *"
+                    className={`rounded border px-2 py-1 text-sm ${co.beneficiario.trim() ? "" : "border-red-400 bg-red-50/50"}`}
+                  />
                   <select value={co.autorizado_por} onChange={(e) => actualizarCortesia(co.key, "autorizado_por", e.target.value)} className="rounded border px-2 py-1 text-sm">
                     <option value="">Autoriza…</option>
                     {autorizadores.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}

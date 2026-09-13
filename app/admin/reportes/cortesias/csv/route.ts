@@ -35,11 +35,12 @@ export async function GET(req: Request) {
     ["Autoriza", "Personas", "No cobrado"],
     ...r.porAutoriza.map((a) => [a.autoriza, String(a.personas), String(a.noCobrado)]),
     [],
-    ["Fecha", "Venta", "Tipo", "Visitante", "Cantidad", "Valor lista", "Valor cobrado", "No cobrado", "Motivo", "Autoriza", "Cajero", "Caja"],
+    ["Fecha", "Venta", "Tipo", "Beneficiario", "Visitante", "Cantidad", "Valor lista", "Valor cobrado", "No cobrado", "Motivo", "Autoriza", "Cajero", "Caja"],
     ...r.lineas.map((l) => [
       formatearFechaHoraCortaBogota(l.fecha),
       String(l.numero_venta),
       ETIQUETA[l.tipo] ?? l.tipo,
+      l.beneficiario,
       l.tipo_visitante,
       String(l.cantidad),
       String(l.valor_lista),

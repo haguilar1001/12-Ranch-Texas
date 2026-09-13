@@ -76,6 +76,7 @@ export default async function TaquillaPage({
         valor_lista: d.valor_lista,
         valor_cobrado: d.valor_cobrado,
         motivo_cortesia_id: d.motivo_cortesia_id,
+        beneficiario: d.beneficiario,
         motivo_descuento: d.motivo_descuento,
         autorizado_por: d.autorizado_por,
       })),

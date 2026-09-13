@@ -21,6 +21,7 @@ export interface LineaVenta {
   motivo_cortesia_id?: string | null;
   motivo_descuento?: string | null;
   autorizado_por?: string | null;
+  beneficiario?: string | null;
 }
 
 export interface Pago {

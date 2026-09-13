@@ -376,6 +376,11 @@ model VentaDetalle {
   valor_lista        Int // por unidad
   valor_cobrado      Int // por unidad (valor_lista - descuento)
   motivo_descuento   String?
+
+  /// A nombre de QUIÉN entró esta cortesía. El motivo dice por qué se dio (convenio,
+  /// cumpleaños, empleado); el beneficiario dice a quién. Antes se metían los dos en el
+  /// motivo y el catálogo se llenaba de nombres de personas.
+  beneficiario       String?
   autorizado_por     String?
   motivo_cortesia_id String?
 

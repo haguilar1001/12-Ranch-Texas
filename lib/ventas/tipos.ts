@@ -5,6 +5,8 @@ export interface EntradaLinea {
   cantidad: number;
   tipo_linea: TipoLinea;
   motivo_cortesia_id?: string | null;
+  /** A nombre de quién entró la cortesía. El motivo dice por qué; esto dice a quién. */
+  beneficiario?: string | null;
   autorizado_por?: string | null;
   /**
    * Descuento: cuánto se cobra por unidad. Se omite si se cobra la tarifa completa.

@@ -98,3 +98,29 @@ describe("relación de atenciones e invitaciones", () => {
     expect(r).toMatchObject({ totalNoCobrado: 0, totalPersonas: 0, porTipo: [], porMotivo: [], porAutoriza: [] });
   });
 });
+
+describe("beneficiario de la cortesía", () => {
+  const base = {
+    fecha: new Date("2026-09-12T15:00:00Z"), numero_venta: 23, caja: "Caja 3", cajero: "María José",
+    tipo: "cortesia" as const, tipo_visitante: "Adulto", cantidad: 3,
+    valor_lista: 60_000, valor_cobrado: 0, no_cobrado: 180_000,
+    motivo: "Convenio", autoriza: "Angela Aguilar",
+  };
+
+  it("viaja en la línea y llega al resumen", () => {
+    const r = resumirCortesias([{ ...base, beneficiario: "ALEX GUZMAN" }]);
+    expect(r.lineas[0].beneficiario).toBe("ALEX GUZMAN");
+  });
+
+  it("agrupar por motivo no lo pierde: son dos preguntas distintas", () => {
+    const r = resumirCortesias([
+      { ...base, beneficiario: "ALEX GUZMAN", motivo: "Policía Nacional" },
+      { ...base, beneficiario: "LUZ MARINA", motivo: "Policía Nacional", cantidad: 1, no_cobrado: 60_000 },
+    ]);
+    // Un solo motivo con las dos personas...
+    expect(r.porMotivo).toHaveLength(1);
+    expect(r.porMotivo[0]).toMatchObject({ motivo: "Policía Nacional", personas: 4 });
+    // ...pero cada beneficiario sigue identificable en el detalle.
+    expect(r.lineas.map((l) => l.beneficiario).sort()).toEqual(["ALEX GUZMAN", "LUZ MARINA"]);
+  });
+});

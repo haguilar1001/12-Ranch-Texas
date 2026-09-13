@@ -67,6 +67,8 @@ export async function crearVenta(
       valor_cobrado: cobrado,
       tipo_linea: l.tipo_linea,
       motivo_cortesia_id: l.motivo_cortesia_id ?? null,
+      // El beneficiario solo tiene sentido en una cortesía: en una línea de pago nadie la recibe.
+      beneficiario: l.tipo_linea !== "pago" ? l.beneficiario?.trim() || null : null,
       // El motivo del descuento solo aplica si de verdad se cobró menos.
       motivo_descuento: cobrado < valor && l.tipo_linea === "pago" ? l.motivo_descuento?.trim() || null : null,
       autorizado_por: l.autorizado_por ?? null,
@@ -140,6 +142,7 @@ export async function crearVenta(
             valor_lista: l.valor_lista,
             valor_cobrado: l.valor_cobrado,
             motivo_cortesia_id: l.motivo_cortesia_id ?? null,
+            beneficiario: l.beneficiario ?? null,
             motivo_descuento: l.motivo_descuento ?? null,
             autorizado_por: l.autorizado_por ?? null,
             creado_por: ctx.usuarioId,

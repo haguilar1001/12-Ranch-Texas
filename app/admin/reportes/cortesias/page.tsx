@@ -134,6 +134,7 @@ export default async function ReporteCortesiasPage({
               <th className="px-3 py-2">Fecha</th>
               <th className="px-3 py-2">Venta</th>
               <th className="px-3 py-2">Tipo</th>
+              <th className="px-3 py-2">Beneficiario</th>
               <th className="px-3 py-2">Visitante</th>
               <th className="px-3 py-2 text-right">Cant.</th>
               <th className="px-3 py-2">Motivo</th>
@@ -150,6 +151,7 @@ export default async function ReporteCortesiasPage({
                 <td className="px-3 py-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${COLOR[l.tipo]}`}>{ETIQUETA[l.tipo]}</span>
                 </td>
+                <td className="px-3 py-2 font-semibold text-ranch-marron">{l.beneficiario}</td>
                 <td className="px-3 py-2 text-ranch-marron/70">{l.tipo_visitante}</td>
                 <td className="px-3 py-2 text-right font-semibold text-ranch-marron">{l.cantidad}</td>
                 <td className="px-3 py-2 text-ranch-marron/70">{l.motivo}</td>
@@ -159,7 +161,7 @@ export default async function ReporteCortesiasPage({
               </tr>
             ))}
             {r.lineas.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-ranch-marron/50">No hubo cortesías en el período.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-ranch-marron/50">No hubo cortesías en el período.</td></tr>
             )}
           </tbody>
         </table>
