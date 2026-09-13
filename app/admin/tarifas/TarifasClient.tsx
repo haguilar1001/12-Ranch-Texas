@@ -83,19 +83,19 @@ export default function TarifasClient({
 
   async function guardarEdicion() {
     if (!edicion) return;
-    setBusy(true);
-    const r = await editarTipo(edicion.id, {
-      nombre: edicion.nombre,
-      edad_min: edicion.edad_min === "" ? null : edicion.edad_min,
-      edad_max: edicion.edad_max === "" ? null : edicion.edad_max,
-      orden: parseInt(edicion.orden, 10) || 0,
-      icono: edicion.icono,
-      requiere_carnet: edicion.requiere_carnet,
-      requiere_escaneo: edicion.requiere_escaneo,
-    });
-    setBusy(false);
-    aviso(r, "Tipo actualizado.");
-    if (r.ok) setEdicion(null);
+    const r = await ejecutar(
+      () => editarTipo(edicion.id, {
+        nombre: edicion.nombre,
+        edad_min: edicion.edad_min === "" ? null : edicion.edad_min,
+        edad_max: edicion.edad_max === "" ? null : edicion.edad_max,
+        orden: parseInt(edicion.orden, 10) || 0,
+        icono: edicion.icono,
+        requiere_carnet: edicion.requiere_carnet,
+        requiere_escaneo: edicion.requiere_escaneo,
+      }),
+      "Tipo actualizado.",
+    );
+    if (r?.ok) setEdicion(null);
   }
   const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
@@ -110,12 +110,36 @@ export default function TarifasClient({
     if (r.ok) router.refresh();
   };
 
-  async function crear() {
+  /**
+   * Corre una acción del servidor dejando SIEMPRE los botones libres.
+   *
+   * Antes cada botón hacía `setBusy(true)` … `setBusy(false)` en línea recta. Si la
+   * acción fallaba —se cayó la red, la sesión venció, o el servidor se estaba
+   * reiniciando por un despliegue—, la promesa se rompía y el `setBusy(false)` nunca
+   * corría: TODOS los botones de la pantalla quedaban deshabilitados, sin un solo
+   * mensaje. Desde afuera se veía como "le doy Guardar y no hace nada", y la única
+   * salida era recargar la página sin saber por qué.
+   */
+  async function ejecutar<T extends { ok: boolean; error?: string }>(
+    accion: () => Promise<T>,
+    exito: string,
+  ): Promise<T | null> {
     setBusy(true);
-    const r = await crearTipo(nuevo);
-    setBusy(false);
-    if (r.ok) setNuevo({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
-    aviso(r, "Tipo de visitante creado.");
+    try {
+      const r = await accion();
+      aviso(r, exito);
+      return r;
+    } catch {
+      setMsg({ ok: false, t: "No se pudo guardar. Revisa la conexión y vuelve a intentarlo." });
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function crear() {
+    const r = await ejecutar(() => crearTipo(nuevo), "Tipo de visitante creado.");
+    if (r?.ok) setNuevo({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
   }
 
   return (
@@ -249,10 +273,9 @@ export default function TarifasClient({
                         <span className="flex gap-1">
                           <button
                             onClick={async () => {
-                              const r = await cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo);
-                              aviso(r, "Tarifa actualizada.");
-                              setErrorTarifa(r.ok ? null : r.error ?? "Error");
-                              if (r.ok) setCambioTarifa(null);
+                              const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
+                              setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
+                              if (r?.ok) setCambioTarifa(null);
                             }}
                             className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white"
                           >Guardar</button>
@@ -308,7 +331,7 @@ export default function TarifasClient({
                   {/* Estado */}
                   <td>
                     <button
-                      onClick={async () => aviso(await cambiarEstadoTipo(t.id, !t.activo), t.activo ? "Tipo desactivado." : "Tipo activado.")}
+                      onClick={() => ejecutar(() => cambiarEstadoTipo(t.id, !t.activo), t.activo ? "Tipo desactivado." : "Tipo activado.")}
                       className={`rounded px-2 py-0.5 text-xs font-semibold ${t.activo ? "bg-ranch-verde/15 text-ranch-verde" : "bg-red-100 text-red-700"}`}
                     >
                       {t.activo ? "Activo" : "Inactivo"}
@@ -369,11 +392,8 @@ export default function TarifasClient({
           <button
             disabled={busy}
             onClick={async () => {
-              setBusy(true);
-              const r = await crearMotivo(nuevoMotivo);
-              setBusy(false);
-              if (r.ok) setNuevoMotivo("");
-              aviso(r, "Motivo creado.");
+              const r = await ejecutar(() => crearMotivo(nuevoMotivo), "Motivo creado.");
+              if (r?.ok) setNuevoMotivo("");
             }}
             className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema disabled:opacity-50"
           >
@@ -381,6 +401,10 @@ export default function TarifasClient({
           </button>
         </div>
 
+        {/* Con el campo de edición abierto, un motivo largo hacía que el botón
+            Guardar se saliera de la pantalla en un equipo angosto: sin este
+            contenedor no había forma de confirmar el cambio. */}
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase text-ranch-marron/50">
@@ -397,7 +421,7 @@ export default function TarifasClient({
                     <input
                       value={editMotivo.v}
                       onChange={(e) => setEditMotivo({ id: m.id, v: e.target.value })}
-                      className="w-48 rounded border border-ranch-marron/30 px-2 py-1"
+                      className="w-full min-w-[16rem] rounded border border-ranch-marron/30 px-2 py-1"
                     />
                   ) : (
                     <span className="font-semibold text-ranch-marron">{m.nombre}</span>
@@ -411,11 +435,8 @@ export default function TarifasClient({
                         <button
                           disabled={busy}
                           onClick={async () => {
-                            setBusy(true);
-                            const r = await editarMotivo(m.id, editMotivo.v);
-                            setBusy(false);
-                            aviso(r, "Motivo actualizado.");
-                            if (r.ok) setEditMotivo(null);
+                            const r = await ejecutar(() => editarMotivo(m.id, editMotivo.v), "Motivo actualizado.");
+                            if (r?.ok) setEditMotivo(null);
                           }}
                           className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50"
                         >Guardar</button>
@@ -426,7 +447,7 @@ export default function TarifasClient({
                         <button onClick={() => setEditMotivo({ id: m.id, v: m.nombre })} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60">✏️ Editar</button>
                         <button
                           disabled={busy}
-                          onClick={async () => aviso(await cambiarEstadoMotivo(m.id, !m.activo), m.activo ? "Motivo desactivado." : "Motivo activado.")}
+                          onClick={() => ejecutar(() => cambiarEstadoMotivo(m.id, !m.activo), m.activo ? "Motivo desactivado." : "Motivo activado.")}
                           className={`rounded px-2 py-0.5 text-xs font-semibold ${m.activo ? "bg-ranch-verde/15 text-ranch-verde" : "bg-red-100 text-red-700"}`}
                         >{m.activo ? "Activo" : "Inactivo"}</button>
                       </>
@@ -440,6 +461,7 @@ export default function TarifasClient({
             )}
           </tbody>
         </table>
+        </div>
       </section>
 
       {/* Autorizadores — alimentan el selector "Autoriza…" de cortesías y descuentos. */}
@@ -466,11 +488,8 @@ export default function TarifasClient({
           <button
             disabled={busy}
             onClick={async () => {
-              setBusy(true);
-              const r = await crearAutorizador(nuevoAutorizador.nombre, nuevoAutorizador.cargo);
-              setBusy(false);
-              if (r.ok) setNuevoAutorizador({ nombre: "", cargo: "" });
-              aviso(r, "Autorizador agregado.");
+              const r = await ejecutar(() => crearAutorizador(nuevoAutorizador.nombre, nuevoAutorizador.cargo), "Autorizador agregado.");
+              if (r?.ok) setNuevoAutorizador({ nombre: "", cargo: "" });
             }}
             className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema disabled:opacity-50"
           >
@@ -494,7 +513,7 @@ export default function TarifasClient({
                     <input
                       value={editAutorizador.nombre}
                       onChange={(e) => setEditAutorizador({ ...editAutorizador, nombre: e.target.value })}
-                      className="w-48 rounded border border-ranch-marron/30 px-2 py-1"
+                      className="w-full min-w-[16rem] rounded border border-ranch-marron/30 px-2 py-1"
                     />
                   ) : (
                     <span className="font-semibold text-ranch-marron">
@@ -524,11 +543,8 @@ export default function TarifasClient({
                         <button
                           disabled={busy}
                           onClick={async () => {
-                            setBusy(true);
-                            const r = await editarAutorizador(a.id, editAutorizador.nombre, editAutorizador.cargo);
-                            setBusy(false);
-                            aviso(r, "Autorizador actualizado.");
-                            if (r.ok) setEditAutorizador(null);
+                            const r = await ejecutar(() => editarAutorizador(a.id, editAutorizador.nombre, editAutorizador.cargo), "Autorizador actualizado.");
+                            if (r?.ok) setEditAutorizador(null);
                           }}
                           className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50"
                         >Guardar</button>
@@ -542,7 +558,7 @@ export default function TarifasClient({
                         >✏️ Editar</button>
                         <button
                           disabled={busy}
-                          onClick={async () => aviso(await cambiarEstadoAutorizador(a.id, !a.activo), a.activo ? "Autorizador desactivado." : "Autorizador activado.")}
+                          onClick={() => ejecutar(() => cambiarEstadoAutorizador(a.id, !a.activo), a.activo ? "Autorizador desactivado." : "Autorizador activado.")}
                           className={`rounded px-2 py-0.5 text-xs font-semibold ${a.activo ? "bg-ranch-verde/15 text-ranch-verde" : "bg-red-100 text-red-700"}`}
                         >{a.activo ? "Activo" : "Inactivo"}</button>
                       </>
