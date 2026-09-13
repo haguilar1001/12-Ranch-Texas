@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias, type TipoCortesia } from "@/lib/reportes/cortesias";
+import { diasDelMes, queryDe, rangoDe } from "./rango";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
 import { formatearCOP } from "@/lib/dinero/cop";
 
@@ -55,7 +56,7 @@ function Agrupado({ titulo, filas }: { titulo: string; filas: { etiqueta: string
 export default async function ReporteCortesiasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ anio?: string; mes?: string; caja?: string; cajero?: string }>;
+  searchParams: Promise<{ anio?: string; mes?: string; dia?: string; caja?: string; cajero?: string }>;
 }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
@@ -65,22 +66,20 @@ export default async function ReporteCortesiasPage({
 
   const hoy = fechaBogota();
   const sp = await searchParams;
-  const anio = parseInt(sp.anio ?? hoy.slice(0, 4), 10);
-  const mes = parseInt(sp.mes ?? hoy.slice(5, 7), 10);
   const cajaId = sp.caja || undefined;
   const cajeroId = sp.cajero || undefined;
 
-  const inicio = new Date(`${anio}-${String(mes).padStart(2, "0")}-01T00:00:00-05:00`);
-  const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
-  const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
+  const rango = rangoDe({ anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
+  const { anio, mes, dia } = rango;
 
   const [r, cajas, cajeros] = await Promise.all([
-    relacionCortesias(inicio, fin, { cajaId, cajeroId }),
+    relacionCortesias(rango.inicio, rango.fin, { cajaId, cajeroId }),
     prisma.caja.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.usuario.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
   ]);
 
-  const qs = `anio=${anio}&mes=${mes}${cajaId ? `&caja=${cajaId}` : ""}${cajeroId ? `&cajero=${cajeroId}` : ""}`;
+  const qs = queryDe(rango, cajaId, cajeroId);
+  const dias = diasDelMes(anio, mes);
 
   return (
     <main className="mx-auto max-w-5xl p-4">
@@ -90,6 +89,14 @@ export default async function ReporteCortesiasPage({
       </p>
 
       <form className="mb-4 flex flex-wrap gap-2 text-sm">
+        {/* "Todo el mes" primero: es la pregunta que más se hace, y un día suelto
+            solo se busca cuando ya se sabe qué día revisar. */}
+        <select name="dia" defaultValue={dia ?? ""} className="rounded border px-2 py-1">
+          <option value="">Todo el mes</option>
+          {Array.from({ length: dias }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
         <select name="mes" defaultValue={mes} className="rounded border px-2 py-1">
           {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
         </select>
@@ -108,7 +115,7 @@ export default async function ReporteCortesiasPage({
         <a href={`/admin/reportes/cortesias/csv?${qs}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
       </form>
 
-      <p className="mb-2 text-sm text-ranch-marron/60">{MESES[mes - 1]} {anio}</p>
+      <p className="mb-2 text-sm capitalize text-ranch-marron/60">{rango.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Valor no cobrado" valor={formatearCOP(r.totalNoCobrado)} />
         <Kpi label="Personas" valor={String(r.totalPersonas)} />

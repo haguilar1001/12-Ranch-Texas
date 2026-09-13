@@ -1,3 +1,4 @@
+import { diasDelMes, queryDe, rangoDe } from "../app/admin/reportes/cortesias/rango";
 import { describe, it, expect } from "vitest";
 import { resumirCortesias, type LineaCortesia } from "../lib/reportes/cortesias";
 import { resolverValorCobrado, descuentoDeLinea } from "../lib/ventas/calculo";
@@ -122,5 +123,61 @@ describe("beneficiario de la cortesía", () => {
     expect(r.porMotivo[0]).toMatchObject({ motivo: "Policía Nacional", personas: 4 });
     // ...pero cada beneficiario sigue identificable en el detalle.
     expect(r.lineas.map((l) => l.beneficiario).sort()).toEqual(["ALEX GUZMAN", "LUZ MARINA"]);
+  });
+});
+
+// El período del informe: lo usan la pantalla y el Excel, así que un error aquí
+// hace que el archivo descargado traiga otras fechas que las que se están viendo.
+describe("período del informe de cortesías", () => {
+  const HOY = "2026-09-13";
+
+  it("sin día, toma el mes completo", () => {
+    const r = rangoDe({ anio: 2026, mes: 9 }, HOY);
+    expect(r.dia).toBeNull();
+    expect(r.inicio.toISOString()).toBe("2026-09-01T05:00:00.000Z"); // medianoche de Bogotá
+    expect(r.fin.toISOString()).toBe("2026-10-01T05:00:00.000Z");
+    expect(r.etiqueta).toBe("septiembre 2026");
+  });
+
+  it("con día, toma solo ese día de medianoche a medianoche", () => {
+    const r = rangoDe({ anio: 2026, mes: 9, dia: 13 }, HOY);
+    expect(r.inicio.toISOString()).toBe("2026-09-13T05:00:00.000Z");
+    expect(r.fin.toISOString()).toBe("2026-09-14T05:00:00.000Z");
+    expect(r.etiqueta).toBe("13 de septiembre de 2026");
+    expect(r.clave).toBe("2026-09-13");
+  });
+
+  it("diciembre cierra en enero del año siguiente", () => {
+    const r = rangoDe({ anio: 2026, mes: 12 }, HOY);
+    expect(r.fin.toISOString()).toBe("2027-01-01T05:00:00.000Z");
+  });
+
+  // Cambiar de mes en el formulario puede dejar seleccionado un día que no existe.
+  // Mostrar el mes completo es preferible a recortarlo a un día que nadie pidió.
+  it("un día que no existe en ese mes cae al mes completo", () => {
+    const r = rangoDe({ anio: 2026, mes: 2, dia: 31 }, HOY);
+    expect(r.dia).toBeNull();
+    expect(r.etiqueta).toBe("febrero 2026");
+  });
+
+  it("sin parámetros usa el mes de hoy", () => {
+    const r = rangoDe({}, HOY);
+    expect(r.anio).toBe(2026);
+    expect(r.mes).toBe(9);
+    expect(r.dia).toBeNull();
+  });
+
+  it("cuenta bien los días del mes, incluido febrero bisiesto", () => {
+    expect(diasDelMes(2026, 2)).toBe(28);
+    expect(diasDelMes(2024, 2)).toBe(29);
+    expect(diasDelMes(2026, 9)).toBe(30);
+    expect(diasDelMes(2026, 12)).toBe(31);
+  });
+
+  it("la query string conserva el día y los filtros", () => {
+    const conDia = queryDe(rangoDe({ anio: 2026, mes: 9, dia: 13 }, HOY), "caja1", "cajero1");
+    expect(conDia).toBe("anio=2026&mes=9&dia=13&caja=caja1&cajero=cajero1");
+    const sinDia = queryDe(rangoDe({ anio: 2026, mes: 9 }, HOY));
+    expect(sinDia).toBe("anio=2026&mes=9");
   });
 });

@@ -1,6 +1,7 @@
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias } from "@/lib/reportes/cortesias";
-import { formatearFechaHoraCortaBogota } from "@/lib/tiempo";
+import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
+import { rangoDe } from "../rango";
 
 const ETIQUETA: Record<string, string> = { atencion: "Atencion", invitacion: "Invitacion", cortesia: "Cortesia", descuento: "Descuento" };
 
@@ -9,19 +10,23 @@ export async function GET(req: Request) {
   if (!s || !tieneRol(s.rol, "supervisor")) return new Response("No autorizado", { status: 401 });
 
   const url = new URL(req.url);
-  const anio = parseInt(url.searchParams.get("anio") ?? "2026", 10);
-  const mes = parseInt(url.searchParams.get("mes") ?? "1", 10);
   const cajaId = url.searchParams.get("caja") || undefined;
   const cajeroId = url.searchParams.get("cajero") || undefined;
 
-  const inicio = new Date(`${anio}-${String(mes).padStart(2, "0")}-01T00:00:00-05:00`);
-  const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
-  const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
+  // El MISMO cálculo que usa la pantalla: el archivo no puede traer otro período.
+  const rango = rangoDe(
+    {
+      anio: url.searchParams.get("anio") ?? undefined,
+      mes: url.searchParams.get("mes") ?? undefined,
+      dia: url.searchParams.get("dia"),
+    },
+    fechaBogota(),
+  );
 
-  const r = await relacionCortesias(inicio, fin, { cajaId, cajeroId });
+  const r = await relacionCortesias(rango.inicio, rango.fin, { cajaId, cajeroId });
 
   const filas: string[][] = [
-    [`Relacion de cortesias ${mes}/${anio}`],
+    [`Relacion de cortesias ${rango.etiqueta}`],
     ["Valor no cobrado", String(r.totalNoCobrado)],
     ["Personas", String(r.totalPersonas)],
     ["Registros", String(r.lineas.length)],
@@ -58,7 +63,7 @@ export async function GET(req: Request) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="cortesias-${anio}-${mes}.csv"`,
+      "Content-Disposition": `attachment; filename="cortesias-${rango.clave}.csv"`,
     },
   });
 }
