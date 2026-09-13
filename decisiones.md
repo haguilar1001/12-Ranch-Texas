@@ -192,21 +192,24 @@ Seis cuadros nuevos del responsable reemplazan la infografía de agosto. Carga i
 - **El heno se mide en pacas**, no en kilos (`unidad_medida = "paca"`, $14.500 c/u). Es la única forma
   de que el costo salga bien sin conocer el peso de la paca.
 - **Los perros pasan a ración grupal** (8 kg/día al lote). En agosto se confirmó "800 g por perro × 10
-  perros"; el cuadro nuevo dice 12 perros y los mismos 8 kg/día, así que el total manda sobre el
-  por-cabeza hasta que se confirme.
+  perros"; el cuadro nuevo dice 12 perros y los mismos 8 kg/día, así que manda el total del lote.
+- **La ración de los caprinos cuelga de la categoría, no del grupo CABRAS.** El cuadro dice "24 cabras"
+  y son los 24 caprinos completos (12 cabras + 5 cabros + 7 crías), no las 12 del grupo.
 
 **Hallazgo:** el cuadro de equinos **no suma el heno**, que son 1.200 pacas al mes = **$17.400.000** —
-más que todo el concentrado equino junto. Con heno, la alimentación del parque es **$38.266.428/mes**
+más que todo el concentrado equino junto. Con heno, la alimentación del parque es **$38.261.002/mes**
 y no los $20.866.480 que suman los dos cuadros.
 
+**Confirmado por el responsable (2026-09-13):**
+- **La libra de la conejina es la colombiana, de 500 g**, no los 0,4536 kg del cuadro (esa es la libra
+  imperial). Son 30 libras al mes = **$53.550**, no $59.029. Es la única diferencia contra el cuadro
+  de la granja ($4.967.551 en la app contra $4.973.029 en el papel).
+- **"Talcán" es el mismo Italcán** escrito distinto. No se crea como alimento aparte.
+- **Mandan los cuadros sobre el Excel de agosto**: perros 10 → **12**, vacas 9 → **15**. No cambia
+  ningún costo (esas raciones son grupales), pero deja el censo al día.
+
 **Por confirmar:**
-- **La libra de la conejina**: el cuadro dice 0,4536 kg (libra imperial); en Colombia son 500 g. Si es
-  de 500 g, la conejina cuesta $53.550/mes y no $59.029. Se cargó como dice el cuadro.
 - **El peso de la paca de heno** (se asumió 20 kg). No afecta el costo, sí la lectura de kilos entregados.
-- **"Talcán"** aparece en la lista de precios (bulto de 30 kg, $105.000) con los mismos datos del
-  Italcán y sin consumo en ningún cuadro. Se dejó **sin cargar** por parecer una repetición del Italcán.
-- **Censo**: el cuadro habla de 12 perros y 15 vacas; la base tiene 10 y 9 (del Excel de agosto). No se
-  tocó el censo porque esas raciones son grupales y el costo no cambia, pero hay que cuadrarlo.
 
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.

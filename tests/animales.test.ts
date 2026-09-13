@@ -194,4 +194,13 @@ describe("dieta de los equinos (cuadro de septiembre de 2026)", () => {
     expect(consumoBaseMensual(racion, 60, HENO)! / 20_000).toBe(1_200);
     expect(costoMensual(racion, 60, HENO)).toBe(17_400_000);
   });
+
+  // La conejina se compra por libras y el cuadro la calculó con la libra imperial
+  // (0,4536 kg). El responsable confirmó que es la libra colombiana: 500 g.
+  it("la conejina se cobra por libra de 500 g, no por libra imperial", () => {
+    const CONEJINA_LIBRA: AlimentoUnidad = { unidad_medida: "libra", equivalencia_g: 500, costo_unitario: 1_785 };
+    const racion: RacionCalculo = { cantidad: 500, unidad: "g", modo: "grupal", frecuencia: "diaria" };
+    expect(consumoBaseMensual(racion, 7, CONEJINA_LIBRA)! / 500).toBe(30); // 15 kg = 30 libras
+    expect(costoMensual(racion, 7, CONEJINA_LIBRA)).toBe(53_550);
+  });
 });
