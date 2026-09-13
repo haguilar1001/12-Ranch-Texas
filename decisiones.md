@@ -173,6 +173,41 @@ una categoría, y "Bovinos" habría arrastrado vacas, toros y toretes. Resultado
 diferencia contra la infografía son el efecto de reemplazar agregados por reglas por cabeza, y quedan a
 la vista para revisarlos contra las compras reales.
 
+### Alimentación actualizada (2026-09-13)
+
+Seis cuadros nuevos del responsable reemplazan la infografía de agosto. Carga idempotente con
+`npm run alimentacion:2026 -- --confirmar` (`scripts/alimentacion-2026-09.ts`).
+
+- **Los precios se guardan CON IVA (5%).** El parque no es responsable de IVA: el impuesto que paga
+  por el alimento es costo, no un saldo a favor. Guardar el valor sin IVA subestimaría el gasto.
+- **Las presentaciones cambiaron y eso mueve el costo por kilo**, no solo el precio: el maíz pasó de
+  40 a 50 kg por bulto, la melaza de 20 a 30, la sal de 40 a 20 y el Italcán de 40 a 30. El supuesto
+  de agosto ("todo bulto es de 40 kg") queda cerrado con datos reales.
+- **Acuatilapia** ✅ resuelto: es **1 bulto/mes a $320.250**, no 2 bultos estimados.
+- **Aves en general** ✅ resuelto: 6 bultos de maíz + 2 de Prepico al mes.
+- **60 EQUINOS cargados por primera vez** (36 caballos, 10 potros, 14 minis). No estaban en el censo
+  de agosto pese a que el Excel se llamaba "LISTADO CABALLOS". El parque pasa de 683 a **743 cabezas**.
+- **La alfalfa se guarda con la equivalencia HÚMEDA (50 kg)**, no la del bulto seco (25 kg): las dietas
+  están escritas en alfalfa húmeda y el bulto rinde el doble al humedecerlo.
+- **El heno se mide en pacas**, no en kilos (`unidad_medida = "paca"`, $14.500 c/u). Es la única forma
+  de que el costo salga bien sin conocer el peso de la paca.
+- **Los perros pasan a ración grupal** (8 kg/día al lote). En agosto se confirmó "800 g por perro × 10
+  perros"; el cuadro nuevo dice 12 perros y los mismos 8 kg/día, así que el total manda sobre el
+  por-cabeza hasta que se confirme.
+
+**Hallazgo:** el cuadro de equinos **no suma el heno**, que son 1.200 pacas al mes = **$17.400.000** —
+más que todo el concentrado equino junto. Con heno, la alimentación del parque es **$38.266.428/mes**
+y no los $20.866.480 que suman los dos cuadros.
+
+**Por confirmar:**
+- **La libra de la conejina**: el cuadro dice 0,4536 kg (libra imperial); en Colombia son 500 g. Si es
+  de 500 g, la conejina cuesta $53.550/mes y no $59.029. Se cargó como dice el cuadro.
+- **El peso de la paca de heno** (se asumió 20 kg). No afecta el costo, sí la lectura de kilos entregados.
+- **"Talcán"** aparece en la lista de precios (bulto de 30 kg, $105.000) con los mismos datos del
+  Italcán y sin consumo en ningún cuadro. Se dejó **sin cargar** por parecer una repetición del Italcán.
+- **Censo**: el cuadro habla de 12 perros y 15 vacas; la base tiene 10 y 9 (del Excel de agosto). No se
+  tocó el censo porque esas raciones son grupales y el costo no cambia, pero hay que cuadrarlo.
+
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).

@@ -146,3 +146,52 @@ describe("existencia del alimento (kardex)", () => {
     expect(diasDeAutonomia(240_000, 0)).toBeNull();
   });
 });
+
+// Los caballos son el mayor gasto de alimento del parque y su dieta tiene dos
+// trampas: la alfalfa se compra seca y se entrega humedecida (el bulto rinde el
+// doble), y el heno se mide en pacas, no en kilos. Estas pruebas fijan las cifras
+// del cuadro de septiembre de 2026 para que un cambio de precio o de censo no las
+// mueva sin que nos demos cuenta.
+describe("dieta de los equinos (cuadro de septiembre de 2026)", () => {
+  // El bulto trae 25 kg en seco y rinde ~50 kg humedecido: la dieta se mide húmeda.
+  const ALFALFA: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 50_000, costo_unitario: 101_010 };
+  const PODIUM: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 40_000, costo_unitario: 87_360 };
+  const BRIO: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 40_000, costo_unitario: 89_985 };
+  const BRIOSAL: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 20_000, costo_unitario: 63_000 };
+  const HENO: AlimentoUnidad = { unidad_medida: "paca", equivalencia_g: 20_000, costo_unitario: 14_500 };
+
+  const porCabeza = (cantidad: number): RacionCalculo => ({ cantidad, unidad: "kg", modo: "individual", frecuencia: "diaria" });
+
+  it("la alfalfa húmeda de los 60 equinos da 3.180 kg y 63,6 bultos al mes", () => {
+    const caballos = consumoBaseMensual(porCabeza(2), 36, ALFALFA)!; // 72 kg/día
+    const potros = consumoBaseMensual(porCabeza(2), 10, ALFALFA)!; //   20 kg/día
+    const minis = consumoBaseMensual(porCabeza(1), 14, ALFALFA)!; //    14 kg/día
+    expect((caballos + potros + minis) / 1_000).toBe(3_180);
+
+    const costo =
+      costoMensual(porCabeza(2), 36, ALFALFA)! +
+      costoMensual(porCabeza(2), 10, ALFALFA)! +
+      costoMensual(porCabeza(1), 14, ALFALFA)!;
+    expect(costo).toBe(6_424_236);
+  });
+
+  it("el Podium lo comen los 36 caballos y los 14 minis: 91,5 bultos", () => {
+    const costo = costoMensual(porCabeza(3), 36, PODIUM)! + costoMensual(porCabeza(1), 14, PODIUM)!;
+    expect(costo).toBe(7_993_440);
+  });
+
+  it("el Brío Potros es solo de los 10 potros", () => {
+    expect(costoMensual(porCabeza(2), 10, BRIO)).toBe(1_349_775);
+  });
+
+  it("el Briosal son 40 kg al mes para todo el lote, sin multiplicar por cabezas", () => {
+    const racion: RacionCalculo = { cantidad: 40, unidad: "kg", modo: "grupal", frecuencia: "mensual" };
+    expect(costoMensual(racion, 60, BRIOSAL)).toBe(126_000);
+  });
+
+  it("el heno se mide en pacas: 40 al día son 1.200 al mes y $17.400.000", () => {
+    const racion: RacionCalculo = { cantidad: 40, unidad: "paca", modo: "grupal", frecuencia: "diaria" };
+    expect(consumoBaseMensual(racion, 60, HENO)! / 20_000).toBe(1_200);
+    expect(costoMensual(racion, 60, HENO)).toBe(17_400_000);
+  });
+});
