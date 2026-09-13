@@ -1,4 +1,4 @@
-import { diasDelMes, queryDe, rangoDe } from "../app/admin/reportes/cortesias/rango";
+import { diasDelMes, queryDe, rangoDe } from "../app/admin/reportes/periodo";
 import { describe, it, expect } from "vitest";
 import { resumirCortesias, type LineaCortesia } from "../lib/reportes/cortesias";
 import { resolverValorCobrado, descuentoDeLinea } from "../lib/ventas/calculo";

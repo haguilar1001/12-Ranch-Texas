@@ -1,22 +1,29 @@
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas } from "@/lib/reportes/ventas";
+import { fechaBogota } from "@/lib/tiempo";
+import { rangoDe } from "../../periodo";
 
 export async function GET(req: Request) {
   const s = await obtenerSesion();
   if (!s || !tieneRol(s.rol, "consulta")) return new Response("No autorizado", { status: 401 });
 
   const url = new URL(req.url);
-  const anio = parseInt(url.searchParams.get("anio") ?? "2026", 10);
-  const mes = parseInt(url.searchParams.get("mes") ?? "1", 10);
-  const inicio = new Date(`${anio}-${String(mes).padStart(2, "0")}-01T00:00:00-05:00`);
-  const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
-  const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
   const cajaId = url.searchParams.get("caja") || undefined;
   const cajeroId = url.searchParams.get("cajero") || undefined;
-  const ind = await indicadoresVentas(inicio, fin, { cajaId, cajeroId });
+
+  // El MISMO cálculo que usa la pantalla: el archivo no puede traer otro período.
+  const periodo = rangoDe(
+    {
+      anio: url.searchParams.get("anio") ?? undefined,
+      mes: url.searchParams.get("mes") ?? undefined,
+      dia: url.searchParams.get("dia"),
+    },
+    fechaBogota(),
+  );
+  const ind = await indicadoresVentas(periodo.inicio, periodo.fin, { cajaId, cajeroId });
 
   const filas: string[][] = [
-    [`Reporte de ventas ${mes}/${anio}`],
+    [`Reporte de ventas ${periodo.etiqueta}`],
     ["Entradas (asistentes)", String(ind.asistentes)],
     ["Ventas", String(ind.numVentas)],
     ["Ingreso total", String(ind.ingreso)],
@@ -37,6 +44,6 @@ export async function GET(req: Request) {
   const csv = "﻿" + filas.map((f) => f.map((c) => `"${(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
 
   return new Response(csv, {
-    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="ventas-${anio}-${mes}.csv"` },
+    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="ventas-${periodo.clave}.csv"` },
   });
 }

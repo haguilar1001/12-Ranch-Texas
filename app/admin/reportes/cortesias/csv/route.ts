@@ -1,7 +1,7 @@
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias } from "@/lib/reportes/cortesias";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
-import { rangoDe } from "../rango";
+import { rangoDe } from "../../periodo";
 
 const ETIQUETA: Record<string, string> = { atencion: "Atencion", invitacion: "Invitacion", cortesia: "Cortesia", descuento: "Descuento" };
 

@@ -1,6 +1,7 @@
-// Qué período está mirando el informe de cortesías.
+// Qué período está mirando un informe: un mes completo o un día suelto.
 //
-// Vive aparte porque lo usan DOS sitios: la pantalla y la ruta que baja el Excel.
+// Vive aparte porque lo usan VARIOS sitios: las pantallas de ventas y de cortesías y
+// las dos rutas que bajan su Excel.
 // Si cada una interpretara los parámetros a su manera, el archivo descargado podría
 // traer un período distinto del que se está viendo, y nadie lo notaría hasta que las
 // cifras no cuadraran en una reunión.
@@ -12,7 +13,7 @@ export function diasDelMes(anio: number, mes: number): number {
   return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
 }
 
-export interface RangoCortesias {
+export interface Periodo {
   anio: number;
   mes: number;
   /** null = el mes completo. */
@@ -43,7 +44,7 @@ function medianocheBogota(anio: number, mes: number, dia: number): Date {
  * formulario) NO se recorta al último día: se muestra el mes completo. Recortarlo
  * daría un informe de un día que el usuario no pidió, y sin avisarle.
  */
-export function rangoDe(params: { anio?: string | number; mes?: string | number; dia?: string | number | null }, hoy: string): RangoCortesias {
+export function rangoDe(params: { anio?: string | number; mes?: string | number; dia?: string | number | null }, hoy: string): Periodo {
   const n = (v: string | number | null | undefined, porDefecto: number) => {
     const x = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
     return Number.isFinite(x) ? x : porDefecto;
@@ -81,7 +82,7 @@ export function rangoDe(params: { anio?: string | number; mes?: string | number;
 }
 
 /** Query string del período + filtros, para el enlace del Excel y para volver. */
-export function queryDe(r: RangoCortesias, cajaId?: string, cajeroId?: string): string {
+export function queryDe(r: Periodo, cajaId?: string, cajeroId?: string): string {
   return [
     `anio=${r.anio}`,
     `mes=${r.mes}`,
