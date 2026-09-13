@@ -253,7 +253,10 @@ export interface EncabezadoCierre {
   ventasCompletadas: number;
   ventasAnuladas: number;
   turnos: { caja: string; cajero: string; estado: string; ventas: number; recaudado: number }[];
+  /** Lo que de verdad entró hoy al parque. */
   porMedioPago: { medio: string; monto: number }[];
+  /** Entradas ya pagadas por banco antes de la visita: suman a la venta, no al recaudo. */
+  yaRecaudado: { medio: string; monto: number }[];
 }
 
 /** Trae las líneas del día (ventas completadas) y arma el informe. */
@@ -282,7 +285,7 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
     }),
     prisma.ventaPago.findMany({
       where: { venta: { estado: "completada", creado_en: { gte: desde, lt: hasta } } },
-      select: { monto: true, medio_pago: { select: { nombre: true } } },
+      select: { monto: true, medio_pago: { select: { nombre: true, afecta_recaudo: true } } },
     }),
   ]);
 
@@ -334,9 +337,12 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
     porTurno.set(clave, t);
   }
 
+  // El prepagado se aparta: es venta del día, pero esa plata ya estaba en el banco.
   const medios = new Map<string, number>();
+  const prepagados = new Map<string, number>();
   for (const p of pagos) {
-    medios.set(p.medio_pago.nombre, (medios.get(p.medio_pago.nombre) ?? 0) + p.monto);
+    const donde = p.medio_pago.afecta_recaudo ? medios : prepagados;
+    donde.set(p.medio_pago.nombre, (donde.get(p.medio_pago.nombre) ?? 0) + p.monto);
   }
 
   return {
@@ -346,5 +352,6 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
     ventasAnuladas: anuladas,
     turnos: [...porTurno.values()].sort((a, b) => b.recaudado - a.recaudado),
     porMedioPago: [...medios.entries()].map(([medio, monto]) => ({ medio, monto })).sort((a, b) => b.monto - a.monto),
+    yaRecaudado: [...prepagados.entries()].map(([medio, monto]) => ({ medio, monto })).sort((a, b) => b.monto - a.monto),
   };
 }

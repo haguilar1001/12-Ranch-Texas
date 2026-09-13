@@ -8,12 +8,30 @@ import { turnoAbiertoDe } from "@/lib/caja/turno";
 import { crearVenta } from "@/lib/ventas/registrar";
 import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 
+/**
+ * Sin nombre y celular del comprador no hay venta.
+ *
+ * Es política de taquilla, no del núcleo: por eso se valida aquí, en la puerta, y no
+ * dentro de `crearVenta` —que también usan los scripts de prueba e importación—. Y se
+ * valida en el servidor además de en la pantalla, porque la pantalla se puede saltar.
+ */
+function validarComprador(e: EntradaVenta): string | null {
+  if (!e.comprador_nombre?.trim()) return "Falta el nombre del comprador: es obligatorio para registrar la venta.";
+  const celular = (e.comprador_celular ?? "").replace(/\D/g, "");
+  if (!celular) return "Falta el celular del comprador: es obligatorio para registrar la venta.";
+  if (celular.length < 7) return "El celular del comprador está incompleto.";
+  return null;
+}
+
 export async function registrarVenta(entrada: EntradaVenta): Promise<ResultadoVenta> {
   const s = await obtenerSesion();
   if (!s) return { ok: false, error: "Sesión expirada." };
   if (!["cajero", "supervisor", "administrador"].includes(s.rol)) {
     return { ok: false, error: "Tu rol no puede registrar ventas." };
   }
+
+  const faltante = validarComprador(entrada);
+  if (faltante) return { ok: false, error: faltante };
 
   const turno = await turnoAbiertoDe(s.id);
   if (!turno) return { ok: false, error: "No tienes un turno abierto." };
@@ -46,6 +64,9 @@ export async function corregirVenta(
 
   const limpio = motivo?.trim();
   if (!limpio) return { ok: false, error: "Indica el motivo de la corrección: queda en la auditoría." };
+
+  const faltante = validarComprador(entrada);
+  if (faltante) return { ok: false, error: faltante };
 
   const original = await prisma.venta.findUnique({
     where: { id: ventaId },

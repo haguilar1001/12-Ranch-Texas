@@ -299,6 +299,11 @@ model MedioPago {
   nombre      String
   codigo      String  @unique
   es_efectivo Boolean @default(false)
+
+  /// ¿Esta plata entra HOY al parque? Un bono redimido o una venta por la página web
+  /// ya se pagó antes y está en el banco: la entrada suma a la VENTA del día, pero no
+  /// al recaudo ni al arqueo del cajón.
+  afecta_recaudo Boolean @default(true)
   orden       Int     @default(0)
   activo      Boolean @default(true)
 

@@ -113,6 +113,10 @@ export default function TaquillaClient({
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ultimaVenta, setUltimaVenta] = useState<{ id: string; numero: number } | null>(null);
+  /** Comprobante de la venta que acaba de entrar: se queda en pantalla hasta que el cajero lo cierra. */
+  const [confirmacion, setConfirmacion] = useState<
+    { numero: number; ventaId: string; total: number; asistentes: number; manillas: number; comprador: string } | null
+  >(null);
   /** Cuando el servidor no contesta (internet caído), se avisa fuerte y se puede reintentar. */
   const [sinRespuesta, setSinRespuesta] = useState(false);
   const router = useRouter();
@@ -186,7 +190,14 @@ export default function TaquillaClient({
   const sobraElectronico = faltante < 0;
 
   const validacion = useMemo(() => validarVenta(lineas, pagosAjustados), [lineas, pagosAjustados]);
-  const puedeVender = lineas.length > 0 && validacion.ok && !enviando;
+
+  // El nombre y el celular del comprador son obligatorios: sin eso no hay a quién
+  // buscar si después toca corregir la venta o reponer una manilla.
+  const faltaNombre = comprador.nombre.trim() === "";
+  const faltaCelular = comprador.celular.replace(/D/g, "").length < 7;
+  const faltaComprador = faltaNombre || faltaCelular;
+
+  const puedeVender = lineas.length > 0 && validacion.ok && !faltaComprador && !enviando;
 
   function setCantidad(id: string, delta: number) {
     setCant((prev) => {
@@ -321,6 +332,16 @@ export default function TaquillaClient({
             : `Venta #${r.numero_venta} registrada · ${detalle}.`,
       });
       setUltimaVenta({ id: r.venta_id, numero: r.numero_venta });
+      // Comprobante en pantalla: el cajero tiene que VER que la venta quedó, con su
+      // consecutivo, antes de entregar las manillas.
+      setConfirmacion({
+        numero: r.numero_venta,
+        ventaId: r.venta_id,
+        total: totales.total_cobrado,
+        asistentes,
+        manillas,
+        comprador: comprador.nombre.trim(),
+      });
       limpiar();
       // Corrigiendo ya no hay nada que hacer en esta URL (la venta original quedó
       // anulada): se pasa a la venta nueva, que es la que hay que imprimir.
@@ -380,14 +401,14 @@ export default function TaquillaClient({
           <div className="rounded-2xl border-2 border-ranch-marron/15 bg-white p-4 shadow-sm">
             <h2 className="mb-3 flex items-center gap-2 font-bold text-ranch-marron">
               🧾 Comprador
-              <span className="text-xs font-normal text-ranch-marron/45">(opcional — es quien paga y firma)</span>
+              <span className="text-xs font-normal text-ranch-marron/45">es quien paga y firma</span>
             </h2>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <input
                 value={comprador.nombre}
                 onChange={(e) => setComprador({ ...comprador, nombre: e.target.value })}
-                placeholder="Nombre"
-                className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
+                placeholder="Nombre *"
+                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${faltaNombre ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
               />
               <input
                 value={comprador.documento}
@@ -399,9 +420,9 @@ export default function TaquillaClient({
               <input
                 value={comprador.celular}
                 onChange={(e) => setComprador({ ...comprador, celular: e.target.value })}
-                placeholder="Celular"
+                placeholder="Celular *"
                 inputMode="tel"
-                className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
+                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${faltaCelular ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
               />
               <input
                 value={comprador.email}
@@ -412,6 +433,11 @@ export default function TaquillaClient({
                 className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
               />
             </div>
+            {faltaComprador && (
+              <p className="mt-2 text-xs font-semibold text-red-600">
+                * El nombre y el celular son obligatorios para registrar la venta.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -680,10 +706,43 @@ export default function TaquillaClient({
             </div>
           )}
 
-          {resultado && (
+          {/* Comprobante de la venta que acabó de entrar. Se queda hasta que el cajero
+              lo cierra: es la prueba de que quedó registrada, con su consecutivo. */}
+          {confirmacion && (
+            <div className="rounded-2xl border-4 border-ranch-verde bg-white p-4 text-center shadow">
+              <p className="text-sm font-bold uppercase tracking-wide text-ranch-verde">✓ Venta registrada</p>
+              <p className="my-1 text-5xl font-black leading-none text-ranch-marron">#{confirmacion.numero}</p>
+              <p className="text-xs uppercase tracking-wide text-ranch-marron/50">Consecutivo</p>
+
+              <div className="mt-3 space-y-0.5 border-t border-ranch-marron/10 pt-3 text-sm text-ranch-marron/80">
+                <p className="text-lg font-black text-ranch-marron">{formatearCOP(confirmacion.total)}</p>
+                <p>
+                  {confirmacion.asistentes} asistente{confirmacion.asistentes === 1 ? "" : "s"} ·{" "}
+                  {confirmacion.manillas} manilla{confirmacion.manillas === 1 ? "" : "s"}
+                </p>
+                {/* En mayúsculas, igual que quedó guardado. */}
+                {confirmacion.comprador && <p className="uppercase text-ranch-marron/60">{confirmacion.comprador}</p>}
+              </div>
+
+              <a
+                href={`/imprimir/venta/${confirmacion.ventaId}`}
+                className="mt-3 block rounded-lg bg-ranch-dorado px-4 py-3 font-semibold text-white hover:opacity-90"
+              >
+                🖨️ Imprimir manillas
+              </a>
+              <button
+                onClick={() => { setConfirmacion(null); setResultado(null); }}
+                className="mt-2 w-full rounded-lg border border-ranch-marron/25 px-4 py-2 text-sm font-semibold text-ranch-marron hover:bg-ranch-crema/60"
+              >
+                Entendido, siguiente venta
+              </button>
+            </div>
+          )}
+
+          {resultado && !confirmacion && (
             <p className={`rounded-lg px-3 py-2 text-sm ${resultado.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{resultado.texto}</p>
           )}
-          {ultimaVenta && (
+          {ultimaVenta && !confirmacion && (
             <a
               href={`/imprimir/venta/${ultimaVenta.id}`}
               className="block rounded-lg bg-ranch-dorado px-4 py-3 text-center font-semibold text-white hover:opacity-90"

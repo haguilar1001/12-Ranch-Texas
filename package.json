@@ -29,7 +29,8 @@
     "iconos:tipos": "tsx scripts/iconos-tipos-visitante.ts",
     "limpiar:taquilla": "tsx scripts/limpiar-taquilla.ts",
     "demo:cierre": "tsx scripts/demo-cierre.ts",
-    "mayusculas:datos": "tsx scripts/mayusculas-datos.ts"
+    "mayusculas:datos": "tsx scripts/mayusculas-datos.ts",
+    "tarifas:prepago": "tsx scripts/tarifas-prepago.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
