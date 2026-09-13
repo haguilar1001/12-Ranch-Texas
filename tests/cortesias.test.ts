@@ -139,12 +139,20 @@ describe("período del informe de cortesías", () => {
     expect(r.etiqueta).toBe("septiembre 2026");
   });
 
-  it("con día, toma solo ese día de medianoche a medianoche", () => {
-    const r = rangoDe({ anio: 2026, mes: 9, dia: 13 }, HOY);
+  it("con fecha, toma solo ese día de medianoche a medianoche", () => {
+    const r = rangoDe({ fecha: "2026-09-13" }, HOY);
     expect(r.inicio.toISOString()).toBe("2026-09-13T05:00:00.000Z");
     expect(r.fin.toISOString()).toBe("2026-09-14T05:00:00.000Z");
     expect(r.etiqueta).toBe("13 de septiembre de 2026");
     expect(r.clave).toBe("2026-09-13");
+    expect(r.fecha).toBe("2026-09-13");
+  });
+
+  // La fecha es lo que el usuario escogió en el calendario: manda sobre el mes que
+  // haya quedado en la URL de antes.
+  it("la fecha manda sobre el mes que venga en la URL", () => {
+    const r = rangoDe({ fecha: "2026-03-05", anio: 2026, mes: 9 }, HOY);
+    expect(r.etiqueta).toBe("5 de marzo de 2026");
   });
 
   it("diciembre cierra en enero del año siguiente", () => {
@@ -152,12 +160,13 @@ describe("período del informe de cortesías", () => {
     expect(r.fin.toISOString()).toBe("2027-01-01T05:00:00.000Z");
   });
 
-  // Cambiar de mes en el formulario puede dejar seleccionado un día que no existe.
-  // Mostrar el mes completo es preferible a recortarlo a un día que nadie pidió.
-  it("un día que no existe en ese mes cae al mes completo", () => {
-    const r = rangoDe({ anio: 2026, mes: 2, dia: 31 }, HOY);
-    expect(r.dia).toBeNull();
-    expect(r.etiqueta).toBe("febrero 2026");
+  // Una fecha escrita a mano en la URL puede no existir. Mostrar el mes completo es
+  // preferible a inventarse un día que nadie pidió.
+  it("una fecha que no existe cae al mes completo", () => {
+    expect(rangoDe({ fecha: "2026-02-31", anio: 2026, mes: 2 }, HOY).dia).toBeNull();
+    expect(rangoDe({ fecha: "2026-02-31", anio: 2026, mes: 2 }, HOY).etiqueta).toBe("febrero 2026");
+    expect(rangoDe({ fecha: "ayer" }, HOY).etiqueta).toBe("septiembre 2026");
+    expect(rangoDe({ fecha: "2026-13-01" }, HOY).etiqueta).toBe("septiembre 2026");
   });
 
   it("sin parámetros usa el mes de hoy", () => {
@@ -174,10 +183,28 @@ describe("período del informe de cortesías", () => {
     expect(diasDelMes(2026, 12)).toBe(31);
   });
 
-  it("la query string conserva el día y los filtros", () => {
-    const conDia = queryDe(rangoDe({ anio: 2026, mes: 9, dia: 13 }, HOY), "caja1", "cajero1");
-    expect(conDia).toBe("anio=2026&mes=9&dia=13&caja=caja1&cajero=cajero1");
-    const sinDia = queryDe(rangoDe({ anio: 2026, mes: 9 }, HOY));
-    expect(sinDia).toBe("anio=2026&mes=9");
+  // La URL dice el modo sin ambigüedad: o `fecha`, o `anio`+`mes`. Nunca los dos,
+  // porque entonces el servidor tendría que adivinar cuál manda.
+  it("la query string dice el modo sin ambigüedad", () => {
+    const conFecha = queryDe(rangoDe({ fecha: "2026-09-13" }, HOY), "caja1", "cajero1");
+    expect(conFecha).toBe("fecha=2026-09-13&caja=caja1&cajero=cajero1");
+    expect(conFecha).not.toContain("mes=");
+
+    const conMes = queryDe(rangoDe({ anio: 2026, mes: 9 }, HOY));
+    expect(conMes).toBe("anio=2026&mes=9");
+    expect(conMes).not.toContain("fecha=");
+  });
+
+  // Lo que sale en la URL tiene que volver a entrar igual: si no, el enlace del Excel
+  // y el de "Ver cortesías" llevarían a otro período.
+  it("el período sobrevive la ida y vuelta por la URL", () => {
+    for (const p of [{ fecha: "2026-09-13" }, { anio: 2026, mes: 12 }, {}]) {
+      const ida = rangoDe(p, HOY);
+      const params = Object.fromEntries(new URLSearchParams(queryDe(ida)));
+      const vuelta = rangoDe(params, HOY);
+      expect(vuelta.clave).toBe(ida.clave);
+      expect(vuelta.inicio.toISOString()).toBe(ida.inicio.toISOString());
+      expect(vuelta.fin.toISOString()).toBe(ida.fin.toISOString());
+    }
   });
 });

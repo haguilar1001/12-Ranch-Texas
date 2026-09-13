@@ -2,13 +2,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias, type TipoCortesia } from "@/lib/reportes/cortesias";
-import { diasDelMes, queryDe, rangoDe } from "../periodo";
+import { queryDe, rangoDe } from "../periodo";
+import FiltroPeriodo from "../FiltroPeriodo";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
 import { formatearCOP } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
-
-const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 const ETIQUETA: Record<TipoCortesia, string> = {
   atencion: "Atención",
@@ -101,7 +100,7 @@ function Agrupado({
 export default async function ReporteCortesiasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ anio?: string; mes?: string; dia?: string; caja?: string; cajero?: string }>;
+  searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }>;
 }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
@@ -114,8 +113,7 @@ export default async function ReporteCortesiasPage({
   const cajaId = sp.caja || undefined;
   const cajeroId = sp.cajero || undefined;
 
-  const rango = rangoDe({ anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
-  const { anio, mes, dia } = rango;
+  const rango = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
 
   const [r, cajas, cajeros] = await Promise.all([
     relacionCortesias(rango.inicio, rango.fin, { cajaId, cajeroId }),
@@ -124,7 +122,6 @@ export default async function ReporteCortesiasPage({
   ]);
 
   const qs = queryDe(rango, cajaId, cajeroId);
-  const dias = diasDelMes(anio, mes);
 
   return (
     <main className="mx-auto max-w-5xl p-4">
@@ -134,20 +131,7 @@ export default async function ReporteCortesiasPage({
       </p>
 
       <form className="mb-4 flex flex-wrap gap-2 text-sm">
-        {/* "Todo el mes" primero: es la pregunta que más se hace, y un día suelto
-            solo se busca cuando ya se sabe qué día revisar. */}
-        <select name="dia" defaultValue={dia ?? ""} className="rounded border px-2 py-1">
-          <option value="">Todo el mes</option>
-          {Array.from({ length: dias }, (_, i) => i + 1).map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-        <select name="mes" defaultValue={mes} className="rounded border px-2 py-1">
-          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
-        <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">
-          {[2024, 2025, 2026].map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <FiltroPeriodo anio={rango.anio} mes={rango.mes} fecha={rango.fecha} hoy={hoy} />
         <select name="caja" defaultValue={cajaId ?? ""} className="rounded border px-2 py-1">
           <option value="">Todas las cajas</option>
           {cajas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}

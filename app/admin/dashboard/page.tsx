@@ -6,6 +6,8 @@ import { indicadoresVentas, ventasPorMes, type FiltrosVentas } from "@/lib/repor
 import { comparativoAnual } from "@/lib/reportes/comparativo";
 import { variacionPct, formatearVariacion } from "@/lib/reportes/util";
 import { fechaBogota } from "@/lib/tiempo";
+import { rangoDe } from "../reportes/periodo";
+import FiltroPeriodo from "../reportes/FiltroPeriodo";
 import { formatearCOP } from "@/lib/dinero/cop";
 import Barras from "@/components/Barras";
 
@@ -24,23 +26,19 @@ function Kpi({ label, valor, sub }: { label: string; valor: string; sub?: string
   );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; caja?: string; cajero?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "consulta")) return <main className="p-6">Sin acceso.</main>;
 
   const hoy = fechaBogota();
   const sp = await searchParams;
-  const anio = parseInt(sp.anio ?? hoy.slice(0, 4), 10);
-  const mes = parseInt(sp.mes ?? hoy.slice(5, 7), 10);
+  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
+  const { anio, mes } = periodo;
   const filtros: FiltrosVentas = { cajaId: sp.caja || undefined, cajeroId: sp.cajero || undefined };
 
-  const inicio = new Date(`${anio}-${String(mes).padStart(2, "0")}-01T00:00:00-05:00`);
-  const nAnio = mes === 12 ? anio + 1 : anio, nMes = mes === 12 ? 1 : mes + 1;
-  const fin = new Date(`${nAnio}-${String(nMes).padStart(2, "0")}-01T00:00:00-05:00`);
-
   const [ind, comp, porMes, cajas, cajeros] = await Promise.all([
-    indicadoresVentas(inicio, fin, filtros),
+    indicadoresVentas(periodo.inicio, periodo.fin, filtros),
     comparativoAnual(anio),
     ventasPorMes(anio, filtros),
     prisma.caja.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
@@ -54,8 +52,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {/* Filtros */}
       <form className="mb-4 flex flex-wrap gap-2 text-sm">
-        <select name="mes" defaultValue={mes} className="rounded-lg border px-2 py-1">{MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}</select>
-        <select name="anio" defaultValue={anio} className="rounded-lg border px-2 py-1">{[2024, 2025, 2026].map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        <FiltroPeriodo anio={anio} mes={mes} fecha={periodo.fecha} hoy={hoy} />
         <select name="caja" defaultValue={sp.caja ?? ""} className="rounded-lg border px-2 py-1">
           <option value="">Todas las cajas</option>
           {cajas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -67,9 +64,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <button className="rounded-lg bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
       </form>
 
-      <p className="mb-2 text-sm text-ranch-marron/60">Mes: {MESES[mes - 1]} {anio}</p>
+      <p className="mb-2 text-sm capitalize text-ranch-marron/60">{periodo.etiqueta}</p>
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Ingreso del mes" valor={formatearCOP(ind.ingreso)} />
+        {/* El rótulo sigue al período: decir "del mes" mirando un día es mentir. */}
+        <Kpi label={periodo.fecha ? "Ingreso del día" : "Ingreso del mes"} valor={formatearCOP(ind.ingreso)} />
         <Kpi label="Entradas" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} />
         <Kpi label="% cortesías" valor={`${ind.pctCortesias.toFixed(1)}%`} sub={formatearCOP(ind.valorNoCobrado)} />

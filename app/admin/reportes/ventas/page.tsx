@@ -3,12 +3,11 @@ import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas } from "@/lib/reportes/ventas";
 import { fechaBogota } from "@/lib/tiempo";
-import { diasDelMes, queryDe, rangoDe } from "../periodo";
+import { queryDe, rangoDe } from "../periodo";
+import FiltroPeriodo from "../FiltroPeriodo";
 import { formatearCOP } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
-
-const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 function Kpi({ label, valor }: { label: string; valor: string }) {
   return (
@@ -19,7 +18,7 @@ function Kpi({ label, valor }: { label: string; valor: string }) {
   );
 }
 
-export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; dia?: string; caja?: string; cajero?: string }> }) {
+export default async function ReporteVentasPage({ searchParams }: { searchParams: Promise<{ anio?: string; mes?: string; fecha?: string; caja?: string; cajero?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "consulta")) return <main className="p-6">Sin acceso.</main>;
@@ -29,9 +28,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
   const cajaId = sp.caja || undefined;
   const cajeroId = sp.cajero || undefined;
 
-  const periodo = rangoDe({ anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
-  const { anio, mes, dia } = periodo;
-  const dias = diasDelMes(anio, mes);
+  const periodo = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes }, hoy);
 
   const [ind, cajas, cajeros] = await Promise.all([
     indicadoresVentas(periodo.inicio, periodo.fin, { cajaId, cajeroId }),
@@ -44,13 +41,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
     <main className="mx-auto max-w-4xl p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Reporte de ventas</h1>
       <form className="mb-4 flex flex-wrap gap-2 text-sm">
-        {/* "Todo el mes" primero: es la pregunta que más se hace. */}
-        <select name="dia" defaultValue={dia ?? ""} className="rounded border px-2 py-1">
-          <option value="">Todo el mes</option>
-          {Array.from({ length: dias }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select name="mes" defaultValue={mes} className="rounded border px-2 py-1">{MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}</select>
-        <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">{[2024, 2025, 2026].map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        <FiltroPeriodo anio={periodo.anio} mes={periodo.mes} fecha={periodo.fecha} hoy={hoy} />
         <select name="caja" defaultValue={cajaId ?? ""} className="rounded border px-2 py-1">
           <option value="">Todas las cajas</option>
           {cajas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
