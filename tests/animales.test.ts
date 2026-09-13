@@ -158,7 +158,9 @@ describe("dieta de los equinos (cuadro de septiembre de 2026)", () => {
   const PODIUM: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 40_000, costo_unitario: 87_360 };
   const BRIO: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 40_000, costo_unitario: 89_985 };
   const BRIOSAL: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 20_000, costo_unitario: 63_000 };
-  const HENO: AlimentoUnidad = { unidad_medida: "paca", equivalencia_g: 20_000, costo_unitario: 14_500 };
+  // La paca no es exacta: 15 kg en promedio. El costo no depende de eso (la dieta
+  // se mide en pacas); el peso solo sirve para leer los kilos de la bitácora.
+  const HENO: AlimentoUnidad = { unidad_medida: "paca", equivalencia_g: 15_000, costo_unitario: 14_500 };
 
   const porCabeza = (cantidad: number): RacionCalculo => ({ cantidad, unidad: "kg", modo: "individual", frecuencia: "diaria" });
 
@@ -191,7 +193,8 @@ describe("dieta de los equinos (cuadro de septiembre de 2026)", () => {
 
   it("el heno se mide en pacas: 40 al día son 1.200 al mes y $17.400.000", () => {
     const racion: RacionCalculo = { cantidad: 40, unidad: "paca", modo: "grupal", frecuencia: "diaria" };
-    expect(consumoBaseMensual(racion, 60, HENO)! / 20_000).toBe(1_200);
+    expect(consumoBaseMensual(racion, 60, HENO)! / 15_000).toBe(1_200);
+    expect(consumoBaseMensual(racion, 60, HENO)! / 1_000).toBe(18_000); // kg al mes
     expect(costoMensual(racion, 60, HENO)).toBe(17_400_000);
   });
 

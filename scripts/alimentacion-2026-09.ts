@@ -66,7 +66,8 @@ const ALIMENTOS: PlanAlimento[] = [
   { nombre: "Briosal", tipo: "suplemento", unidad: "bulto", costo: 63_000, equivalencia: 20_000 },
   // El peso de la paca no está en los cuadros. Da igual para el costo (la dieta se
   // mide en pacas), pero sí para leer "cuántos kilos de heno se entregaron".
-  { nombre: "Heno", tipo: "forraje", unidad: "paca", costo: 14_500, equivalencia: 20_000, nota: "SUPUESTO: paca de 20 kg, por confirmar" },
+  // CONFIRMADO 2026-09-13: 15 kg en promedio; la paca no es exacta.
+  { nombre: "Heno", tipo: "forraje", unidad: "paca", costo: 14_500, equivalencia: 15_000, nota: "paca de 15 kg en promedio" },
   // "Talcán" aparece en la lista de precios con los mismos datos del Italcán (bulto de
   // 30 kg, $105.000) y sin consumo en ningún cuadro. CONFIRMADO 2026-09-13: es el mismo
   // Italcán escrito distinto, así que no se crea como alimento aparte.

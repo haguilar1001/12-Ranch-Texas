@@ -207,9 +207,8 @@ y no los $20.866.480 que suman los dos cuadros.
 - **"Talcán" es el mismo Italcán** escrito distinto. No se crea como alimento aparte.
 - **Mandan los cuadros sobre el Excel de agosto**: perros 10 → **12**, vacas 9 → **15**. No cambia
   ningún costo (esas raciones son grupales), pero deja el censo al día.
-
-**Por confirmar:**
-- **El peso de la paca de heno** (se asumió 20 kg). No afecta el costo, sí la lectura de kilos entregados.
+- **La paca de heno pesa 15 kg en promedio** (no es exacta). No mueve el costo — la dieta se mide en
+  pacas — pero sí la lectura de la bitácora: 40 pacas al día son 600 kg, 18 toneladas al mes.
 
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
