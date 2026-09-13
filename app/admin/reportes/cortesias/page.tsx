@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias, type TipoCortesia } from "@/lib/reportes/cortesias";
-import { diasDelMes, queryDe, rangoDe } from "./rango";
+import { diasDelMes, queryDe, rangoDe } from "../periodo";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
 import { formatearCOP } from "@/lib/dinero/cop";
 
@@ -33,22 +33,67 @@ function Kpi({ label, valor, sub }: { label: string; valor: string; sub?: string
   );
 }
 
-function Agrupado({ titulo, filas }: { titulo: string; filas: { etiqueta: string; personas: number; noCobrado: number }[] }) {
+/**
+ * Un agrupado del informe (por tipo, por motivo, por quién autorizó).
+ *
+ * Lleva barra de participación a propósito: la pregunta de estos cuadros no es
+ * "cuánto", sino "cuál pesa más". Con tres renglones de cifras parecidas eso no se
+ * ve; con la barra se ve de una. El porcentaje es sobre el total del propio cuadro.
+ */
+function Agrupado({
+  titulo, filas,
+}: {
+  titulo: string;
+  filas: { etiqueta: string; personas: number; noCobrado: number }[];
+}) {
+  const total = filas.reduce((a, f) => a + f.noCobrado, 0);
+  const personas = filas.reduce((a, f) => a + f.personas, 0);
+
   return (
-    <section className="rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
-      <h2 className="mb-2 font-bold text-ranch-marron">{titulo}</h2>
-      <table className="w-full text-sm">
-        <tbody>
-          {filas.map((f) => (
-            <tr key={f.etiqueta} className="border-t border-ranch-marron/10">
-              <td className="py-1">{f.etiqueta}</td>
-              <td className="py-1 text-right text-ranch-marron/60">{f.personas}</td>
-              <td className="py-1 text-right font-semibold">{formatearCOP(f.noCobrado)}</td>
-            </tr>
-          ))}
-          {filas.length === 0 && <tr><td className="py-1 text-ranch-marron/40">Sin datos.</td></tr>}
-        </tbody>
-      </table>
+    <section className="flex flex-col rounded-xl border-2 border-ranch-marron/20 bg-white">
+      <header className="flex items-baseline justify-between gap-2 border-b border-ranch-marron/15 px-4 py-2.5">
+        <h2 className="font-bold text-ranch-marron">{titulo}</h2>
+        {filas.length > 0 && (
+          <span className="whitespace-nowrap text-xs text-ranch-marron/50">
+            {personas.toLocaleString("es-CO")} {personas === 1 ? "persona" : "personas"}
+          </span>
+        )}
+      </header>
+
+      {filas.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-ranch-marron/40">Sin datos.</p>
+      ) : (
+        <ul className="divide-y divide-ranch-marron/10">
+          {filas.map((f) => {
+            const parte = total > 0 ? (f.noCobrado / total) * 100 : 0;
+            return (
+              <li key={f.etiqueta} className="px-4 py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 text-sm leading-snug text-ranch-marron/85">{f.etiqueta}</span>
+                  <span className="whitespace-nowrap text-sm font-bold tabular-nums text-ranch-marron">
+                    {formatearCOP(f.noCobrado)}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ranch-marron/10">
+                    <div className="h-full rounded-full bg-ranch-dorado" style={{ width: `${parte}%` }} />
+                  </div>
+                  <span className="w-24 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-ranch-marron/50">
+                    {f.personas.toLocaleString("es-CO")} pers · {parte.toFixed(0)}%
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {filas.length > 1 && (
+        <footer className="mt-auto flex items-baseline justify-between gap-2 border-t border-ranch-marron/15 bg-ranch-crema/40 px-4 py-2">
+          <span className="text-xs font-bold uppercase text-ranch-marron/60">Total</span>
+          <span className="whitespace-nowrap text-sm font-black tabular-nums text-ranch-marron">{formatearCOP(total)}</span>
+        </footer>
+      )}
     </section>
   );
 }
@@ -127,10 +172,21 @@ export default async function ReporteCortesiasPage({
         />
       </div>
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
-        <Agrupado titulo="Por tipo" filas={r.porTipo.map((t) => ({ etiqueta: ETIQUETA[t.tipo], personas: t.personas, noCobrado: t.noCobrado }))} />
-        <Agrupado titulo="Por motivo" filas={r.porMotivo.map((m) => ({ etiqueta: m.motivo, personas: m.personas, noCobrado: m.noCobrado }))} />
-        <Agrupado titulo="Por quién autorizó" filas={r.porAutoriza.map((a) => ({ etiqueta: a.autoriza, personas: a.personas, noCobrado: a.noCobrado }))} />
+      {/* Los tres cuadros NO llevan el mismo ancho: los motivos son frases largas
+          ("REDENCIÓN CUMPLEAÑOS / EVENTOS") y los tipos son una sola palabra. Repartido
+          en partes iguales, el de motivos parte cada etiqueta en dos líneas mientras el
+          de tipos queda medio vacío. `items-start` evita además que un cuadro de una
+          fila se estire hasta la altura del más largo. */}
+      <div className="mb-4 grid items-start gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <div className="lg:col-span-3">
+          <Agrupado titulo="Por tipo" filas={r.porTipo.map((t) => ({ etiqueta: ETIQUETA[t.tipo], personas: t.personas, noCobrado: t.noCobrado }))} />
+        </div>
+        <div className="lg:col-span-5">
+          <Agrupado titulo="Por motivo" filas={r.porMotivo.map((m) => ({ etiqueta: m.motivo, personas: m.personas, noCobrado: m.noCobrado }))} />
+        </div>
+        <div className="md:col-span-2 lg:col-span-4">
+          <Agrupado titulo="Por quién autorizó" filas={r.porAutoriza.map((a) => ({ etiqueta: a.autoriza, personas: a.personas, noCobrado: a.noCobrado }))} />
+        </div>
       </div>
 
       <h2 className="mb-2 font-bold text-ranch-marron">Detalle</h2>
