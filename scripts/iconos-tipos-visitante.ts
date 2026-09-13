@@ -40,8 +40,12 @@ const PLAN: Plan[] = [
   { clave: "cajas de compensacion", nombre: "Cajas de Compensación", icono: "🏢", carnet: true },
   { clave: "redencion bono", nombre: "Redención Bono", icono: "🎟️", carnet: false },
   { clave: "pagina web", nombre: "Página Web", icono: "🌐", carnet: false },
-  // Fundación Campbell (salud): el funcionario se identifica solo, no pide carnet.
-  { clave: "funcionario campbell", nombre: "Funcionario Campbell", icono: "🏥", carnet: false },
+  // Los convenios van con el logo de la entidad: se reconocen de un vistazo y es lo
+  // que el visitante muestra. Mientras el archivo no esté en public/logos, la tarjeta
+  // cae en las iniciales (ver components/IconoTipo) — nunca se ve rota.
+  { clave: "funcionario campbell", nombre: "Funcionario Campbell", icono: "/logos/campbell.png", carnet: false },
+  { clave: "bono coomeva", nombre: "Bono Coomeva", icono: "/logos/coomeva.png", carnet: true },
+  { clave: "bono comfamiliar", nombre: "Bono Comfamiliar", icono: "/logos/comfamiliar.png", carnet: true },
 ];
 
 async function main() {
