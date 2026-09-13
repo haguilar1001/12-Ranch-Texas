@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../db";
-import { calcularTotales, esCortesia, resolverValorCobrado, validarVenta, type LineaVenta } from "./calculo";
+import {
+  calcularTotales, esCortesia, faltanPorEscanear, resolverValorCobrado, validarVenta, type LineaVenta,
+} from "./calculo";
 import { firmarUuid } from "../qr/firma";
 import { finDelDiaOperativo, formatearFechaHoraBogota } from "../tiempo";
 import { textoManilla, type DatosManilla } from "../impresion";
@@ -43,8 +45,10 @@ export async function crearVenta(
 
   const ids = [...new Set(entrada.lineas.map((l) => l.tipo_visitante_id))];
   const tiposInfo = new Map(
-    (await prisma.tipoVisitante.findMany({ where: { id: { in: ids } }, select: { id: true, codigo: true, nombre: true } }))
-      .map((t) => [t.id, t]),
+    (await prisma.tipoVisitante.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, codigo: true, nombre: true, requiere_escaneo: true },
+    })).map((t) => [t.id, t]),
   );
 
   // Recalcular precios en el SERVIDOR desde la tarifa vigente (no confiar en el cliente).
@@ -69,6 +73,7 @@ export async function crearVenta(
       motivo_cortesia_id: l.motivo_cortesia_id ?? null,
       // El beneficiario solo tiene sentido en una cortesía: en una línea de pago nadie la recibe.
       beneficiario: l.tipo_linea !== "pago" ? l.beneficiario?.trim() || null : null,
+      escaneado: !!l.escaneado,
       // El motivo del descuento solo aplica si de verdad se cobró menos.
       motivo_descuento: cobrado < valor && l.tipo_linea === "pago" ? l.motivo_descuento?.trim() || null : null,
       autorizado_por: l.autorizado_por ?? null,
@@ -77,6 +82,13 @@ export async function crearVenta(
 
   const val = validarVenta(lineas, entrada.pagos ?? []);
   if (!val.ok) return { ok: false, error: val.errores.join(" ") };
+
+  // Quién exige escaneo lo dice la BD, no el cliente: de la taquilla solo se cree la
+  // marca de que el cajero sí lo hizo.
+  const sinEscanear = faltanPorEscanear(lineas, tiposInfo);
+  if (sinEscanear.length) {
+    return { ok: false, error: `Falta escanear en la aplicación de bonos: ${sinEscanear.join(", ")}.` };
+  }
 
   const totales = calcularTotales(lineas);
   const vencimiento = finDelDiaOperativo();
@@ -143,6 +155,7 @@ export async function crearVenta(
             valor_cobrado: l.valor_cobrado,
             motivo_cortesia_id: l.motivo_cortesia_id ?? null,
             beneficiario: l.beneficiario ?? null,
+            escaneado: !!l.escaneado,
             motivo_descuento: l.motivo_descuento ?? null,
             autorizado_por: l.autorizado_por ?? null,
             creado_por: ctx.usuarioId,

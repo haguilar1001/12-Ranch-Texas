@@ -22,6 +22,8 @@ export interface LineaVenta {
   motivo_descuento?: string | null;
   autorizado_por?: string | null;
   beneficiario?: string | null;
+  /** El bono/QR ya se verificó en la aplicación de bonos. Solo aplica a los tipos que lo exigen. */
+  escaneado?: boolean;
 }
 
 export interface Pago {
@@ -138,4 +140,29 @@ export function resolverValorCobrado(
 /** Descuento total de una línea (por las unidades), en pesos enteros. */
 export function descuentoDeLinea(l: Pick<LineaVenta, "valor_lista" | "valor_cobrado" | "cantidad">): number {
   return (l.valor_lista - l.valor_cobrado) * l.cantidad;
+}
+
+/**
+ * Bonos y compras por la web que entraron sin pasar por la aplicación de bonos.
+ *
+ * El bono de Coomeva, el de Comfamiliar, la compra por la página web y el QR de
+ * redención ya se pagaron antes de llegar al parque: lo único que hace la taquilla
+ * es verificar en OTRA aplicación (la de los PC de caja) que el bono sea válido y no
+ * se haya usado. Sin esa verificación, un bono repetido entra igual y el parque se
+ * entera cuando la caja de compensación no se lo paga.
+ *
+ * `exigen` dice qué tipos hay que escanear; viene de la BD, nunca del cliente.
+ * Devuelve los NOMBRES sin escanear, sin repetir. Vacío = todo en orden.
+ */
+export function faltanPorEscanear(
+  lineas: Pick<LineaVenta, "tipo_visitante_id" | "escaneado">[],
+  exigen: Map<string, { nombre: string; requiere_escaneo: boolean }>,
+): string[] {
+  const nombres: string[] = [];
+  for (const l of lineas) {
+    const t = exigen.get(l.tipo_visitante_id);
+    if (!t?.requiere_escaneo || l.escaneado) continue;
+    if (!nombres.includes(t.nombre)) nombres.push(t.nombre);
+  }
+  return nombres;
 }

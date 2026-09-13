@@ -7,6 +7,11 @@ export interface EntradaLinea {
   motivo_cortesia_id?: string | null;
   /** A nombre de quién entró la cortesía. El motivo dice por qué; esto dice a quién. */
   beneficiario?: string | null;
+  /**
+   * El cajero ya verificó el bono o el QR en la aplicación de bonos de su PC.
+   * Obligatorio en los tipos con `requiere_escaneo`; el servidor lo exige.
+   */
+  escaneado?: boolean;
   autorizado_por?: string | null;
   /**
    * Descuento: cuánto se cobra por unidad. Se omite si se cobra la tarifa completa.

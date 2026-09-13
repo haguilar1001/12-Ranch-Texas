@@ -118,6 +118,8 @@ interface CambiosTipo {
   /** Emoji ("🤠") o ruta de imagen ("/logos/campbell.png"); vacío = sin icono. */
   icono?: string | null;
   requiere_carnet?: boolean;
+  /** El bono/QR se verifica en la aplicación de bonos antes de vender. */
+  requiere_escaneo?: boolean;
 }
 
 export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resultado> {
@@ -171,6 +173,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
   }
 
   if (cambios.requiere_carnet !== undefined) data.requiere_carnet = !!cambios.requiere_carnet;
+  if (cambios.requiere_escaneo !== undefined) data.requiere_escaneo = !!cambios.requiere_escaneo;
 
   await prisma.tipoVisitante.update({ where: { id }, data });
   await registrarAuditoria({
@@ -178,6 +181,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     datos_antes: {
       nombre: tipo.nombre, requiere_pago: tipo.requiere_pago, edad_min: tipo.edad_min,
       edad_max: tipo.edad_max, orden: tipo.orden, icono: tipo.icono, requiere_carnet: tipo.requiere_carnet,
+      requiere_escaneo: tipo.requiere_escaneo,
     },
     datos_despues: JSON.parse(JSON.stringify(cambios)),
   });

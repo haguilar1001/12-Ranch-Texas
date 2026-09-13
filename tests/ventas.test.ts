@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcularTotales, validarVenta, type LineaVenta, type Pago } from "../lib/ventas/calculo";
+import { calcularTotales, faltanPorEscanear, validarVenta, type LineaVenta, type Pago } from "../lib/ventas/calculo";
 
 const adulto = (cant: number, cobrado = 60000): LineaVenta => ({
   tipo_visitante_id: "adulto",
@@ -119,5 +119,39 @@ describe("validación de venta", () => {
   it("rechaza cantidades no enteras o cero", () => {
     expect(validarVenta([adulto(0)], []).ok).toBe(false);
     expect(validarVenta([{ ...adulto(1), cantidad: 1.5 }], [{ medio_pago_id: "e", monto: 60000 }]).ok).toBe(false);
+  });
+});
+
+// Los bonos y la compra por la web se verifican en la aplicación de bonos de los PC
+// de caja. La regla vive en el servidor: la taquilla puede marcar el cuadrito, pero
+// quién tiene que escanear lo decide la BD.
+describe("escaneo de bonos", () => {
+  const TIPOS = new Map([
+    ["bono", { nombre: "BONO COOMEVA", requiere_escaneo: true }],
+    ["web", { nombre: "PÁGINA WEB", requiere_escaneo: true }],
+    ["adulto", { nombre: "ADULTO", requiere_escaneo: false }],
+  ]);
+  const linea = (tipo: string, escaneado?: boolean) => ({ tipo_visitante_id: tipo, escaneado });
+
+  it("deja pasar lo que no se escanea", () => {
+    expect(faltanPorEscanear([linea("adulto")], TIPOS)).toEqual([]);
+  });
+
+  it("reclama el bono que no se escaneó", () => {
+    expect(faltanPorEscanear([linea("adulto"), linea("bono")], TIPOS)).toEqual(["BONO COOMEVA"]);
+  });
+
+  it("no reclama el bono ya escaneado", () => {
+    expect(faltanPorEscanear([linea("bono", true)], TIPOS)).toEqual([]);
+  });
+
+  it("nombra cada tipo una sola vez aunque sean varias líneas", () => {
+    const faltan = faltanPorEscanear([linea("bono"), linea("bono"), linea("web")], TIPOS);
+    expect(faltan).toEqual(["BONO COOMEVA", "PÁGINA WEB"]);
+  });
+
+  // Si el tipo no está en el mapa que vino de la BD, no se inventa una exigencia.
+  it("ignora un tipo que no conoce", () => {
+    expect(faltanPorEscanear([linea("fantasma")], TIPOS)).toEqual([]);
   });
 });

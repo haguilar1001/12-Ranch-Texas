@@ -22,6 +22,7 @@ interface Tipo {
   activo: boolean;
   icono: string | null;
   requiere_carnet: boolean;
+  requiere_escaneo: boolean;
   valorVigente: number;
   vigenteDesde: string;
   historial: HistLinea[];
@@ -61,7 +62,10 @@ export default function TarifasClient({
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [edicion, setEdicion] = useState<
-    { id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string; requiere_carnet: boolean } | null
+    {
+      id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string;
+      requiere_carnet: boolean; requiere_escaneo: boolean;
+    } | null
   >(null);
 
   function abrirEdicion(t: Tipo) {
@@ -73,6 +77,7 @@ export default function TarifasClient({
       orden: String(t.orden),
       icono: t.icono ?? "",
       requiere_carnet: t.requiere_carnet,
+      requiere_escaneo: t.requiere_escaneo,
     });
   }
 
@@ -86,6 +91,7 @@ export default function TarifasClient({
       orden: parseInt(edicion.orden, 10) || 0,
       icono: edicion.icono,
       requiere_carnet: edicion.requiere_carnet,
+      requiere_escaneo: edicion.requiere_escaneo,
     });
     setBusy(false);
     aviso(r, "Tipo actualizado.");
@@ -193,6 +199,15 @@ export default function TarifasClient({
                           />
                           Debe presentar carnet
                         </label>
+                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
+                          <input
+                            type="checkbox"
+                            checked={edicion.requiere_escaneo}
+                            onChange={(e) => setEdicion({ ...edicion, requiere_escaneo: e.target.checked })}
+                            className="h-3.5 w-3.5"
+                          />
+                          Se escanea en la app de bonos
+                        </label>
                         <span className="flex items-center gap-1 text-[10px] text-ranch-marron/50">
                           orden
                           <input
@@ -212,6 +227,11 @@ export default function TarifasClient({
                           {t.requiere_carnet && (
                             <span title="Debe presentar carnet" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
                               * carnet
+                            </span>
+                          )}
+                          {t.requiere_escaneo && (
+                            <span title="Se escanea en la aplicación de bonos" className="ml-1 rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">
+                              ☑ escaneo
                             </span>
                           )}
                           <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>

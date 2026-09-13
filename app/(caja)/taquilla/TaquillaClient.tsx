@@ -17,6 +17,8 @@ interface Tipo {
   /** Emoji o ruta de imagen; ver components/IconoTipo. */
   icono: string | null;
   requiere_carnet: boolean;
+  /** Bono o compra web: hay que verificarlo en la aplicación de bonos antes de vender. */
+  requiere_escaneo: boolean;
 }
 interface Medio { id: string; nombre: string; es_efectivo: boolean }
 interface Motivo { id: string; nombre: string }
@@ -58,6 +60,7 @@ export interface VentaACorregir {
     valor_cobrado: number;
     motivo_cortesia_id: string | null;
     beneficiario: string | null;
+    escaneado: boolean;
     motivo_descuento: string | null;
     autorizado_por: string | null;
   }[];
@@ -90,6 +93,13 @@ export default function TaquillaClient({
         autoriza: l.autorizado_por ?? "",
       };
     }
+    return inicial;
+  });
+  // Qué bonos ya pasó el cajero por la aplicación de bonos. Se marca por TIPO, no por
+  // línea: la pregunta que se hace el cajero es "¿ya escaneé los bonos de Coomeva?".
+  const [escaneados, setEscaneados] = useState<Record<string, boolean>>(() => {
+    const inicial: Record<string, boolean> = {};
+    for (const l of correccion?.lineas ?? []) if (l.escaneado) inicial[l.tipo_visitante_id] = true;
     return inicial;
   });
   const [comprador, setComprador] = useState(
@@ -150,6 +160,7 @@ export default function TaquillaClient({
         valor_lista: t.valor, valor_cobrado: cobrado, tipo_linea: "pago",
         motivo_descuento: d?.motivo || null,
         autorizado_por: d?.autoriza || null,
+        escaneado: !!escaneados[t.id],
       });
     }
     for (const co of cortesias) {
@@ -159,10 +170,11 @@ export default function TaquillaClient({
         tipo_visitante_id: co.tipo_visitante_id, cantidad: co.cantidad, valor_lista: t.valor, valor_cobrado: 0,
         tipo_linea: co.tipo_linea, motivo_cortesia_id: co.motivo_cortesia_id || null,
         beneficiario: co.beneficiario || null, autorizado_por: co.autorizado_por || null,
+        escaneado: !!escaneados[co.tipo_visitante_id],
       });
     }
     return ls;
-  }, [cant, descuentos, cortesias, tipos, tipoPorId]);
+  }, [cant, descuentos, cortesias, tipos, tipoPorId, escaneados]);
 
   const totales = useMemo(() => calcularTotales(lineas), [lineas]);
   const pagosLimpios = useMemo(
@@ -205,7 +217,23 @@ export default function TaquillaClient({
   // Una cortesía sin beneficiario no sirve de control: hay que saber quién entró gratis.
   const faltaBeneficiario = cortesias.some((c) => c.cantidad > 0 && !c.beneficiario.trim());
 
-  const puedeVender = lineas.length > 0 && validacion.ok && !faltaComprador && !faltaBeneficiario && !enviando;
+  // Los bonos y la compra por la web se verifican en la aplicación de bonos del PC antes
+  // de entregar la manilla. Sin esa marca no se puede vender: un bono ya usado entraría
+  // igual y el parque lo descubriría cuando Coomeva no lo pague.
+  const enUso = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [id, c] of Object.entries(cant)) if (c > 0) ids.add(id);
+    for (const co of cortesias) if (co.cantidad > 0) ids.add(co.tipo_visitante_id);
+    return ids;
+  }, [cant, cortesias]);
+  const porEscanear = useMemo(
+    () => tipos.filter((t) => t.requiere_escaneo && enUso.has(t.id) && !escaneados[t.id]),
+    [tipos, enUso, escaneados],
+  );
+  const faltaEscaneo = porEscanear.length > 0;
+
+  const puedeVender =
+    lineas.length > 0 && validacion.ok && !faltaComprador && !faltaBeneficiario && !faltaEscaneo && !enviando;
 
   function setCantidad(id: string, delta: number) {
     setCant((prev) => {
@@ -263,7 +291,8 @@ export default function TaquillaClient({
   }
 
   function limpiar() {
-    setCant({}); setCortesias([]); setDescuentos({}); setComprador({ nombre: "", documento: "", celular: "", email: "" });
+    setCant({}); setCortesias([]); setDescuentos({}); setEscaneados({});
+    setComprador({ nombre: "", documento: "", celular: "", email: "" });
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
     // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
     claveRef.current = nuevaClave();
@@ -292,6 +321,7 @@ export default function TaquillaClient({
       lineas: lineas.map((l) => ({
         tipo_visitante_id: l.tipo_visitante_id, cantidad: l.cantidad, tipo_linea: l.tipo_linea,
         motivo_cortesia_id: l.motivo_cortesia_id ?? null, beneficiario: l.beneficiario ?? null,
+        escaneado: !!l.escaneado,
         autorizado_por: l.autorizado_por ?? null,
         // Solo se manda si de verdad se cobró menos que la tarifa.
         valor_cobrado: l.valor_cobrado < l.valor_lista ? l.valor_cobrado : null,
@@ -511,6 +541,25 @@ export default function TaquillaClient({
                       className="h-10 w-10 shrink-0 rounded-xl bg-ranch-marron text-xl font-bold text-ranch-crema hover:bg-ranch-marron-oscuro active:scale-95"
                     >+</button>
                   </div>
+
+                  {/* Bonos y web: el cajero confirma que ya lo pasó por la aplicación de bonos. */}
+                  {t.requiere_escaneo && enUso.has(t.id) && (
+                    <label
+                      className={`mt-2 flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2 py-1.5 text-xs font-semibold transition ${
+                        escaneados[t.id]
+                          ? "border-ranch-verde bg-ranch-verde/10 text-ranch-verde"
+                          : "border-red-300 bg-red-50 text-red-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!escaneados[t.id]}
+                        onChange={(e) => setEscaneados((prev) => ({ ...prev, [t.id]: e.target.checked }))}
+                        className="h-4 w-4 shrink-0 accent-ranch-verde"
+                      />
+                      {escaneados[t.id] ? "Escaneado ✓" : "Escanear el bono"}
+                    </label>
+                  )}
 
                   {/* Descuento: solo tiene sentido si el tipo cobra y hay unidades. */}
                   {t.requiere_pago && t.valor > 0 && c > 0 && (
@@ -769,6 +818,12 @@ export default function TaquillaClient({
           )}
           {!validacion.ok && lineas.length > 0 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{validacion.errores[0]}</p>
+          )}
+          {faltaEscaneo && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+              Falta escanear en la aplicación de bonos: {porEscanear.map((t) => t.nombre).join(", ")}. Marca el
+              cuadrito de la tarjeta cuando lo hayas verificado.
+            </p>
           )}
 
           <button

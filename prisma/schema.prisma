@@ -225,6 +225,10 @@ model TipoVisitante {
   /// un * junto al nombre y el aviso al pie de la rejilla.
   requiere_carnet Boolean @default(false)
 
+  /// El bono o el QR se verifica en la aplicación de bonos de los PC de caja antes
+  /// de vender. En taquilla obliga a marcar "escaneado" para poder registrar.
+  requiere_escaneo Boolean @default(false)
+
   tarifas  Tarifa[]
   detalle  VentaDetalle[]
   manillas Manilla[]
@@ -383,6 +387,10 @@ model VentaDetalle {
   beneficiario       String?
   autorizado_por     String?
   motivo_cortesia_id String?
+
+  /// El cajero verificó el bono/QR en la aplicación de bonos antes de vender.
+  /// Solo se exige en los tipos con `requiere_escaneo`.
+  escaneado Boolean @default(false)
 
   venta           Venta           @relation(fields: [venta_id], references: [id])
   tipo_visitante  TipoVisitante   @relation(fields: [tipo_visitante_id], references: [id])
