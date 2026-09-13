@@ -24,10 +24,27 @@ function slug(texto: string): string {
     .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
-const PLAN: { nombre: string; valor: number; icono: string }[] = [
+const PLAN: { nombre: string; valor: number; icono: string; motivo?: string }[] = [
   { nombre: "Bono Coomeva", valor: 45_000, icono: "🎟️" },
   { nombre: "Bono Comfamiliar", valor: 55_000, icono: "🎟️" },
-  { nombre: "Página Web", valor: 60_000, icono: "🌐" },
+  // El 13/09/2026 se puso en $ 0 con el motivo "ya vienen con su pago en línea". Es
+  // cierto que esa plata no debe entrar a la caja, pero la tarifa en cero tampoco la
+  // deja aparecer en la VENTA: para eso está el medio PREPAGADO (BANCO), que suma a la
+  // venta sin tocar el arqueo. Se restaura el valor.
+  {
+    nombre: "Página Web",
+    valor: 60_000,
+    icono: "🌐",
+    motivo: "Se restaura el valor: la entrada suma a la venta y se cobra con PREPAGADO (BANCO), que no entra al recaudo",
+  },
+  // Venía en $ 0 desde el primer día: 137 personas entraron por aquí el 13/09 sin
+  // registrar un peso, mientras Coomeva y Comfamiliar no registraron ninguna.
+  {
+    nombre: "Redención Bono",
+    valor: 55_000,
+    icono: "🎟️",
+    motivo: "La redención vale lo que el bono: suma a la venta y se cobra con PREPAGADO (BANCO)",
+  },
 ];
 
 async function main() {
@@ -63,7 +80,7 @@ async function main() {
             },
           });
           await tx.tarifa.create({
-            data: { tipo_visitante_id: t.id, valor: p.valor, vigente_desde: ahora, motivo_cambio: MOTIVO },
+            data: { tipo_visitante_id: t.id, valor: p.valor, vigente_desde: ahora, motivo_cambio: p.motivo ?? MOTIVO },
           });
         });
       }
@@ -82,7 +99,7 @@ async function main() {
       await prisma.$transaction(async (tx) => {
         if (vigente) await tx.tarifa.update({ where: { id: vigente.id }, data: { vigente_hasta: ahora } });
         await tx.tarifa.create({
-          data: { tipo_visitante_id: existente.id, valor: p.valor, vigente_desde: ahora, motivo_cambio: MOTIVO },
+          data: { tipo_visitante_id: existente.id, valor: p.valor, vigente_desde: ahora, motivo_cambio: p.motivo ?? MOTIVO },
         });
         // El flag se deriva del valor, igual que en /admin/tarifas.
         if (!existente.requiere_pago) {

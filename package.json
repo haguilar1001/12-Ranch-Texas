@@ -31,7 +31,8 @@
     "demo:cierre": "tsx scripts/demo-cierre.ts",
     "mayusculas:datos": "tsx scripts/mayusculas-datos.ts",
     "tarifas:prepago": "tsx scripts/tarifas-prepago.ts",
-    "alimentacion:2026": "tsx scripts/alimentacion-2026-09.ts"
+    "alimentacion:2026": "tsx scripts/alimentacion-2026-09.ts",
+    "valorar:prepagos": "tsx scripts/valorar-prepagos.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
