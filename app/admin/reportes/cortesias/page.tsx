@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import FormularioFiltros from "../FormularioFiltros";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { relacionCortesias, type TipoCortesia } from "@/lib/reportes/cortesias";
@@ -130,7 +131,7 @@ export default async function ReporteCortesiasPage({
         Quién entró gratis, con qué motivo y quién lo autorizó. Las rebajas de tarifa no salen aquí: esas son del cierre del día, en "Descuentos autorizados".
       </p>
 
-      <form className="mb-4 flex flex-wrap gap-2 text-sm">
+      <FormularioFiltros className="mb-4 flex flex-wrap gap-2 text-sm">
         <FiltroPeriodo anio={rango.anio} mes={rango.mes} fecha={rango.fecha} hoy={hoy} />
         <select name="caja" defaultValue={cajaId ?? ""} className="rounded border px-2 py-1">
           <option value="">Todas las cajas</option>
@@ -140,9 +141,8 @@ export default async function ReporteCortesiasPage({
           <option value="">Todos los cajeros</option>
           {cajeros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
         <a href={`/admin/reportes/cortesias/csv?${qs}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
-      </form>
+      </FormularioFiltros>
 
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{rango.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

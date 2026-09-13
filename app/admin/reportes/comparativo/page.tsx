@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import FormularioFiltros from "../FormularioFiltros";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { comparativoAnual, productosVentaHistorica, resumenAnual } from "@/lib/reportes/comparativo";
 import { variacionPct, formatearVariacion } from "@/lib/reportes/util";
@@ -28,7 +29,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Comparativo año vs. año</h1>
       <p className="mb-4 text-sm text-ranch-marron/60">Venta histórica del parque</p>
 
-      <form className="mb-4 flex flex-wrap gap-2 text-sm">
+      <FormularioFiltros className="mb-4 flex flex-wrap gap-2 text-sm">
         <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">
           {aniosDisponibles.map((a) => <option key={a} value={a}>{a} vs {a - 1}</option>)}
         </select>
@@ -36,9 +37,8 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
           <option value="__todos">Todos los productos</option>
           {productos.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
         <a href={`/admin/reportes/comparativo/csv?anio=${anio}${producto ? `&producto=${encodeURIComponent(producto)}` : ""}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
-      </form>
+      </FormularioFiltros>
 
       {/* Totales */}
       <div className="mb-4 grid grid-cols-3 gap-3 text-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -35,11 +35,24 @@ export default function FiltroPeriodo({
   const [modo, setModo] = useState<"mes" | "dia">(fecha ? "dia" : "mes");
   const clase = "rounded border border-ranch-marron/25 px-2 py-1";
 
+  // Cambiar de modo también consulta: pasar a "Día" ya trae hoy, y volver a "Mes"
+  // trae el mes. Se hace en un efecto y no en el clic porque el campo nuevo tiene
+  // que estar en el formulario ANTES de enviarlo; si no, viajaría el del modo viejo.
+  const ancla = useRef<HTMLDivElement>(null);
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
+    }
+    ancla.current?.closest("form")?.requestSubmit();
+  }, [modo]);
+
   return (
     <>
       {/* El modo no es un filtro: no lleva `name`, así que no viaja en la URL.
           Lo que viaja es el campo que quede visible. */}
-      <div className="flex overflow-hidden rounded border border-ranch-marron/25">
+      <div ref={ancla} className="flex overflow-hidden rounded border border-ranch-marron/25">
         {(["mes", "dia"] as const).map((m) => (
           <button
             key={m}

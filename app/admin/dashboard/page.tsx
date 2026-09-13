@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FormularioFiltros from "../reportes/FormularioFiltros";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
@@ -51,7 +52,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <h1 className="mb-3 text-2xl font-black text-ranch-marron">Dashboard de ventas</h1>
 
       {/* Filtros */}
-      <form className="mb-4 flex flex-wrap gap-2 text-sm">
+      <FormularioFiltros className="mb-4 flex flex-wrap gap-2 text-sm">
         <FiltroPeriodo anio={anio} mes={mes} fecha={periodo.fecha} hoy={hoy} />
         <select name="caja" defaultValue={sp.caja ?? ""} className="rounded-lg border px-2 py-1">
           <option value="">Todas las cajas</option>
@@ -61,8 +62,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <option value="">Todos los cajeros</option>
           {cajeros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <button className="rounded-lg bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
-      </form>
+      </FormularioFiltros>
 
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{periodo.etiqueta}</p>
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { redirect } from "next/navigation";
+import FormularioFiltros from "@/app/admin/reportes/FormularioFiltros";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { fechaBogota } from "@/lib/tiempo";
 import { programacionDelDia, type PedidoDelDia } from "@/lib/eventos/cotizaciones";
@@ -65,7 +66,7 @@ export default async function EventosDelDiaPage({
           <p className="text-sm capitalize text-ranch-marron/60">{fechaLarga(dia)}</p>
         </div>
         {/* Un GET: la fecha queda en la URL y se puede compartir o volver a ella. */}
-        <form className="flex items-end gap-2">
+        <FormularioFiltros className="flex items-end gap-2">
           <label className="flex flex-col gap-1 text-xs font-semibold text-ranch-marron/60">
             Ver otro día
             <input
@@ -75,10 +76,7 @@ export default async function EventosDelDiaPage({
               className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm text-ranch-marron"
             />
           </label>
-          <button className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema hover:bg-ranch-marron-oscuro">
-            Ver
-          </button>
-        </form>
+        </FormularioFiltros>
       </div>
 
       {!r.ok ? (

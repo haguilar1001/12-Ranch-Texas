@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import FormularioFiltros from "../FormularioFiltros";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas } from "@/lib/reportes/ventas";
@@ -40,7 +41,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
   return (
     <main className="mx-auto max-w-4xl p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Reporte de ventas</h1>
-      <form className="mb-4 flex flex-wrap gap-2 text-sm">
+      <FormularioFiltros className="mb-4 flex flex-wrap gap-2 text-sm">
         <FiltroPeriodo anio={periodo.anio} mes={periodo.mes} fecha={periodo.fecha} hoy={hoy} />
         <select name="caja" defaultValue={cajaId ?? ""} className="rounded border px-2 py-1">
           <option value="">Todas las cajas</option>
@@ -50,10 +51,9 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
           <option value="">Todos los cajeros</option>
           {cajeros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
         <a href={`/admin/reportes/ventas/csv?${qs}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
         <a href={`/admin/reportes/cortesias?${qs}`} className="rounded border border-ranch-marron/25 px-3 py-1 font-semibold text-ranch-marron">Ver cortesías</a>
-      </form>
+      </FormularioFiltros>
 
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{periodo.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">

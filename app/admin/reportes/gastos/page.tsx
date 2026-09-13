@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import FormularioFiltros from "../FormularioFiltros";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { rubrosPlano } from "@/lib/gastos/rubros";
@@ -63,15 +64,14 @@ export default async function ReporteGastosPage({ searchParams }: { searchParams
   return (
     <main className="mx-auto max-w-3xl p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Reporte de gastos</h1>
-      <form className="mb-4 flex gap-2 text-sm">
+      <FormularioFiltros className="mb-4 flex gap-2 text-sm">
         <select name="mes" defaultValue={mes} className="rounded border px-2 py-1">
           {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
         </select>
         <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">
           {[2024, 2025, 2026].map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
-        <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
-      </form>
+      </FormularioFiltros>
 
       <section className="mb-4 rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
         <h2 className="mb-2 font-bold text-ranch-marron">Presupuesto vs. ejecutado — {MESES[mes - 1]} {anio}</h2>

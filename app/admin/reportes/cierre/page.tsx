@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import FormularioFiltros from "../FormularioFiltros";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { cierreDelDia } from "@/lib/reportes/cierre";
 import { fechaBogota } from "@/lib/tiempo";
@@ -55,13 +56,12 @@ export default async function CierreDiaPage({
   return (
     <main className="mx-auto max-w-3xl p-4 print:max-w-none print:p-0">
       {/* Barra de control: no se imprime. */}
-      <form className="mb-4 flex flex-wrap items-center gap-2 text-sm print:hidden">
+      <FormularioFiltros className="mb-4 flex flex-wrap items-center gap-2 text-sm print:hidden">
         <label className="text-ranch-marron/70">Día</label>
         <input type="date" name="fecha" defaultValue={fecha} className="rounded border border-ranch-marron/30 px-2 py-1" />
-        <button className="rounded bg-ranch-marron px-3 py-1 font-semibold text-ranch-crema">Ver</button>
         <a href={`/admin/reportes/cierre/csv?fecha=${fecha}`} className="rounded bg-ranch-verde px-3 py-1 font-semibold text-white">⬇️ Excel</a>
         <span className="ml-auto text-xs text-ranch-marron/50">Ctrl+P para imprimir o guardar en PDF</span>
-      </form>
+      </FormularioFiltros>
 
       <section className="rounded-2xl border-2 border-ranch-marron/20 bg-white p-5 print:rounded-none print:border-0 print:p-0">
         <header className="mb-4 text-center">
