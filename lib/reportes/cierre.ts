@@ -260,6 +260,23 @@ export interface EncabezadoCierre {
 }
 
 /** Trae las líneas del día (ventas completadas) y arma el informe. */
+/**
+ * Turnos SIEMPRE en el orden de las cajas: CAJA 1, CAJA 2, CAJA 3.
+ *
+ * Antes se ordenaban por lo recaudado, y eso hacía que las cajas cambiaran de puesto
+ * según el día: quien firma este informe todas las noches lo lee por posición, y una
+ * tabla que se reordena sola obliga a leerla completa cada vez.
+ *
+ * `numeric` es para que CAJA 10 quede después de CAJA 9 y no entre la 1 y la 2.
+ */
+export function ordenarTurnos<T extends { caja: string; cajero: string }>(turnos: T[]): T[] {
+  return [...turnos].sort(
+    (a, b) =>
+      a.caja.localeCompare(b.caja, "es-CO", { numeric: true, sensitivity: "base" }) ||
+      a.cajero.localeCompare(b.cajero, "es-CO", { sensitivity: "base" }),
+  );
+}
+
 export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia & EncabezadoCierre & { porCaja: MatrizCajas }> {
   const [detalle, ventasDelDia, pagos] = await Promise.all([
     prisma.ventaDetalle.findMany({
@@ -350,7 +367,7 @@ export async function cierreDelDia(desde: Date, hasta: Date): Promise<CierreDia 
     porCaja: matrizPorCaja(planas),
     ventasCompletadas: completadas,
     ventasAnuladas: anuladas,
-    turnos: [...porTurno.values()].sort((a, b) => b.recaudado - a.recaudado),
+    turnos: ordenarTurnos([...porTurno.values()]),
     porMedioPago: [...medios.entries()].map(([medio, monto]) => ({ medio, monto })).sort((a, b) => b.monto - a.monto),
     yaRecaudado: [...prepagados.entries()].map(([medio, monto]) => ({ medio, monto })).sort((a, b) => b.monto - a.monto),
   };

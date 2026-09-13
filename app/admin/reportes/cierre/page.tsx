@@ -227,18 +227,49 @@ export default async function CierreDiaPage({
           <div>
             <h2 className="mb-2 font-bold uppercase text-ranch-marron">Turnos del día</h2>
             <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ranch-crema">
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-left font-bold uppercase text-ranch-marron">Caja</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Ventas</th>
+                  <th className="border border-ranch-marron/25 px-3 py-1.5 text-right font-bold uppercase text-ranch-marron">Recaudado</th>
+                </tr>
+              </thead>
               <tbody>
                 {r.turnos.map((t, i) => (
                   <tr key={i}>
-                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/85">
-                      {t.caja}
-                      <span className="block text-xs text-ranch-marron/50">{t.cajero} · {t.ventas} ventas</span>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5">
+                      <span className="font-semibold uppercase text-ranch-marron">{t.caja}</span>
+                      {/* Un turno sin cerrar avisa que esa cifra todavía puede moverse:
+                          este informe se firma, y firmar un parcial sin saberlo es peor
+                          que esperar a que el cajero cierre. */}
+                      {t.estado !== "cerrado" && (
+                        <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                          {t.estado}
+                        </span>
+                      )}
+                      <span className="block text-xs uppercase text-ranch-marron/50">{t.cajero}</span>
                     </td>
-                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">{formatearCOP(t.recaudado)}</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums text-ranch-marron/70">
+                      {t.ventas.toLocaleString("es-CO")}
+                    </td>
+                    <td className="whitespace-nowrap border border-ranch-marron/25 px-3 py-1.5 text-right font-semibold tabular-nums text-ranch-marron">
+                      {formatearCOP(t.recaudado)}
+                    </td>
                   </tr>
                 ))}
+                {r.turnos.length > 0 && (
+                  <tr className="bg-ranch-crema/70 font-bold text-ranch-marron">
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 uppercase">Total</td>
+                    <td className="border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">
+                      {r.turnos.reduce((a, t) => a + t.ventas, 0).toLocaleString("es-CO")}
+                    </td>
+                    <td className="whitespace-nowrap border border-ranch-marron/25 px-3 py-1.5 text-right tabular-nums">
+                      {formatearCOP(r.turnos.reduce((a, t) => a + t.recaudado, 0))}
+                    </td>
+                  </tr>
+                )}
                 {r.turnos.length === 0 && (
-                  <tr><td className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/50">Sin turnos.</td></tr>
+                  <tr><td colSpan={3} className="border border-ranch-marron/25 px-3 py-1.5 text-ranch-marron/50">Sin turnos.</td></tr>
                 )}
               </tbody>
             </table>

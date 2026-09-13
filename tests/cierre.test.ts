@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resumirCierre, matrizPorCaja, type LineaCierre } from "../lib/reportes/cierre";
+import { resumirCierre, matrizPorCaja, type LineaCierre, ordenarTurnos } from "../lib/reportes/cierre";
 
 const linea = (p: Partial<LineaCierre>): LineaCierre => ({
   tipo_visitante: "Adulto",
@@ -254,5 +254,32 @@ describe("cierre con una columna por caja", () => {
     expect(matrizPorCaja([])).toEqual({
       cajas: [], filas: [], totalPorCaja: [], totalCantidad: 0, totalValor: 0,
     });
+  });
+});
+
+// El informe se firma todas las noches. Si las cajas cambian de puesto según lo que
+// recaudaron, quien lo lee por posición se equivoca de fila.
+describe("orden de los turnos del día", () => {
+  const t = (caja: string, cajero = "X") => ({ caja, cajero });
+
+  it("siempre CAJA 1, CAJA 2, CAJA 3, sin importar lo recaudado", () => {
+    const orden = ordenarTurnos([t("CAJA 3"), t("CAJA 1"), t("CAJA 2")]).map((x) => x.caja);
+    expect(orden).toEqual(["CAJA 1", "CAJA 2", "CAJA 3"]);
+  });
+
+  it("CAJA 10 va después de CAJA 9, no entre la 1 y la 2", () => {
+    const orden = ordenarTurnos([t("CAJA 10"), t("CAJA 2"), t("CAJA 9"), t("CAJA 1")]).map((x) => x.caja);
+    expect(orden).toEqual(["CAJA 1", "CAJA 2", "CAJA 9", "CAJA 10"]);
+  });
+
+  it("dos turnos de la misma caja se ordenan por cajero", () => {
+    const orden = ordenarTurnos([t("CAJA 1", "ZULMA"), t("CAJA 1", "ANDRÉS")]).map((x) => x.cajero);
+    expect(orden).toEqual(["ANDRÉS", "ZULMA"]);
+  });
+
+  it("no modifica el arreglo que recibe", () => {
+    const original = [t("CAJA 3"), t("CAJA 1")];
+    ordenarTurnos(original);
+    expect(original.map((x) => x.caja)).toEqual(["CAJA 3", "CAJA 1"]);
   });
 });
