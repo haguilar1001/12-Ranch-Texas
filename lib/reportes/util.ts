@@ -12,3 +12,13 @@ export function formatearVariacion(v: number | null): string {
   const signo = v > 0 ? "+" : v < 0 ? "−" : "";
   return `${signo}${Math.abs(v).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
+
+/**
+ * Un porcentaje tal como se escribe en Colombia: "30,6%", con coma decimal.
+ *
+ * `toFixed(1)` devuelve "30.6" con punto, que en una pantalla llena de cifras en
+ * pesos —donde el punto es separador de MILES— se lee mal: "100.0%" parece cien mil.
+ */
+export function formatearPct(v: number, decimales = 1): string {
+  return `${v.toLocaleString("es-CO", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}%`;
+}

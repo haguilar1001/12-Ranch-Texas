@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas } from "@/lib/reportes/ventas";
 import { fechaBogota } from "@/lib/tiempo";
+import { formatearPct } from "@/lib/reportes/util";
 import { queryDe, rangoDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
 import { formatearCOP } from "@/lib/dinero/cop";
@@ -63,7 +64,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} />
         <Kpi label="Entradas de cortesía" valor={String(ind.personasCortesia)} />
         <Kpi label="Valor no cobrado" valor={formatearCOP(ind.valorNoCobrado)} />
-        <Kpi label="% cortesías/desc." valor={`${ind.pctCortesias.toFixed(1)}%`} />
+        <Kpi label="% cortesías/desc." valor={formatearPct(ind.pctCortesias)} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

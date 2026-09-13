@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVentas, ventasPorMes, type FiltrosVentas } from "@/lib/reportes/ventas";
 import { comparativoAnual } from "@/lib/reportes/comparativo";
-import { variacionPct, formatearVariacion } from "@/lib/reportes/util";
+import { variacionPct, formatearVariacion, formatearPct } from "@/lib/reportes/util";
 import { fechaBogota } from "@/lib/tiempo";
 import { rangoDe } from "../reportes/periodo";
 import FiltroPeriodo from "../reportes/FiltroPeriodo";
@@ -70,7 +70,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Kpi label={periodo.fecha ? "Ingreso del día" : "Ingreso del mes"} valor={formatearCOP(ind.ingreso)} />
         <Kpi label="Entradas" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} />
-        <Kpi label="% cortesías" valor={`${ind.pctCortesias.toFixed(1)}%`} sub={formatearCOP(ind.valorNoCobrado)} />
+        <Kpi label="% cortesías" valor={formatearPct(ind.pctCortesias)} sub={formatearCOP(ind.valorNoCobrado)} />
       </div>
 
       {/* Tendencia mensual del año (en vivo) */}
@@ -110,18 +110,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="space-y-1">
           {(() => {
             const max = Math.max(1, ...comp.meses.map((m) => Math.max(m.actual, m.anterior)));
-            return comp.meses.map((m) => (
-              <div key={m.mes} className="flex items-center gap-2 text-xs">
-                <span className="w-8 shrink-0 text-ranch-marron/60">{MESES_ABR[m.mes - 1]}</span>
-                <div className="flex-1 space-y-0.5">
-                  <div className="h-2.5 rounded bg-ranch-marron/25" style={{ width: `${(m.anterior / max) * 100}%` }} />
-                  <div className="h-2.5 rounded bg-ranch-dorado" style={{ width: `${(m.actual / max) * 100}%` }} />
+            return comp.meses.map((m) => {
+              // Aquí el porcentaje que dice algo NO es participación sino la variación
+              // contra el mismo mes del año pasado: es un cuadro de comparación, no de
+              // composición. Un mes sin dato del año anterior queda en "—", no en 0%.
+              const v = variacionPct(m.actual, m.anterior);
+              return (
+                <div key={m.mes} className="flex items-center gap-2 text-xs">
+                  <span className="w-8 shrink-0 text-ranch-marron/60">{MESES_ABR[m.mes - 1]}</span>
+                  <div className="flex-1 space-y-0.5">
+                    <div className="h-2.5 rounded bg-ranch-marron/25" style={{ width: `${(m.anterior / max) * 100}%` }} />
+                    <div className="h-2.5 rounded bg-ranch-dorado" style={{ width: `${(m.actual / max) * 100}%` }} />
+                  </div>
+                  <span
+                    className={`w-14 shrink-0 whitespace-nowrap text-right tabular-nums ${
+                      v === null ? "text-ranch-marron/30" : v >= 0 ? "text-ranch-verde" : "text-red-600"
+                    }`}
+                  >
+                    {formatearVariacion(v)}
+                  </span>
                 </div>
-              </div>
-            ));
+              );
+            });
           })()}
         </div>
-        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · <Link href="/admin/reportes/comparativo" className="underline">ver detalle</Link></p>
+        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · el % es la variación contra el mismo mes del año anterior · <Link href="/admin/reportes/comparativo" className="underline">ver detalle</Link></p>
       </section>
     </main>
   );
