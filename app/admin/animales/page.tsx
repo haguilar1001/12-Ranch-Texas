@@ -178,6 +178,8 @@ export default async function AnimalesPage() {
       observaciones: b.observaciones,
       anulado: b.anulado,
       motivo_anulacion: b.motivo_anulacion,
+      automatico: b.automatico,
+      franja: b.franja,
     };
   });
 

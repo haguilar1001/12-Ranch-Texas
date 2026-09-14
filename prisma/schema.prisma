@@ -1139,6 +1139,8 @@ model RegistroAlimentacion {
   motivo              String? // obligatorio si es parcial u omitida
   empleado_id         String? // quién alimentó
   usuario_id          String? // quién lo registró en el sistema
+  automatico          Boolean            @default(false) // creado solo por el reparto automático de horarios
+  franja              String? // "07:00" | "12:00" | "16:00": solo si automatico=true
   observaciones       String?
   anulado             Boolean            @default(false)
   motivo_anulacion    String?
@@ -1159,6 +1161,7 @@ model RegistroAlimentacion {
   @@index([animal_id])
   @@index([alimento_id])
   @@index([recinto_id])
+  @@index([racion_id])
   @@map("registros_alimentacion")
 }
 

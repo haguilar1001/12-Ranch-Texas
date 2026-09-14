@@ -210,6 +210,28 @@ y no los $20.866.480 que suman los dos cuadros.
 - **La paca de heno pesa 15 kg en promedio** (no es exacta). No mueve el costo — la dieta se mide en
   pacas — pero sí la lectura de la bitácora: 40 pacas al día son 600 kg, 18 toneladas al mes.
 
+### Reparto automático de la alimentación (2026-09-14)
+- **Áreas creadas:** `PESEBRERAS` (los 60 equinos: caballos, potros, caballos mini) y `GRANJA` (el
+  resto de las 29 especies). Asignación inicial hecha por script directo a producción, con el mismo
+  historial de traslados que deja la app.
+- **La dieta ya no se registra a mano todos los días:** un cron en Railway dispara
+  `npm run alimentar:auto` a las 7:00 a.m., 12:00 m. y 4:00 p.m. hora Bogotá.
+  - **Equinos (categoría EQUINOS): 3 franjas** (7 a.m., 12 m., 4 p.m.). El resto de categorías:
+    **2 franjas** (7 a.m., 4 p.m.). La cantidad de la ración (ya prorrateada al día en
+    `cantidadPorEntrega`) se reparte entre las franjas que le tocan a esa categoría.
+  - **Las raciones de "consumo libre"** (sal mineralizada y melaza de las vacas) quedan **fuera** del
+    reparto automático — es acceso todo el día, no una entrega puntual. Se siguen registrando a mano
+    si hace falta.
+  - Cada entrega automática queda marcada (`automatico=true`, `franja`) y es **idempotente**: si el
+    cron se repite o se atrasa unos minutos, no duplica la entrega del día.
+  - Implementación: `lib/animales/auto-alimentacion.ts` (reglas puras, con pruebas),
+    `lib/animales/ejecutar-automatico.ts` (orquesta contra la BD), `scripts/alimentar-automatico.ts`
+    (punto de entrada del cron). Migración `20260914155957_f_reparto_automatico_alimentacion`.
+- **Pendiente del responsable:** terminar de configurar en el dashboard de Railway el servicio
+  `alimentacion-automatica` (ya creado, con el mismo repo y el mismo `DATABASE_URL`): Start Command
+  `npm run alimentar:auto` y Cron Schedule `0 12,17,21 * * *` (UTC = 7 a.m./12 m./4 p.m. Bogotá). La
+  CLI de Railway no expone esos dos campos todavía.
+
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).

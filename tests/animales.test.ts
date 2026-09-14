@@ -12,6 +12,7 @@ import {
   type RacionCalculo,
 } from "../lib/animales/racion";
 import { calcularExistencia, diasDeAutonomia, quedaEnNegativo } from "../lib/animales/existencia";
+import { franjasDeCategoria, esConsumoLibre, cantidadPorFranja, franjaMasCercana } from "../lib/animales/auto-alimentacion";
 
 // Alimentos reales del parque (infografía de consumo mensual).
 const ITALCAN: AlimentoUnidad = { unidad_medida: "bulto", equivalencia_g: 40_000, costo_unitario: 110_000 };
@@ -205,5 +206,39 @@ describe("dieta de los equinos (cuadro de septiembre de 2026)", () => {
     const racion: RacionCalculo = { cantidad: 500, unidad: "g", modo: "grupal", frecuencia: "diaria" };
     expect(consumoBaseMensual(racion, 7, CONEJINA_LIBRA)! / 500).toBe(30); // 15 kg = 30 libras
     expect(costoMensual(racion, 7, CONEJINA_LIBRA)).toBe(53_550);
+  });
+});
+
+// Reparto automático de la dieta por franja horaria: los equinos comen 3 veces
+// (7 a.m., 12 m., 4 p.m.); el resto, 2 veces (7 a.m., 4 p.m.).
+describe("reparto automático por franja horaria", () => {
+  it("los equinos tienen 3 franjas; el resto, 2", () => {
+    expect(franjasDeCategoria("EQUINOS")).toEqual(["07:00", "12:00", "16:00"]);
+    expect(franjasDeCategoria("equinos")).toEqual(["07:00", "12:00", "16:00"]); // sin distinguir mayúsculas
+    expect(franjasDeCategoria("BOVINOS")).toEqual(["07:00", "16:00"]);
+    expect(franjasDeCategoria("AVES DE CORRAL")).toEqual(["07:00", "16:00"]);
+  });
+
+  it("reconoce el consumo libre sin importar mayúsculas o espacios", () => {
+    expect(esConsumoLibre("CONSUMO LIBRE")).toBe(true);
+    expect(esConsumoLibre(" consumo libre ")).toBe(true);
+    expect(esConsumoLibre("6:00 a.m.")).toBe(false);
+    expect(esConsumoLibre(null)).toBe(false);
+    expect(esConsumoLibre(undefined)).toBe(false);
+  });
+
+  it("reparte la ración diaria entre el número de franjas", () => {
+    expect(cantidadPorFranja(72_000, 3)).toBe(24_000); // 72 kg/día de alfalfa de los caballos → 24 kg por franja
+    expect(cantidadPorFranja(8_000, 2)).toBe(4_000); // 8 kg/día de los perros → 4 kg por franja
+    expect(cantidadPorFranja(100, 3)).toBe(33); // no reparte exacto; redondea
+    expect(cantidadPorFranja(100, 0)).toBe(0);
+  });
+
+  it("ubica la hora real del cron en su franja más cercana, con tolerancia", () => {
+    expect(franjaMasCercana("07:00")).toBe("07:00");
+    expect(franjaMasCercana("07:05")).toBe("07:00"); // el cron se atrasó un poco
+    expect(franjaMasCercana("11:55")).toBe("12:00");
+    expect(franjaMasCercana("16:00")).toBe("16:00");
+    expect(franjaMasCercana("10:00")).toBeNull(); // no cae cerca de ninguna franja
   });
 });

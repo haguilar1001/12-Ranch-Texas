@@ -46,6 +46,7 @@ export interface BitacoraVista {
   id: string; fecha: string; destino: string; recinto: string | null; alimento: string;
   entregadaTexto: string; planeadaTexto: string | null; cumple: boolean | null; costo: number | null;
   estado: string; motivo: string | null; observaciones: string | null; anulado: boolean; motivo_anulacion: string | null;
+  automatico: boolean; franja: string | null;
 }
 
 interface Props {
@@ -918,7 +919,14 @@ function Bitacora({
             {bitacora.map((b) => (
               <>
                 <tr key={b.id} className={`border-t border-ranch-marron/10 ${b.anulado ? "opacity-50 line-through" : ""}`}>
-                  <td className="px-3 py-2 text-ranch-marron/60">{b.fecha}</td>
+                  <td className="px-3 py-2 text-ranch-marron/60">
+                    {b.fecha}
+                    {b.automatico && (
+                      <span className="mt-1 block w-fit rounded-full bg-ranch-verde/15 px-2 py-0.5 text-[10px] font-semibold text-ranch-verde">
+                        auto {b.franja}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 font-semibold text-ranch-marron">
                     {b.destino}
                     {b.recinto && <span className="block text-xs font-normal text-ranch-marron/45">{b.recinto}</span>}

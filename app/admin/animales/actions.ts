@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma, type Tx } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol, puedeOperarGranja } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
 import { aBase, costoCOP, type AlimentoUnidad } from "@/lib/animales/unidades";
 import { cantidadPorEntrega, type FrecuenciaRacion, type ModoRacion } from "@/lib/animales/racion";
-import { calcularExistencia } from "@/lib/animales/existencia";
+import { recalcularExistencia, registrarEntregaConKardex } from "@/lib/animales/alimentacion";
 import type { Prisma } from "@prisma/client";
 
 interface Resultado {
@@ -399,17 +399,6 @@ export async function cambiarEstadoAlimento(id: string, activo: boolean): Promis
   return { ok: true };
 }
 
-/** Recalcula la existencia del alimento desde su kardex (nunca se escribe a mano). */
-async function recalcularExistencia(tx: Tx, alimentoId: string, usuarioId: string): Promise<number> {
-  const movs = await tx.movimientoAlimento.findMany({
-    where: { alimento_id: alimentoId },
-    select: { tipo: true, cantidad_base: true, fecha: true },
-  });
-  const saldo = calcularExistencia(movs);
-  await tx.alimento.update({ where: { id: alimentoId }, data: { existencia_base: saldo, actualizado_por: usuarioId } });
-  return saldo;
-}
-
 const TIPOS_MOV = ["entrada", "salida", "ajuste"] as const;
 
 export async function registrarMovimientoAlimento(e: {
@@ -665,41 +654,24 @@ export async function registrarAlimentacion(e: {
   const recintoId = animal?.recinto_id ?? null;
 
   const { saldo } = await prisma.$transaction(async (tx) => {
-    const reg = await tx.registroAlimentacion.create({
-      data: {
-        racion_id: racion?.id ?? null,
-        animal_id: animalId,
-        categoria_animal_id: categoriaId,
-        recinto_id: recintoId,
-        alimento_id: alimento.id,
-        cantidad_planeada: planeada,
-        cantidad_entregada: entregada,
-        costo,
-        estado,
-        motivo: texto(e.motivo),
-        empleado_id: texto(e.empleado_id),
-        usuario_id: s.id,
-        observaciones: texto(e.observaciones),
-        creado_por: s.id,
-      },
+    const { saldo: saldoNuevo } = await registrarEntregaConKardex(tx, {
+      racion_id: racion?.id,
+      animal_id: animalId,
+      categoria_animal_id: categoriaId,
+      recinto_id: recintoId,
+      alimento_id: alimento.id,
+      cantidad_planeada: planeada,
+      cantidad_entregada: entregada,
+      costo,
+      estado,
+      motivo: texto(e.motivo),
+      empleado_id: texto(e.empleado_id),
+      usuario_id: s.id,
+      observaciones: texto(e.observaciones),
+      creado_por: s.id,
+      motivoMovimiento: "Entrega a los animales",
     });
-
-    if (entregada > 0) {
-      await tx.movimientoAlimento.create({
-        data: {
-          alimento_id: alimento.id,
-          tipo: "salida",
-          cantidad_base: entregada,
-          motivo: "Entrega a los animales",
-          costo,
-          alimentacion_id: reg.id,
-          creado_por: s.id,
-        },
-      });
-    }
-
-    const saldoNuevo = await recalcularExistencia(tx, alimento.id, s.id);
-    return { reg, saldo: saldoNuevo };
+    return { saldo: saldoNuevo };
   });
 
   await registrarAuditoria({

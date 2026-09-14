@@ -26,6 +26,16 @@ export function inicioDelDiaOperativo(now: Date = new Date()): Date {
   return new Date(`${fechaBogota(now)}T00:00:00-05:00`);
 }
 
+/** Hora local (HH:MM, 24h) en Bogotá para un instante dado. */
+export function horaBogota(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+}
+
 /** Formatea fecha/hora en Bogotá para mostrar en la manilla. */
 export function formatearFechaHoraBogota(d: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
