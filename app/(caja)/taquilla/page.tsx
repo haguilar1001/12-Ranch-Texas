@@ -141,7 +141,7 @@ export default async function TaquillaPage({
       cajero={s.nombre}
       caja={cajaNombre}
       tipos={tipos}
-      medios={medios.map((m) => ({ id: m.id, nombre: m.nombre, es_efectivo: m.es_efectivo }))}
+      medios={medios.map((m) => ({ id: m.id, nombre: m.nombre, codigo: m.codigo, es_efectivo: m.es_efectivo }))}
       motivos={motivos.map((m) => ({ id: m.id, nombre: m.nombre }))}
       autorizadores={autorizadores}
       correccion={correccion}

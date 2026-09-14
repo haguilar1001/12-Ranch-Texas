@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { registrarVenta, corregirVenta } from "./actions";
 import IconoTipo from "@/components/IconoTipo";
@@ -20,7 +20,7 @@ interface Tipo {
   /** Bono o compra web: hay que verificarlo en la aplicación de bonos antes de vender. */
   requiere_escaneo: boolean;
 }
-interface Medio { id: string; nombre: string; es_efectivo: boolean }
+interface Medio { id: string; nombre: string; codigo: string; es_efectivo: boolean }
 interface Motivo { id: string; nombre: string }
 interface Autorizador { id: string; nombre: string; cargo: string | null }
 
@@ -177,6 +177,61 @@ export default function TaquillaClient({
   }, [cant, descuentos, cortesias, tipos, tipoPorId, escaneados]);
 
   const totales = useMemo(() => calcularTotales(lineas), [lineas]);
+
+  // Los bonos y la Página Web ya se pagaron antes (no entran hoy al cajón): la app
+  // sugiere solo el medio PREPAGADO por ese valor, para que el cajero no tenga que
+  // acordarse de cambiarlo a mano. Sigue siendo editable: si el cajero toca esa fila
+  // (monto o medio) o la borra, se deja de tocar por el resto de este tiquete.
+  const medioPrepagoId = useMemo(() => medios.find((m) => m.codigo === "prepagado")?.id ?? null, [medios]);
+  const montoPrepagoSugerido = useMemo(() => {
+    if (!medioPrepagoId) return 0;
+    return lineas
+      .filter((l) => l.tipo_linea === "pago" && tipoPorId.get(l.tipo_visitante_id)?.requiere_escaneo)
+      .reduce((a, l) => a + l.valor_cobrado * l.cantidad, 0);
+  }, [lineas, tipoPorId, medioPrepagoId]);
+  /** Último valor que ESTE efecto puso en la fila de prepago; sirve para notar si el cajero lo cambió. */
+  const prepagoAutoValorRef = useRef<number | null>(null);
+  /** Una vez el cajero toca (o quita) la fila de prepago, se deja de tocar en este tiquete. */
+  const prepagoLiberadoRef = useRef(false);
+
+  useEffect(() => {
+    // OJO: lee `pagos` del cierre (valor ya confirmado del render), no un updater
+    // funcional de setState — un updater con mutaciones de ref no es puro y React
+    // lo invoca dos veces en Strict Mode, disparando la lógica de "liberado" sola.
+    if (!medioPrepagoId || prepagoLiberadoRef.current) return;
+    const i = pagos.findIndex((p) => p.medio_pago_id === medioPrepagoId);
+
+    if (i < 0) {
+      // Ya hubo una fila automática y ya no está: el cajero la cambió o la borró a mano.
+      if (prepagoAutoValorRef.current !== null) {
+        prepagoLiberadoRef.current = true;
+        return;
+      }
+      if (montoPrepagoSugerido <= 0) return;
+      prepagoAutoValorRef.current = montoPrepagoSugerido;
+      const nueva = { key: nextKey(), medio_pago_id: medioPrepagoId, monto: String(montoPrepagoSugerido) };
+      const esInicialVacia = pagos.length === 1 && parseCOP(pagos[0].monto) === 0 && pagos[0].medio_pago_id === (medios[0]?.id ?? "");
+      setPagos(esInicialVacia ? [nueva] : [...pagos, nueva]);
+      return;
+    }
+
+    const actual = parseCOP(pagos[i].monto);
+    if (prepagoAutoValorRef.current !== null && actual !== prepagoAutoValorRef.current) {
+      // El cajero le cambió el monto a mano: es suyo, no se lo pisamos más.
+      prepagoLiberadoRef.current = true;
+      return;
+    }
+    if (montoPrepagoSugerido <= 0) {
+      prepagoAutoValorRef.current = null;
+      const resto = pagos.filter((_, k) => k !== i);
+      setPagos(resto.length > 0 ? resto : [{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+      return;
+    }
+    if (actual === montoPrepagoSugerido) return;
+    prepagoAutoValorRef.current = montoPrepagoSugerido;
+    setPagos(pagos.map((p, k) => (k === i ? { ...p, monto: String(montoPrepagoSugerido) } : p)));
+  }, [montoPrepagoSugerido, medioPrepagoId, medios, pagos]);
+
   const pagosLimpios = useMemo(
     () => pagos.filter((p) => parseCOP(p.monto) > 0).map((p) => ({ medio_pago_id: p.medio_pago_id, monto: parseCOP(p.monto) })),
     [pagos],
@@ -297,6 +352,9 @@ export default function TaquillaClient({
     // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
     claveRef.current = nuevaClave();
     setSinRespuesta(false);
+    // Tiquete nuevo: el auto-relleno de PREPAGADO vuelve a ayudar desde cero.
+    prepagoAutoValorRef.current = null;
+    prepagoLiberadoRef.current = false;
   }
 
   function alternarDescuento(tipoId: string, valorLista: number) {
@@ -702,6 +760,11 @@ export default function TaquillaClient({
                 </div>
               ))}
             </div>
+            {medioPrepagoId && pagos.some((p) => p.medio_pago_id === medioPrepagoId) && (
+              <p className="mt-1 text-xs text-ranch-marron/50">
+                PREPAGADO se agregó solo por los bonos / Página Web de este tiquete — no pide efectivo. Si no aplica, cámbialo.
+              </p>
+            )}
             {/* Los billetes que circulan: se va sumando uno por cada uno que recibe. */}
             {hayEfectivo && (
               <div className="mt-2 flex flex-wrap items-center gap-1">
