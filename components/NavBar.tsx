@@ -51,6 +51,7 @@ export default async function NavBar() {
         ["📈", "Comparativo año vs año", "/admin/reportes/comparativo", "Contra la venta histórica", consulta],
         ["🎁", "Cortesías", "/admin/reportes/cortesias", "Quién entró gratis y quién lo autorizó", supervisor],
         ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
+        ["🐴", "Alimentación de animales", "/admin/reportes/alimentacion", "Costo del mes por categoría", consulta],
         ["📄", "Cierre del día", "/admin/reportes/cierre", "Informe para firmar e imprimir", supervisor],
         ["💰", "Cuadre diario", "/admin/cuadre", "Consolidado de todos los turnos", supervisor],
       ],
