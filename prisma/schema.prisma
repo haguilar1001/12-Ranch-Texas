@@ -390,6 +390,7 @@ model Cliente {
   nombre    String
   documento String?
   email     String?
+  activo    Boolean @default(true)
 
   ventas Venta[]
 

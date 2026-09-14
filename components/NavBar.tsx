@@ -62,6 +62,7 @@ export default async function NavBar() {
       enlaces: [
         ["💸", "Gastos", "/admin/gastos", "Registrar por rubro con soporte", supervisor],
         ["🏷️", "Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
+        ["🙋", "Clientes", "/admin/clientes", "Editar o desactivar un perfil", supervisor],
         ["🎫", "Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
         ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
         ["🖨️", "Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],

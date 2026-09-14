@@ -43,9 +43,9 @@ export async function buscarClientePorCelular(celular: string): Promise<ClienteE
 
   const cliente = await prisma.cliente.findUnique({
     where: { celular: limpio },
-    select: { nombre: true, documento: true, email: true },
+    select: { nombre: true, documento: true, email: true, activo: true },
   });
-  return cliente;
+  return cliente?.activo ? cliente : null;
 }
 
 export async function registrarVenta(entrada: EntradaVenta): Promise<ResultadoVenta> {
