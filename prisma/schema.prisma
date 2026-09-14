@@ -339,11 +339,16 @@ model Venta {
   anulada_por         String?
   anulada_en          DateTime?
 
-  // Datos opcionales del comprador (configurable)
+  // Datos opcionales del comprador (configurable). Es una FOTO de lo que se
+  // capturó EN ESTA venta — no se edita si el cliente maestro cambia después.
   comprador_nombre    String?
   comprador_documento String?
   comprador_celular   String?
   comprador_email     String?
+
+  /// A qué cliente maestro quedó asociada esta venta (por celular). null si no
+  /// se capturó celular o si la venta es de antes de que existiera `Cliente`.
+  cliente_id String?
 
   /// Llave que manda la taquilla al registrar. Si el internet se cae y el cajero
   /// vuelve a darle "Registrar", llega la MISMA llave y la venta no se duplica.
@@ -355,6 +360,7 @@ model Venta {
 
   turno      TurnoCaja      @relation(fields: [turno_id], references: [id])
   usuario    Usuario        @relation(fields: [usuario_id], references: [id])
+  cliente    Cliente?       @relation(fields: [cliente_id], references: [id])
   corrige    Venta?         @relation("CorreccionVenta", fields: [corrige_venta_id], references: [id])
   correccion Venta?         @relation("CorreccionVenta")
   detalle    VentaDetalle[]
@@ -367,7 +373,33 @@ model Venta {
 
   @@unique([turno_id, numero_venta])
   @@index([creado_en])
+  @@index([cliente_id])
   @@map("ventas")
+}
+
+// Perfil del comprador, para no recapturar sus datos en cada visita. La LLAVE es el
+// celular (obligatorio hoy en taquilla) — la cédula queda por fuera a propósito:
+// niños no la tienen, extranjeros traen pasaporte y mucha gente no la trae encima.
+//
+// El celular en Colombia se recicla y la gente lo cambia seguido, así que un
+// match NUNCA se aplica solo: la taquilla lo muestra como SUGERENCIA ("¿Es Fulano
+// de Tal?") y el cajero —que tiene al cliente en frente— la confirma con un clic.
+model Cliente {
+  id        String  @id @default(uuid())
+  celular   String  @unique
+  nombre    String
+  documento String?
+  email     String?
+
+  ventas Venta[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([documento])
+  @@map("clientes")
 }
 
 model VentaDetalle {

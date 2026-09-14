@@ -27,6 +27,7 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   AutorizadorCortesia: ["nombre", "cargo"],
   MedioPago: ["nombre"],
   Venta: ["motivo_anulacion", "comprador_nombre", "comprador_documento"],
+  Cliente: ["nombre", "documento"],
   VentaDetalle: ["motivo_descuento"],
   VentaPago: ["referencia"],
   Manilla: ["motivo_anulacion"],

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { registrarVenta, corregirVenta } from "./actions";
+import { registrarVenta, corregirVenta, buscarClientePorCelular, type ClienteEncontrado } from "./actions";
 import IconoTipo from "@/components/IconoTipo";
 import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
@@ -105,6 +105,30 @@ export default function TaquillaClient({
   const [comprador, setComprador] = useState(
     correccion?.comprador ?? { nombre: "", documento: "", celular: "", email: "" },
   );
+  // Cliente que ya conocemos por su celular: se SUGIERE, nunca se aplica solo (ver
+  // Cliente en el schema). `celularBuscado` evita repetir la búsqueda en cada blur.
+  const [sugerenciaCliente, setSugerenciaCliente] = useState<ClienteEncontrado | null>(null);
+  const [celularBuscado, setCelularBuscado] = useState<string | null>(null);
+  async function alSalirDeCelular() {
+    const limpio = comprador.celular.replace(/\D/g, "");
+    if (limpio.length < 7 || limpio === celularBuscado) return;
+    setCelularBuscado(limpio);
+    const encontrado = await buscarClientePorCelular(limpio);
+    // Si mientras esperaba la respuesta el cajero volvió a cambiar el celular, esta
+    // respuesta ya no aplica a lo que hay escrito ahora.
+    if (comprador.celular.replace(/\D/g, "") !== limpio) return;
+    setSugerenciaCliente(encontrado);
+  }
+  function usarSugerencia() {
+    if (!sugerenciaCliente) return;
+    setComprador((c) => ({
+      ...c,
+      nombre: sugerenciaCliente.nombre,
+      documento: sugerenciaCliente.documento ?? c.documento,
+      email: sugerenciaCliente.email ?? c.email,
+    }));
+    setSugerenciaCliente(null);
+  }
   const [cortesias, setCortesias] = useState<Cortesia[]>(() =>
     (correccion?.lineas ?? [])
       .filter((l) => l.tipo_linea !== "pago")
@@ -348,6 +372,7 @@ export default function TaquillaClient({
   function limpiar() {
     setCant({}); setCortesias([]); setDescuentos({}); setEscaneados({});
     setComprador({ nombre: "", documento: "", celular: "", email: "" });
+    setSugerenciaCliente(null); setCelularBuscado(null);
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
     // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
     claveRef.current = nuevaClave();
@@ -517,6 +542,7 @@ export default function TaquillaClient({
               <input
                 value={comprador.celular}
                 onChange={(e) => setComprador({ ...comprador, celular: e.target.value })}
+                onBlur={alSalirDeCelular}
                 placeholder="Celular *"
                 inputMode="tel"
                 className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${faltaCelular ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
@@ -530,6 +556,17 @@ export default function TaquillaClient({
                 className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
               />
             </div>
+            {sugerenciaCliente && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-ranch-dorado/50 bg-ranch-dorado/10 px-3 py-2 text-sm">
+                <span>📱 Ese celular ya está a nombre de <strong>{sugerenciaCliente.nombre}</strong>. ¿Es la misma persona?</span>
+                <button type="button" onClick={usarSugerencia} className="rounded bg-ranch-verde px-2 py-1 text-xs font-semibold text-white">
+                  Sí, usar sus datos
+                </button>
+                <button type="button" onClick={() => setSugerenciaCliente(null)} className="rounded px-2 py-1 text-xs font-semibold text-ranch-marron/50 hover:bg-ranch-marron/10">
+                  No, es otra persona
+                </button>
+              </div>
+            )}
             {faltaComprador && (
               <p className="mt-2 text-xs font-semibold text-red-600">
                 * El nombre y el celular son obligatorios para registrar la venta.

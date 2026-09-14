@@ -234,6 +234,25 @@ y no los $20.866.480 que suman los dos cuadros.
     *(Se intentó primero un Cron Job de Railway; se creó y se revirtió — el responsable no maneja
     esa parte de Railway.)*
 
+### Cliente maestro por celular, para agilizar taquilla (2026-09-14)
+- **Llave = celular, NO cédula.** La cédula queda por fuera a propósito: niños no la
+  tienen, extranjeros traen pasaporte, mucha gente no la trae encima, y hoy es un
+  campo opcional en taquilla — obligarla frenaría la caja en vez de agilizarla.
+- **El celular se recicla y la gente lo cambia seguido en Colombia.** Por eso un
+  match **nunca se aplica solo**: la taquilla lo muestra como SUGERENCIA ("¿Es Fulano
+  de Tal?") y el cajero —que tiene al cliente en frente— la confirma con un clic. Así
+  un número reciclado no le hereda a un desconocido los datos de otra persona.
+  - Tabla `clientes` (`prisma/schema.prisma`), llave única `celular` normalizado a
+    solo dígitos. `Venta.cliente_id` enlaza cada venta a su cliente maestro; los
+    campos `comprador_*` de la venta se conservan igual (son la foto de esa venta).
+  - Se alimenta solo (upsert) al registrar cada venta con celular+nombre
+    (`lib/ventas/registrar.ts`); la búsqueda es `buscarClientePorCelular`
+    (`app/(caja)/taquilla/actions.ts`), disparada al salir del campo celular.
+  - Migración `20260914225127_f_clientes_por_celular`.
+- **Pendiente/a futuro:** no se migró el histórico de ventas viejas a `clientes` (solo
+  alimenta hacia adelante); si se quiere un reporte de clientes frecuentes o dedup
+  del histórico, tocaría un script aparte.
+
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).

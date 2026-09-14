@@ -23,6 +23,31 @@ function validarComprador(e: EntradaVenta): string | null {
   return null;
 }
 
+export interface ClienteEncontrado {
+  nombre: string;
+  documento: string | null;
+  email: string | null;
+}
+
+/**
+ * Busca el cliente maestro por celular, para SUGERIR sus datos en taquilla — nunca
+ * se aplican solos. El celular se recicla y la gente lo cambia seguido en Colombia:
+ * quien confirma que es la misma persona es el cajero, mirando al cliente en frente.
+ */
+export async function buscarClientePorCelular(celular: string): Promise<ClienteEncontrado | null> {
+  const s = await obtenerSesion();
+  if (!s || !["cajero", "supervisor", "administrador"].includes(s.rol)) return null;
+
+  const limpio = celular.replace(/\D/g, "");
+  if (limpio.length < 7) return null;
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { celular: limpio },
+    select: { nombre: true, documento: true, email: true },
+  });
+  return cliente;
+}
+
 export async function registrarVenta(entrada: EntradaVenta): Promise<ResultadoVenta> {
   const s = await obtenerSesion();
   if (!s) return { ok: false, error: "Sesión expirada." };

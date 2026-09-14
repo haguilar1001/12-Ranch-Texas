@@ -121,6 +121,37 @@ export async function crearVenta(
       const agg = await tx.venta.aggregate({ where: { turno_id: ctx.turnoId }, _max: { numero_venta: true } });
       const numero = (agg._max.numero_venta ?? 0) + 1;
 
+      // Cliente maestro: llave = celular (ver Cliente en el schema, sobre por qué no
+      // es la cédula). Sin celular no hay a quién enlazar — la venta queda igual, solo
+      // que no alimenta el perfil ni sale sugerida la próxima vez.
+      //
+      // Se normaliza a solo dígitos para la LLAVE: "300 123 4567" y "300-123-4567" son
+      // el mismo cliente. `comprador_celular` en la venta sí guarda tal cual se tecleó
+      // (es una foto de esa venta, no la llave).
+      const celularCrudo = entrada.comprador_celular?.trim() || null;
+      const celular = celularCrudo ? celularCrudo.replace(/\D/g, "") || null : null;
+      const nombreComprador = entrada.comprador_nombre?.trim() || null;
+      const documentoComprador = entrada.comprador_documento?.trim() || null;
+      const emailComprador = entrada.comprador_email?.trim() || null;
+
+      const cliente = celular && nombreComprador
+        ? await tx.cliente.upsert({
+            where: { celular },
+            create: {
+              celular, nombre: nombreComprador, documento: documentoComprador, email: emailComprador,
+              creado_por: ctx.usuarioId,
+            },
+            // Se actualiza con lo último que trajo (nunca se borra un dato con uno vacío
+            // de una venta donde el cajero no volvió a preguntar documento/correo).
+            update: {
+              nombre: nombreComprador,
+              ...(documentoComprador ? { documento: documentoComprador } : {}),
+              ...(emailComprador ? { email: emailComprador } : {}),
+              actualizado_por: ctx.usuarioId,
+            },
+          })
+        : null;
+
       const venta = await tx.venta.create({
         data: {
           turno_id: ctx.turnoId,
@@ -132,10 +163,11 @@ export async function crearVenta(
           total_cobrado: totales.total_cobrado,
           total_descuento: totales.total_descuento,
           cantidad_asistentes: totales.cantidad_asistentes,
-          comprador_nombre: entrada.comprador_nombre?.trim() || null,
-          comprador_documento: entrada.comprador_documento?.trim() || null,
-          comprador_celular: entrada.comprador_celular?.trim() || null,
-          comprador_email: entrada.comprador_email?.trim() || null,
+          comprador_nombre: nombreComprador,
+          comprador_documento: documentoComprador,
+          comprador_celular: celularCrudo,
+          comprador_email: emailComprador,
+          cliente_id: cliente?.id ?? null,
           creado_por: ctx.usuarioId,
           pagos: { create: (entrada.pagos ?? []).map((p) => ({ medio_pago_id: p.medio_pago_id, monto: p.monto, creado_por: ctx.usuarioId })) },
         },
