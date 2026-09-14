@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
+import { limpiarCelular, esCelularColombiano, esEmailValido } from "@/lib/contacto";
 
 interface Resultado {
   ok: boolean;
@@ -40,8 +41,8 @@ export async function editarCliente(id: string, cambios: CambiosCliente): Promis
     data.nombre = cambios.nombre.trim();
   }
   if (cambios.celular !== undefined) {
-    const limpio = cambios.celular.replace(/\D/g, "");
-    if (limpio.length < 7) return { ok: false, error: "El celular está incompleto." };
+    if (!esCelularColombiano(cambios.celular)) return { ok: false, error: "El celular debe tener 10 dígitos y empezar por 3." };
+    const limpio = limpiarCelular(cambios.celular);
     if (limpio !== c.celular) {
       const choca = await prisma.cliente.findUnique({ where: { celular: limpio } });
       if (choca) return { ok: false, error: `Ese celular ya es de ${choca.nombre}.` };
@@ -49,7 +50,11 @@ export async function editarCliente(id: string, cambios: CambiosCliente): Promis
     data.celular = limpio;
   }
   if (cambios.documento !== undefined) data.documento = cambios.documento?.trim() || null;
-  if (cambios.email !== undefined) data.email = cambios.email?.trim() || null;
+  if (cambios.email !== undefined) {
+    const email = cambios.email?.trim() || null;
+    if (email && !esEmailValido(email)) return { ok: false, error: "El correo no es válido." };
+    data.email = email;
+  }
 
   await prisma.cliente.update({ where: { id }, data });
   await registrarAuditoria({

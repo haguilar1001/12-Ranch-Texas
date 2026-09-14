@@ -6,6 +6,7 @@ import { registrarVenta, corregirVenta, buscarClientePorCelular, type ClienteEnc
 import IconoTipo from "@/components/IconoTipo";
 import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
+import { esCelularColombiano, esEmailValido } from "@/lib/contacto";
 import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
 
 interface Tipo {
@@ -288,10 +289,13 @@ export default function TaquillaClient({
   const validacion = useMemo(() => validarVenta(lineas, pagosAjustados), [lineas, pagosAjustados]);
 
   // El nombre y el celular del comprador son obligatorios: sin eso no hay a quién
-  // buscar si después toca corregir la venta o reponer una manilla.
+  // buscar si después toca corregir la venta o reponer una manilla. El celular tiene
+  // que ser uno colombiano de verdad (10 dígitos, empieza por 3): así el cliente
+  // maestro (buscarClientePorCelular) tiene una llave confiable.
   const faltaNombre = comprador.nombre.trim() === "";
-  const faltaCelular = comprador.celular.replace(/D/g, "").length < 7;
-  const faltaComprador = faltaNombre || faltaCelular;
+  const faltaCelular = !esCelularColombiano(comprador.celular);
+  const emailInvalido = comprador.email.trim() !== "" && !esEmailValido(comprador.email);
+  const faltaComprador = faltaNombre || faltaCelular || emailInvalido;
 
   // Una cortesía sin beneficiario no sirve de control: hay que saber quién entró gratis.
   const faltaBeneficiario = cortesias.some((c) => c.cantidad > 0 && !c.beneficiario.trim());
@@ -541,9 +545,9 @@ export default function TaquillaClient({
               />
               <input
                 value={comprador.celular}
-                onChange={(e) => setComprador({ ...comprador, celular: e.target.value })}
+                onChange={(e) => setComprador({ ...comprador, celular: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                 onBlur={alSalirDeCelular}
-                placeholder="Celular *"
+                placeholder="Celular * (10 dígitos, empieza por 3)"
                 inputMode="tel"
                 className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${faltaCelular ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
               />
@@ -553,7 +557,7 @@ export default function TaquillaClient({
                 placeholder="Correo electrónico"
                 inputMode="email"
                 type="email"
-                className="rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm focus:border-ranch-dorado focus:outline-none"
+                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${emailInvalido ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
               />
             </div>
             {sugerenciaCliente && (
@@ -569,7 +573,9 @@ export default function TaquillaClient({
             )}
             {faltaComprador && (
               <p className="mt-2 text-xs font-semibold text-red-600">
-                * El nombre y el celular son obligatorios para registrar la venta.
+                {faltaNombre && "* Falta el nombre. "}
+                {faltaCelular && "* El celular debe tener 10 dígitos y empezar por 3. "}
+                {emailInvalido && "* El correo no es válido."}
               </p>
             )}
           </div>

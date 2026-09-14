@@ -7,6 +7,7 @@ import { registrarAuditoria } from "@/lib/audit";
 import { turnoAbiertoDe } from "@/lib/caja/turno";
 import { crearVenta } from "@/lib/ventas/registrar";
 import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
+import { esCelularColombiano, esEmailValido } from "@/lib/contacto";
 
 /**
  * Sin nombre y celular del comprador no hay venta.
@@ -17,9 +18,10 @@ import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
  */
 function validarComprador(e: EntradaVenta): string | null {
   if (!e.comprador_nombre?.trim()) return "Falta el nombre del comprador: es obligatorio para registrar la venta.";
-  const celular = (e.comprador_celular ?? "").replace(/\D/g, "");
-  if (!celular) return "Falta el celular del comprador: es obligatorio para registrar la venta.";
-  if (celular.length < 7) return "El celular del comprador está incompleto.";
+  const celular = e.comprador_celular ?? "";
+  if (!celular.trim()) return "Falta el celular del comprador: es obligatorio para registrar la venta.";
+  if (!esCelularColombiano(celular)) return "El celular debe tener 10 dígitos y empezar por 3.";
+  if (e.comprador_email?.trim() && !esEmailValido(e.comprador_email)) return "El correo del comprador no es válido.";
   return null;
 }
 
