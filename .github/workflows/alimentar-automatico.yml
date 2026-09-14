@@ -1,0 +1,26 @@
+name: Alimentación automática
+
+# Reparto de la dieta por franja horaria (ver decisiones.md).
+#   Equinos (caballos, potros, caballos mini): 7 a.m., 12 m. y 4 p.m.
+#   Resto de los animales:                     7 a.m. y 4 p.m.
+# Colombia no tiene horario de verano (UTC-5 todo el año), así que el cron en UTC
+# es fijo: 12:00, 17:00 y 21:00 → 7:00, 12:00 y 16:00 hora Bogotá.
+on:
+  schedule:
+    - cron: "0 12,17,21 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  alimentar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run alimentar:auto
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

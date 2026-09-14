@@ -214,7 +214,7 @@ y no los $20.866.480 que suman los dos cuadros.
 - **Áreas creadas:** `PESEBRERAS` (los 60 equinos: caballos, potros, caballos mini) y `GRANJA` (el
   resto de las 29 especies). Asignación inicial hecha por script directo a producción, con el mismo
   historial de traslados que deja la app.
-- **La dieta ya no se registra a mano todos los días:** un cron en Railway dispara
+- **La dieta ya no se registra a mano todos los días:** un cron dispara
   `npm run alimentar:auto` a las 7:00 a.m., 12:00 m. y 4:00 p.m. hora Bogotá.
   - **Equinos (categoría EQUINOS): 3 franjas** (7 a.m., 12 m., 4 p.m.). El resto de categorías:
     **2 franjas** (7 a.m., 4 p.m.). La cantidad de la ración (ya prorrateada al día en
@@ -227,10 +227,12 @@ y no los $20.866.480 que suman los dos cuadros.
   - Implementación: `lib/animales/auto-alimentacion.ts` (reglas puras, con pruebas),
     `lib/animales/ejecutar-automatico.ts` (orquesta contra la BD), `scripts/alimentar-automatico.ts`
     (punto de entrada del cron). Migración `20260914155957_f_reparto_automatico_alimentacion`.
-- **Pendiente del responsable:** terminar de configurar en el dashboard de Railway el servicio
-  `alimentacion-automatica` (ya creado, con el mismo repo y el mismo `DATABASE_URL`): Start Command
-  `npm run alimentar:auto` y Cron Schedule `0 12,17,21 * * *` (UTC = 7 a.m./12 m./4 p.m. Bogotá). La
-  CLI de Railway no expone esos dos campos todavía.
+  - **Disparador: GitHub Actions**, no Railway Cron (el responsable maneja todos sus cron por
+    GitHub). `.github/workflows/alimentar-automatico.yml` corre `0 12,17,21 * * *` (UTC = 7 a.m./
+    12 m./4 p.m. Bogotá) más `workflow_dispatch` para correrlo a mano. Usa el secreto de repo
+    `DATABASE_URL` (la URL pública de Postgres en Railway, para que el runner externo se conecte).
+    *(Se intentó primero un Cron Job de Railway; se creó y se revirtió — el responsable no maneja
+    esa parte de Railway.)*
 
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.

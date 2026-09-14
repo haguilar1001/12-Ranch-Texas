@@ -110,9 +110,9 @@ Responde a: *"la alimentación de los animales, ubicación, si es alimentación 
       no se registra a mano: un cron (`npm run alimentar:auto`, `scripts/alimentar-automatico.ts`)
       reparte la ración diaria en franjas — equinos 3 veces (7 a.m./12 m./4 p.m.), el resto 2 veces
       (7 a.m./4 p.m.) — dejando fuera el "consumo libre". Idempotente por (ración, franja, día).
-      Migración `20260914155957_f_reparto_automatico_alimentacion`. Detalle en `decisiones.md`.
-      Pendiente: terminar de configurar Start Command + Cron Schedule del servicio en Railway (ver
-      `decisiones.md`, la CLI no expone esos campos).
+      Migración `20260914155957_f_reparto_automatico_alimentacion`. Disparador:
+      **GitHub Actions** (`.github/workflows/alimentar-automatico.yml`), con el secreto de repo
+      `DATABASE_URL`. Detalle en `decisiones.md`.
 - [x] **Validación contra la fuente**: la suma de las 11 raciones reales da **$5.357.000/mes**,
       idéntico al total de la infografía de consumo.
 
