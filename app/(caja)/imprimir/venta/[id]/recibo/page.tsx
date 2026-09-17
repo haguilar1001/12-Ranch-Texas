@@ -8,9 +8,6 @@ import ReciboAcciones from "./ReciboAcciones";
 
 export const dynamic = "force-dynamic";
 
-/** Un dato del emisor que aún no se completó en `lib/config/parque.ts`. */
-const opcional = (v: string | null) => v ?? "(pendiente)";
-
 export default async function ReciboVentaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await obtenerSesion();
@@ -53,11 +50,13 @@ export default async function ReciboVentaPage({ params }: { params: Promise<{ id
       <div className="w-[302px] bg-white p-2 font-mono text-[11px] leading-tight text-ranch-marron">
         <div className="text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={PARQUE.razonSocial} className="mx-auto mb-1 h-10 w-auto" />
-          <p className="text-sm font-bold uppercase">{PARQUE.razonSocial}</p>
-          <p>NIT {opcional(PARQUE.nit)}</p>
-          <p>{opcional(PARQUE.direccion)}</p>
-          {PARQUE.telefono && <p>Tel. {PARQUE.telefono}</p>}
+          <img src="/logo.png" alt={PARQUE.nombreComercial} className="mx-auto mb-1 h-10 w-auto" />
+          <p className="text-sm font-bold uppercase">{PARQUE.nombreComercial}</p>
+          {/* Identificación legal (quien de verdad emite el recibo ante la DIAN). */}
+          <p className="uppercase">{PARQUE.razonSocial}</p>
+          <p>NIT {PARQUE.nit}</p>
+          <p>{PARQUE.direccion}</p>
+          <p>Tel. {PARQUE.telefono}</p>
         </div>
 
         <div className="my-2 border-y border-dashed border-ranch-marron/40 py-1 text-center">

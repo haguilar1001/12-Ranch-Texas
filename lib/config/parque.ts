@@ -1,15 +1,16 @@
 // Datos del PARQUE como emisor del recibo de caja (encabezado del documento).
+// Tomados del RUT (formulario DIAN 141225032887, hoja 1 y hoja 6 — establecimiento
+// "RANCH TEXAS" en Galapa, Atlántico).
 //
 // Es un archivo de configuración, no una tabla: un NIT o una razón social no cambian
 // casi nunca, así que no vale la pena una pantalla de administración para esto — se
-// edita aquí y ya. Si algún día cambia, es un commit, no un formulario.
-//
-// ⚠️ PENDIENTE: completar con los datos reales antes de usar el recibo con clientes
-// de verdad. Mientras tanto el recibo va a mostrar "(pendiente)" en lo que falte, para
-// que sea imposible no darse cuenta si se imprime así por error.
+// edita aquí y ya. Si algún día cambia (o se abre otro establecimiento), es un commit.
 export const PARQUE = {
-  razonSocial: "PARQUE RANCH TEXAS",
-  nit: null as string | null, // ej. "900.123.456-7"
-  direccion: null as string | null, // ej. "Km 5 vía Baranoa - Sibarco, Baranoa, Atlántico"
-  telefono: null as string | null,
+  /** Nombre comercial: el que reconoce el cliente. */
+  nombreComercial: "RANCH TEXAS",
+  /** Razón social ante la DIAN — quien de verdad emite el recibo. */
+  razonSocial: "DIVERSIONES DEL OCCIDENTE S.A.S",
+  nit: "901.126.143-5",
+  direccion: "Km 14 vía Cordialidad Ruta Nacional 90, Galapa, Atlántico",
+  telefono: "300 834 8017",
 };
