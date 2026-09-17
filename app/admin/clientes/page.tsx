@@ -25,13 +25,19 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           OR: [
             { nombre: { contains: q, mode: "insensitive" } },
             { documento: { contains: q, mode: "insensitive" } },
+            { razon_social: { contains: q, mode: "insensitive" } },
+            { nit: { contains: q, mode: "insensitive" } },
             ...(soloDigitos.length >= 3 ? [{ celular: { contains: soloDigitos } }] : []),
           ],
         }
       : undefined,
     orderBy: { actualizado_en: "desc" },
     take: 100,
-    select: { id: true, nombre: true, celular: true, documento: true, email: true, activo: true, actualizado_en: true, _count: { select: { ventas: true } } },
+    select: {
+      id: true, nombre: true, celular: true, documento: true, email: true,
+      razon_social: true, nit: true, activo: true, actualizado_en: true,
+      _count: { select: { ventas: true } },
+    },
   });
 
   return (
@@ -55,6 +61,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           celular: c.celular,
           documento: c.documento,
           email: c.email,
+          razon_social: c.razon_social,
+          nit: c.nit,
           activo: c.activo,
           ventas: c._count.ventas,
           actualizado: formatearFechaHoraCortaBogota(c.actualizado_en),

@@ -23,6 +23,8 @@ interface CambiosCliente {
   celular?: string;
   documento?: string | null;
   email?: string | null;
+  razon_social?: string | null;
+  nit?: string | null;
 }
 
 export async function editarCliente(id: string, cambios: CambiosCliente): Promise<Resultado> {
@@ -32,9 +34,10 @@ export async function editarCliente(id: string, cambios: CambiosCliente): Promis
   const c = await prisma.cliente.findUnique({ where: { id } });
   if (!c) return { ok: false, error: "Cliente no encontrado." };
 
-  const data: { nombre?: string; celular?: string; documento?: string | null; email?: string | null; actualizado_por: string } = {
-    actualizado_por: s.id,
-  };
+  const data: {
+    nombre?: string; celular?: string; documento?: string | null; email?: string | null;
+    razon_social?: string | null; nit?: string | null; actualizado_por: string;
+  } = { actualizado_por: s.id };
 
   if (cambios.nombre !== undefined) {
     if (!cambios.nombre.trim()) return { ok: false, error: "El nombre no puede quedar vacío." };
@@ -55,11 +58,19 @@ export async function editarCliente(id: string, cambios: CambiosCliente): Promis
     if (email && !esEmailValido(email)) return { ok: false, error: "El correo no es válido." };
     data.email = email;
   }
+  if (cambios.razon_social !== undefined || cambios.nit !== undefined) {
+    const razonSocial = (cambios.razon_social ?? c.razon_social)?.trim() || null;
+    const nit = (cambios.nit ?? c.nit)?.trim() || null;
+    // Ambos o ninguno: una razón social sin NIT (o al revés) no sirve para el recibo.
+    if (!!razonSocial !== !!nit) return { ok: false, error: "Para empresa, indica razón social Y NIT (o borra los dos)." };
+    data.razon_social = razonSocial;
+    data.nit = nit;
+  }
 
   await prisma.cliente.update({ where: { id }, data });
   await registrarAuditoria({
     usuario_id: s.id, entidad: "cliente", entidad_id: id, accion: "editar",
-    datos_antes: { nombre: c.nombre, celular: c.celular, documento: c.documento, email: c.email },
+    datos_antes: { nombre: c.nombre, celular: c.celular, documento: c.documento, email: c.email, razon_social: c.razon_social, nit: c.nit },
     datos_despues: JSON.parse(JSON.stringify(cambios)),
   });
   revalidatePath(RUTA);

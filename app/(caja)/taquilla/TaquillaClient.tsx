@@ -67,6 +67,8 @@ export interface VentaACorregir {
   }[];
   pagos: { medio_pago_id: string; monto: number }[];
   comprador: { nombre: string; documento: string; celular: string; email: string };
+  /** Solo si la venta quedó a nombre de una empresa. */
+  empresa?: { razon_social: string; nit: string } | null;
 }
 
 export default function TaquillaClient({
@@ -106,6 +108,10 @@ export default function TaquillaClient({
   const [comprador, setComprador] = useState(
     correccion?.comprador ?? { nombre: "", documento: "", celular: "", email: "" },
   );
+  // Solo se piden si la compra queda a nombre de una empresa (recibo de caja). Con el
+  // toggle apagado no estorban en la venta normal de una familia.
+  const [esEmpresa, setEsEmpresa] = useState(!!correccion?.empresa);
+  const [empresa, setEmpresa] = useState(correccion?.empresa ?? { razon_social: "", nit: "" });
   // Cliente que ya conocemos por su celular: se SUGIERE, nunca se aplica solo (ver
   // Cliente en el schema). `celularBuscado` evita repetir la búsqueda en cada blur.
   const [sugerenciaCliente, setSugerenciaCliente] = useState<ClienteEncontrado | null>(null);
@@ -128,6 +134,10 @@ export default function TaquillaClient({
       documento: sugerenciaCliente.documento ?? c.documento,
       email: sugerenciaCliente.email ?? c.email,
     }));
+    if (sugerenciaCliente.razon_social && sugerenciaCliente.nit) {
+      setEsEmpresa(true);
+      setEmpresa({ razon_social: sugerenciaCliente.razon_social, nit: sugerenciaCliente.nit });
+    }
     setSugerenciaCliente(null);
   }
   const [cortesias, setCortesias] = useState<Cortesia[]>(() =>
@@ -295,7 +305,10 @@ export default function TaquillaClient({
   const faltaNombre = comprador.nombre.trim() === "";
   const faltaCelular = !esCelularColombiano(comprador.celular);
   const emailInvalido = comprador.email.trim() !== "" && !esEmailValido(comprador.email);
-  const faltaComprador = faltaNombre || faltaCelular || emailInvalido;
+  // Con el toggle de empresa prendido, los dos datos son obligatorios: una razón
+  // social sin NIT (o al revés) no sirve para el recibo de caja.
+  const faltaEmpresa = esEmpresa && (empresa.razon_social.trim() === "" || empresa.nit.trim() === "");
+  const faltaComprador = faltaNombre || faltaCelular || emailInvalido || faltaEmpresa;
 
   // Una cortesía sin beneficiario no sirve de control: hay que saber quién entró gratis.
   const faltaBeneficiario = cortesias.some((c) => c.cantidad > 0 && !c.beneficiario.trim());
@@ -376,6 +389,7 @@ export default function TaquillaClient({
   function limpiar() {
     setCant({}); setCortesias([]); setDescuentos({}); setEscaneados({});
     setComprador({ nombre: "", documento: "", celular: "", email: "" });
+    setEsEmpresa(false); setEmpresa({ razon_social: "", nit: "" });
     setSugerenciaCliente(null); setCelularBuscado(null);
     setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
     // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
@@ -420,6 +434,8 @@ export default function TaquillaClient({
       comprador_documento: comprador.documento,
       comprador_celular: comprador.celular,
       comprador_email: comprador.email,
+      comprador_razon_social: esEmpresa ? empresa.razon_social : undefined,
+      comprador_nit: esEmpresa ? empresa.nit : undefined,
     };
     const asistentes = totales.cantidad_asistentes;
     // Los bebés entran en brazos: cuentan como asistentes pero no llevan manilla.
@@ -571,11 +587,36 @@ export default function TaquillaClient({
                 </button>
               </div>
             )}
+            <label className="mt-2 flex items-center gap-2 text-sm text-ranch-marron/70">
+              <input
+                type="checkbox"
+                checked={esEmpresa}
+                onChange={(e) => setEsEmpresa(e.target.checked)}
+              />
+              Es una compra a nombre de empresa (para el recibo de caja)
+            </label>
+            {esEmpresa && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input
+                  value={empresa.razon_social}
+                  onChange={(e) => setEmpresa({ ...empresa, razon_social: e.target.value })}
+                  placeholder="Razón social *"
+                  className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${empresa.razon_social.trim() === "" ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
+                />
+                <input
+                  value={empresa.nit}
+                  onChange={(e) => setEmpresa({ ...empresa, nit: e.target.value })}
+                  placeholder="NIT *"
+                  className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${empresa.nit.trim() === "" ? "border-red-400 bg-red-50/50 focus:border-red-500" : "border-ranch-marron/25 focus:border-ranch-dorado"}`}
+                />
+              </div>
+            )}
             {faltaComprador && (
               <p className="mt-2 text-xs font-semibold text-red-600">
                 {faltaNombre && "* Falta el nombre. "}
                 {faltaCelular && "* El celular debe tener 10 dígitos y empezar por 3. "}
-                {emailInvalido && "* El correo no es válido."}
+                {emailInvalido && "* El correo no es válido. "}
+                {faltaEmpresa && "* Falta la razón social o el NIT de la empresa."}
               </p>
             )}
           </div>
@@ -902,6 +943,13 @@ export default function TaquillaClient({
               >
                 🖨️ Imprimir manillas
               </a>
+              <a
+                href={`/imprimir/venta/${confirmacion.ventaId}/recibo`}
+                target="_blank"
+                className="mt-2 block rounded-lg border border-ranch-marron/25 px-4 py-2 text-sm font-semibold text-ranch-marron hover:bg-ranch-crema/60"
+              >
+                🧾 Imprimir recibo
+              </a>
               <button
                 onClick={() => { setConfirmacion(null); setResultado(null); }}
                 className="mt-2 w-full rounded-lg border border-ranch-marron/25 px-4 py-2 text-sm font-semibold text-ranch-marron hover:bg-ranch-crema/60"
@@ -915,12 +963,21 @@ export default function TaquillaClient({
             <p className={`rounded-lg px-3 py-2 text-sm ${resultado.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{resultado.texto}</p>
           )}
           {ultimaVenta && !confirmacion && (
-            <a
-              href={`/imprimir/venta/${ultimaVenta.id}`}
-              className="block rounded-lg bg-ranch-dorado px-4 py-3 text-center font-semibold text-white hover:opacity-90"
-            >
-              🖨️ Imprimir manillas (Venta #{ultimaVenta.numero})
-            </a>
+            <>
+              <a
+                href={`/imprimir/venta/${ultimaVenta.id}`}
+                className="block rounded-lg bg-ranch-dorado px-4 py-3 text-center font-semibold text-white hover:opacity-90"
+              >
+                🖨️ Imprimir manillas (Venta #{ultimaVenta.numero})
+              </a>
+              <a
+                href={`/imprimir/venta/${ultimaVenta.id}/recibo`}
+                target="_blank"
+                className="block rounded-lg border border-ranch-marron/25 px-4 py-2 text-center text-sm font-semibold text-ranch-marron hover:bg-ranch-crema/60"
+              >
+                🧾 Imprimir recibo (Venta #{ultimaVenta.numero})
+              </a>
+            </>
           )}
           {!validacion.ok && lineas.length > 0 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{validacion.errores[0]}</p>

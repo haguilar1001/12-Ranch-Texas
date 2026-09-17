@@ -39,6 +39,9 @@ export interface EntradaVenta {
   comprador_documento?: string;
   comprador_celular?: string;
   comprador_email?: string;
+  /** Solo si la compra queda a nombre de una empresa (para el recibo de caja). */
+  comprador_razon_social?: string;
+  comprador_nit?: string;
 }
 
 export type ResultadoVenta =

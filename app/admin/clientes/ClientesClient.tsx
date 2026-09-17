@@ -10,6 +10,8 @@ interface Cliente {
   celular: string;
   documento: string | null;
   email: string | null;
+  razon_social: string | null;
+  nit: string | null;
   activo: boolean;
   ventas: number;
   actualizado: string;
@@ -21,6 +23,8 @@ interface Edicion {
   celular: string;
   documento: string;
   email: string;
+  razon_social: string;
+  nit: string;
 }
 
 export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
@@ -41,6 +45,7 @@ export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
     const r = await editarCliente(edit.id, {
       nombre: edit.nombre, celular: edit.celular,
       documento: edit.documento, email: edit.email,
+      razon_social: edit.razon_social, nit: edit.nit,
     });
     setBusy(false);
     if (aviso(r, "Cliente actualizado.")) setEdit(null);
@@ -57,7 +62,7 @@ export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-ranch-marron/60">
-              <th className="py-1">Nombre</th><th>Celular</th><th>Documento</th><th>Correo</th>
+              <th className="py-1">Nombre</th><th>Celular</th><th>Documento</th><th>Correo</th><th>Empresa</th>
               <th className="text-right">Ventas</th><th>Estado</th><th>Actualizado</th><th></th>
             </tr>
           </thead>
@@ -72,6 +77,10 @@ export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
                       <td><input value={edit.celular} onChange={(e) => setEdit({ ...edit, celular: e.target.value })} inputMode="tel" className="w-24 rounded border px-1 py-0.5" /></td>
                       <td><input value={edit.documento} onChange={(e) => setEdit({ ...edit, documento: e.target.value })} className="w-24 rounded border px-1 py-0.5" /></td>
                       <td><input value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} className="w-32 rounded border px-1 py-0.5" /></td>
+                      <td>
+                        <input value={edit.razon_social} onChange={(e) => setEdit({ ...edit, razon_social: e.target.value })} placeholder="Razón social" className="mb-0.5 w-28 rounded border px-1 py-0.5" />
+                        <input value={edit.nit} onChange={(e) => setEdit({ ...edit, nit: e.target.value })} placeholder="NIT" className="w-28 rounded border px-1 py-0.5" />
+                      </td>
                       <td className="text-right text-ranch-marron/50">{c.ventas}</td>
                       <td colSpan={2} className="text-ranch-marron/40">—</td>
                       <td className="whitespace-nowrap text-right">
@@ -85,6 +94,14 @@ export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
                       <td className="text-ranch-marron/70">{c.celular}</td>
                       <td className="text-ranch-marron/70">{c.documento ?? "—"}</td>
                       <td className="text-ranch-marron/70">{c.email ?? "—"}</td>
+                      <td className="text-xs text-ranch-marron/70">
+                        {c.razon_social ? (
+                          <>
+                            <span className="block font-semibold text-ranch-marron">{c.razon_social}</span>
+                            <span className="text-ranch-marron/50">NIT {c.nit}</span>
+                          </>
+                        ) : "—"}
+                      </td>
                       <td className="text-right text-ranch-marron/50">{c.ventas}</td>
                       <td>
                         <button
@@ -97,7 +114,7 @@ export default function ClientesClient({ clientes }: { clientes: Cliente[] }) {
                       <td className="whitespace-nowrap text-xs text-ranch-marron/45">{c.actualizado}</td>
                       <td className="text-right">
                         <button
-                          onClick={() => setEdit({ id: c.id, nombre: c.nombre, celular: c.celular, documento: c.documento ?? "", email: c.email ?? "" })}
+                          onClick={() => setEdit({ id: c.id, nombre: c.nombre, celular: c.celular, documento: c.documento ?? "", email: c.email ?? "", razon_social: c.razon_social ?? "", nit: c.nit ?? "" })}
                           className="text-ranch-marron/40 hover:text-ranch-marron"
                         >
                           ✏️

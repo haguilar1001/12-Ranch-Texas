@@ -55,6 +55,9 @@ export default function ImprimirAcciones({
         <button onClick={imprimir} disabled={anulada} className="rounded-lg border border-ranch-marron/30 px-5 py-2 font-semibold text-ranch-marron hover:bg-white">
           🖨️ Imprimir por navegador
         </button>
+        <a href={`/imprimir/venta/${ventaId}/recibo`} target="_blank" className="rounded-lg border border-ranch-marron/30 px-5 py-2 font-semibold text-ranch-marron hover:bg-white">
+          🧾 Imprimir recibo
+        </a>
         <a href="/taquilla" className="rounded-lg border border-ranch-marron/30 px-5 py-2 font-semibold text-ranch-marron hover:bg-white">
           ← Volver a taquilla
         </a>

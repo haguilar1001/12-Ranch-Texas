@@ -88,6 +88,9 @@ export default async function TaquillaPage({
         celular: v.comprador_celular ?? "",
         email: v.comprador_email ?? "",
       },
+      empresa: v.comprador_razon_social && v.comprador_nit
+        ? { razon_social: v.comprador_razon_social, nit: v.comprador_nit }
+        : null,
     };
     cajaNombre = v.turno.caja.nombre;
   } else {

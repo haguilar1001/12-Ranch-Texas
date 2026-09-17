@@ -22,6 +22,11 @@ function validarComprador(e: EntradaVenta): string | null {
   if (!celular.trim()) return "Falta el celular del comprador: es obligatorio para registrar la venta.";
   if (!esCelularColombiano(celular)) return "El celular debe tener 10 dígitos y empezar por 3.";
   if (e.comprador_email?.trim() && !esEmailValido(e.comprador_email)) return "El correo del comprador no es válido.";
+  // Empresa: o se dan los dos datos, o ninguno — una razón social sin NIT (o al
+  // revés) no sirve para el recibo de caja.
+  const tieneRazon = !!e.comprador_razon_social?.trim();
+  const tieneNit = !!e.comprador_nit?.trim();
+  if (tieneRazon !== tieneNit) return "Para una compra a nombre de empresa, indica razón social Y NIT.";
   return null;
 }
 
@@ -29,6 +34,8 @@ export interface ClienteEncontrado {
   nombre: string;
   documento: string | null;
   email: string | null;
+  razon_social: string | null;
+  nit: string | null;
 }
 
 /**
@@ -45,7 +52,7 @@ export async function buscarClientePorCelular(celular: string): Promise<ClienteE
 
   const cliente = await prisma.cliente.findUnique({
     where: { celular: limpio },
-    select: { nombre: true, documento: true, email: true, activo: true },
+    select: { nombre: true, documento: true, email: true, razon_social: true, nit: true, activo: true },
   });
   return cliente?.activo ? cliente : null;
 }

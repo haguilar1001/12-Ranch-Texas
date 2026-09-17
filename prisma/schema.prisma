@@ -345,6 +345,9 @@ model Venta {
   comprador_documento String?
   comprador_celular   String?
   comprador_email     String?
+  /// Cuando la venta queda a nombre de una empresa (para el recibo de caja).
+  comprador_razon_social String?
+  comprador_nit           String?
 
   /// A qué cliente maestro quedó asociada esta venta (por celular). null si no
   /// se capturó celular o si la venta es de antes de que existiera `Cliente`.
@@ -391,6 +394,11 @@ model Cliente {
   documento String?
   email     String?
   activo    Boolean @default(true)
+
+  /// Para cuando la compra queda a nombre de una empresa (recibo de caja). Ambos o
+  /// ninguno: una razón social sin NIT no sirve para el recibo, y viceversa.
+  razon_social String?
+  nit          String?
 
   ventas Venta[]
 

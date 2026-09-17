@@ -133,12 +133,18 @@ export async function crearVenta(
       const nombreComprador = entrada.comprador_nombre?.trim() || null;
       const documentoComprador = entrada.comprador_documento?.trim() || null;
       const emailComprador = entrada.comprador_email?.trim() || null;
+      // Empresa: ambos o ninguno (una razón social sin NIT no sirve para el recibo).
+      const razonSocialComprador = entrada.comprador_razon_social?.trim() || null;
+      const nitComprador = entrada.comprador_nit?.trim() || null;
+      const esEmpresa = !!(razonSocialComprador && nitComprador);
 
       const cliente = celular && nombreComprador
         ? await tx.cliente.upsert({
             where: { celular },
             create: {
               celular, nombre: nombreComprador, documento: documentoComprador, email: emailComprador,
+              razon_social: esEmpresa ? razonSocialComprador : null,
+              nit: esEmpresa ? nitComprador : null,
               creado_por: ctx.usuarioId,
             },
             // Se actualiza con lo último que trajo (nunca se borra un dato con uno vacío
@@ -147,6 +153,7 @@ export async function crearVenta(
               nombre: nombreComprador,
               ...(documentoComprador ? { documento: documentoComprador } : {}),
               ...(emailComprador ? { email: emailComprador } : {}),
+              ...(esEmpresa ? { razon_social: razonSocialComprador, nit: nitComprador } : {}),
               actualizado_por: ctx.usuarioId,
             },
           })
@@ -167,6 +174,8 @@ export async function crearVenta(
           comprador_documento: documentoComprador,
           comprador_celular: celularCrudo,
           comprador_email: emailComprador,
+          comprador_razon_social: esEmpresa ? razonSocialComprador : null,
+          comprador_nit: esEmpresa ? nitComprador : null,
           cliente_id: cliente?.id ?? null,
           creado_por: ctx.usuarioId,
           pagos: { create: (entrada.pagos ?? []).map((p) => ({ medio_pago_id: p.medio_pago_id, monto: p.monto, creado_por: ctx.usuarioId })) },
