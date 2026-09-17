@@ -50,6 +50,7 @@ export default async function NavBar() {
         ["📋", "Reporte de ventas", "/admin/reportes/ventas", "Por tipo, medio, día y hora", consulta],
         ["📈", "Comparativo año vs año", "/admin/reportes/comparativo", "Contra la venta histórica", consulta],
         ["🎁", "Cortesías", "/admin/reportes/cortesias", "Quién entró gratis y quién lo autorizó", supervisor],
+        ["🗑️", "Ventas anuladas", "/admin/reportes/anulaciones", "Quién anuló, con qué motivo", supervisor],
         ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
         ["🐴", "Alimentación de animales", "/admin/reportes/alimentacion", "Costo del mes por categoría", consulta],
         ["📄", "Cierre del día", "/admin/reportes/cierre", "Informe para firmar e imprimir", supervisor],
