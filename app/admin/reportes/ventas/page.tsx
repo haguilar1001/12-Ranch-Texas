@@ -11,11 +11,12 @@ import { formatearCOP } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
-function Kpi({ label, valor }: { label: string; valor: string }) {
+function Kpi({ label, valor, sub }: { label: string; valor: string; sub?: string }) {
   return (
     <div className="rounded-xl border-2 border-ranch-marron/20 bg-white p-3 text-center">
       <p className="text-xs text-ranch-marron/60">{label}</p>
       <p className="text-lg font-black text-ranch-marron">{valor}</p>
+      {sub && <p className="text-xs text-ranch-marron/45">{sub}</p>}
     </div>
   );
 }
@@ -61,7 +62,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
         <Kpi label="Entradas (asistentes)" valor={String(ind.asistentes)} />
         <Kpi label="Ventas" valor={String(ind.numVentas)} />
         <Kpi label="Ingreso total" valor={formatearCOP(ind.ingreso)} />
-        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} />
+        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub={`${ind.numClientes} ${ind.numClientes === 1 ? "cliente" : "clientes"}`} />
         <Kpi label="Entradas de cortesía" valor={String(ind.personasCortesia)} />
         <Kpi label="Valor no cobrado" valor={formatearCOP(ind.valorNoCobrado)} />
         <Kpi label="% cortesías/desc." valor={formatearPct(ind.pctCortesias)} />
