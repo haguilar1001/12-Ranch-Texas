@@ -9,13 +9,10 @@ function aBogota(d: Date): Date {
 
 export interface IndicadoresVentas {
   numVentas: number;
-  /** Clientes distintos (por `cliente_id`); una venta sin celular capturado cuenta
-   * como un cliente aparte, porque no hay forma de saber si se repite con otra. */
-  numClientes: number;
   asistentes: number;
   ingreso: number;
-  /** Ingreso entre CLIENTES distintos, no entre ventas — dos compras del mismo
-   * cliente en el día no deben inflar (ni desinflar) el ticket promedio. */
+  /** Ingreso entre ENTRADAS (personas), no entre ventas — el gasto promedio por
+   * cliente atendido, sin importar cuántas cabezas trajera cada tiquete. */
   ticketPromedio: number;
   valorNoCobrado: number; // cortesías + descuentos
   pctCortesias: number; // sobre el valor lista
@@ -57,15 +54,9 @@ function whereVentas(desde: Date, hasta: Date, f?: FiltrosVentas) {
 export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: FiltrosVentas): Promise<IndicadoresVentas> {
   const ventas = await prisma.venta.findMany({
     where: whereVentas(desde, hasta, filtros),
-    select: { id: true, total_cobrado: true, total_lista: true, total_descuento: true, cantidad_asistentes: true, creado_en: true, cliente_id: true },
+    select: { id: true, total_cobrado: true, total_lista: true, total_descuento: true, cantidad_asistentes: true, creado_en: true },
   });
   const ids = ventas.map((v) => v.id);
-
-  // Clientes distintos: por cliente_id cuando se capturó celular; si no, cada venta
-  // sin cliente cuenta aparte (no hay con qué agruparla).
-  const clientesConId = new Set(ventas.map((v) => v.cliente_id).filter((id): id is string => !!id));
-  const ventasSinCliente = ventas.filter((v) => !v.cliente_id).length;
-  const numClientes = clientesConId.size + ventasSinCliente;
 
   const ingreso = ventas.reduce((a, v) => a + v.total_cobrado, 0);
   const asistentes = ventas.reduce((a, v) => a + v.cantidad_asistentes, 0);
@@ -130,10 +121,9 @@ export async function indicadoresVentas(desde: Date, hasta: Date, filtros?: Filt
 
   return {
     numVentas: ventas.length,
-    numClientes,
     asistentes,
     ingreso,
-    ticketPromedio: numClientes ? Math.round(ingreso / numClientes) : 0,
+    ticketPromedio: asistentes ? Math.round(ingreso / asistentes) : 0,
     valorNoCobrado,
     pctCortesias: totalLista ? (valorNoCobrado / totalLista) * 100 : 0,
     personasCortesia,

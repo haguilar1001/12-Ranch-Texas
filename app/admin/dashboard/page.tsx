@@ -69,7 +69,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {/* El rótulo sigue al período: decir "del mes" mirando un día es mentir. */}
         <Kpi label={periodo.fecha ? "Ingreso del día" : "Ingreso del mes"} valor={formatearCOP(ind.ingreso)} />
         <Kpi label="Entradas" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
-        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub={`${ind.numClientes} ${ind.numClientes === 1 ? "cliente" : "clientes"}`} />
+        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
         <Kpi label="% cortesías" valor={formatearPct(ind.pctCortesias)} sub={formatearCOP(ind.valorNoCobrado)} />
       </div>
 

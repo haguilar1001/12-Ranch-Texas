@@ -27,7 +27,6 @@ export async function GET(req: Request) {
     [`Reporte de ventas ${periodo.etiqueta}`],
     ["Entradas (asistentes)", String(ind.asistentes)],
     ["Ventas", String(ind.numVentas)],
-    ["Clientes", String(ind.numClientes)],
     ["Ingreso total", String(ind.ingreso)],
     ["Ticket promedio", String(ind.ticketPromedio)],
     ["% cortesias/descuento", ind.pctCortesias.toFixed(1)],

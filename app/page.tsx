@@ -133,7 +133,7 @@ export default async function Home() {
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Kpi label="Ingreso hoy" valor={formatearCOP(ind.ingreso)} />
           <Kpi label="Entradas hoy" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
-          <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub={`${ind.numClientes} ${ind.numClientes === 1 ? "cliente" : "clientes"}`} />
+          <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
           <Kpi label="Aforo actual" valor={String(aforo)} sub={ep?.aforo_maximo ? `de ${ep.aforo_maximo}` : undefined} />
         </div>
         )}

@@ -62,7 +62,7 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
         <Kpi label="Entradas (asistentes)" valor={String(ind.asistentes)} />
         <Kpi label="Ventas" valor={String(ind.numVentas)} />
         <Kpi label="Ingreso total" valor={formatearCOP(ind.ingreso)} />
-        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub={`${ind.numClientes} ${ind.numClientes === 1 ? "cliente" : "clientes"}`} />
+        <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
         <Kpi label="Entradas de cortesía" valor={String(ind.personasCortesia)} />
         <Kpi label="Valor no cobrado" valor={formatearCOP(ind.valorNoCobrado)} />
         <Kpi label="% cortesías/desc." valor={formatearPct(ind.pctCortesias)} />
