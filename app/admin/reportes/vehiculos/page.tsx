@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import FormularioFiltros from "../FormularioFiltros";
+import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { indicadoresVehiculos } from "@/lib/reportes/vehiculos";
+import { kmRecorridos } from "@/lib/vehiculos/calculo";
 import { rangoDe, queryDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
-import { fechaBogota } from "@/lib/tiempo";
+import { fechaBogota, formatearFechaHoraBogota } from "@/lib/tiempo";
 
 export const dynamic = "force-dynamic";
 
@@ -63,8 +66,29 @@ export default async function ReporteVehiculosPage({
   const hoy = fechaBogota();
   const sp = await searchParams;
   const rango = rangoDe({ fecha: sp.fecha, anio: sp.anio, mes: sp.mes, dia: sp.dia }, hoy);
-  const ind = await indicadoresVehiculos(rango.inicio, rango.fin);
+  const [ind, detalleRaw] = await Promise.all([
+    indicadoresVehiculos(rango.inicio, rango.fin),
+    prisma.solicitudVehiculo.findMany({
+      where: { estado: "completada", cerrado_en: { gte: rango.inicio, lt: rango.fin } },
+      orderBy: { cerrado_en: "desc" },
+      include: { solicitante: { select: { nombre: true } }, vehiculo: { select: { placa: true } }, chofer: { select: { nombre: true } } },
+    }),
+  ]);
   const qs = queryDe(rango);
+  // El reporte individual (con observaciones del chofer) es de supervisor hacia arriba;
+  // "consulta" ve el resumen y el detalle de esta tabla, pero no entra a cada reporte.
+  const puedeVerReporte = tieneRol(s.rol, "supervisor");
+  const detalle = detalleRaw.map((v) => ({
+    id: v.id,
+    cerrado: v.cerrado_en ? formatearFechaHoraBogota(v.cerrado_en) : "—",
+    solicitante: v.solicitante.nombre,
+    chofer: v.chofer?.nombre ?? "—",
+    vehiculo: v.vehiculo?.placa ?? "—",
+    km: kmRecorridos(v.km_inicial, v.km_final),
+    horaReal: v.hora_inicio_real && v.hora_fin_real
+      ? `${formatearFechaHoraBogota(v.hora_inicio_real)} → ${formatearFechaHoraBogota(v.hora_fin_real)}`
+      : "—",
+  }));
 
   return (
     <main className="mx-auto max-w-4xl p-4 sm:p-6">
@@ -84,10 +108,45 @@ export default async function ReporteVehiculosPage({
         <Kpi label="Quién más maneja" valor={ind.porChofer[0]?.nombre ?? "—"} sub={ind.porChofer[0] ? `${ind.porChofer[0].km} km` : undefined} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="mb-4 grid gap-4 sm:grid-cols-2">
         <Agrupado titulo="Por solicitante" filas={ind.porSolicitante} />
         <Agrupado titulo="Por chofer" filas={ind.porChofer} />
         <Agrupado titulo="Por vehículo" filas={ind.porVehiculo} />
+      </div>
+
+      <h2 className="mb-2 font-bold text-ranch-marron">Detalle — reportes del servicio</h2>
+      <div className="overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
+        <table className="w-full whitespace-nowrap text-left text-sm">
+          <thead className="bg-ranch-crema/60 text-xs uppercase text-ranch-marron/60">
+            <tr>
+              <th className="px-3 py-2">Cerrado</th>
+              <th className="px-3 py-2">Solicitante</th>
+              <th className="px-3 py-2">Chofer</th>
+              <th className="px-3 py-2">Vehículo</th>
+              <th className="px-3 py-2 text-right">Km</th>
+              <th className="px-3 py-2">Hora real</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {detalle.map((d) => (
+              <tr key={d.id} className="border-t border-ranch-marron/10">
+                <td className="px-3 py-2 text-ranch-marron/60">{d.cerrado}</td>
+                <td className="px-3 py-2 font-semibold text-ranch-marron">{d.solicitante}</td>
+                <td className="px-3 py-2 text-ranch-marron/70">{d.chofer}</td>
+                <td className="px-3 py-2 text-ranch-marron/70">{d.vehiculo}</td>
+                <td className="px-3 py-2 text-right font-bold text-ranch-marron">{d.km} km</td>
+                <td className="px-3 py-2 text-xs text-ranch-marron/50">{d.horaReal}</td>
+                <td className="px-3 py-2">
+                  {puedeVerReporte && <Link href={`/vehiculos/reporte/${d.id}`} className="text-xs font-semibold text-ranch-dorado hover:underline">Ver reporte →</Link>}
+                </td>
+              </tr>
+            ))}
+            {detalle.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">No hubo viajes cerrados en el período.</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </main>
   );
