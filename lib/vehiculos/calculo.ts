@@ -50,13 +50,38 @@ export function validarSolicitud(e: EntradaSolicitud): string[] {
   return errores;
 }
 
-/** Valida el cierre del viaje: el chofer registra los dos kilometrajes en un solo paso. */
+/** Valida los dos kilometrajes de un cierre. */
 export function validarCierre(kmInicial: number, kmFinal: number): string[] {
   const errores: string[] = [];
   if (!Number.isInteger(kmInicial) || kmInicial < 0) errores.push("El kilometraje inicial debe ser un entero mayor o igual a 0.");
   if (!Number.isInteger(kmFinal) || kmFinal < 0) errores.push("El kilometraje final debe ser un entero mayor o igual a 0.");
   if (Number.isInteger(kmInicial) && Number.isInteger(kmFinal) && kmInicial >= 0 && kmFinal < kmInicial) {
     errores.push("El kilometraje final no puede ser menor que el inicial.");
+  }
+  return errores;
+}
+
+export interface EntradaReporteServicio {
+  km_inicial: number;
+  km_final: number;
+  hora_inicio_real: Date | null;
+  hora_fin_real: Date | null;
+  observaciones: string;
+}
+
+/**
+ * Valida el reporte del servicio: lo llena el chofer al devolver el vehículo, en un
+ * solo paso (kilometraje + lo que de verdad pasó, no lo planeado al pedirlo).
+ */
+export function validarReporteServicio(e: EntradaReporteServicio): string[] {
+  const errores = validarCierre(e.km_inicial, e.km_final);
+
+  const inicioValido = e.hora_inicio_real instanceof Date && !isNaN(e.hora_inicio_real.getTime());
+  const finValido = e.hora_fin_real instanceof Date && !isNaN(e.hora_fin_real.getTime());
+  if (!inicioValido) errores.push("La hora real de salida no es válida.");
+  if (!finValido) errores.push("La hora real de llegada no es válida.");
+  if (inicioValido && finValido && (e.hora_fin_real as Date) <= (e.hora_inicio_real as Date)) {
+    errores.push("La hora real de llegada debe ser después de la de salida.");
   }
   return errores;
 }

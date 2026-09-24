@@ -1438,10 +1438,14 @@ model SolicitudVehiculo {
   aprobado_en    DateTime?
   motivo_rechazo String?
 
-  /// Los llena el chofer al devolver el vehículo — un solo paso, no dos.
-  km_inicial Int?
-  km_final   Int?
-  cerrado_en DateTime?
+  /// Reporte del servicio: lo llena el chofer al devolver el vehículo, en un solo paso.
+  km_inicial       Int?
+  km_final         Int?
+  /// Lo que de verdad pasó, contra `hora_inicio`/`hora_fin` que es lo planeado al pedirlo.
+  hora_inicio_real DateTime?
+  hora_fin_real    DateTime?
+  observaciones    String?
+  cerrado_en       DateTime?
 
   motivo_cancelacion String?
 

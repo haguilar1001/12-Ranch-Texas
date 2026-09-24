@@ -359,6 +359,12 @@ y no los $20.866.480 que suman los dos cuadros.
       no salen ahí), navegable por mes.
     - **Resumen por día** en "Mis viajes": cuántos viajes y cuántos km cerró el chofer
       cada día (de sus últimos cerrados).
+    - **Reporte del servicio** (`/vehiculos/reporte/[id]`): reemplaza el mini-formulario
+      de "cerrar viaje" por una pantalla propia. El chofer llena, en un solo paso, los
+      dos kilometrajes, la hora REAL de salida/llegada (contra `hora_inicio`/`hora_fin`,
+      que es lo planeado al pedir el vehículo) y observaciones libres. Ya cerrado, la
+      misma pantalla se vuelve de solo lectura para consultarlo después
+      (`SolicitudVehiculo.hora_inicio_real/hora_fin_real/observaciones`).
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).
 - Hora de corte del "día operativo" para cuadre diario y export CSV (no medianoche UTC).

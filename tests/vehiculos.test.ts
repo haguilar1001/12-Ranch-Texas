@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { validarSolicitud, validarCierre, kmRecorridos, horaFinDe, type EntradaSolicitud } from "../lib/vehiculos/calculo";
+import {
+  validarSolicitud, validarCierre, validarReporteServicio, kmRecorridos, horaFinDe,
+  type EntradaSolicitud, type EntradaReporteServicio,
+} from "../lib/vehiculos/calculo";
 
 const base: EntradaSolicitud = {
   solicitante_id: "sol-1",
@@ -75,6 +78,37 @@ describe("validarCierre", () => {
     expect(validarCierre(-1, 100).length).toBeGreaterThan(0);
     expect(validarCierre(100, -1).length).toBeGreaterThan(0);
     expect(validarCierre(100.5, 200).length).toBeGreaterThan(0);
+  });
+});
+
+describe("validarReporteServicio", () => {
+  const reporte: EntradaReporteServicio = {
+    km_inicial: 1000, km_final: 1050,
+    hora_inicio_real: new Date("2026-09-25T08:05:00-05:00"),
+    hora_fin_real: new Date("2026-09-25T12:10:00-05:00"),
+    observaciones: "Sin novedad",
+  };
+
+  it("acepta un reporte bien formado", () => {
+    expect(validarReporteServicio(reporte)).toEqual([]);
+  });
+
+  it("hereda las validaciones de kilometraje", () => {
+    const e = validarReporteServicio({ ...reporte, km_final: 900 });
+    expect(e.some((x) => x.includes("no puede ser menor"))).toBe(true);
+  });
+
+  it("rechaza horas reales inválidas o en orden incorrecto", () => {
+    const invalidas = validarReporteServicio({ ...reporte, hora_inicio_real: null, hora_fin_real: null });
+    expect(invalidas.some((x) => x.includes("hora real de salida"))).toBe(true);
+    expect(invalidas.some((x) => x.includes("hora real de llegada"))).toBe(true);
+
+    const alReves = validarReporteServicio({ ...reporte, hora_fin_real: new Date("2026-09-25T07:00:00-05:00") });
+    expect(alReves.some((x) => x.includes("después de la de salida"))).toBe(true);
+  });
+
+  it("las observaciones son opcionales", () => {
+    expect(validarReporteServicio({ ...reporte, observaciones: "" })).toEqual([]);
   });
 });
 

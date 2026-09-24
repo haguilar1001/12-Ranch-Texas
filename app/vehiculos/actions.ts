@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol, puedeConducir } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
-import { validarSolicitud, validarCierre, horaFinDe, type Prioridad } from "@/lib/vehiculos/calculo";
+import { fechaBogota } from "@/lib/tiempo";
+import { validarSolicitud, validarReporteServicio, horaFinDe, type Prioridad } from "@/lib/vehiculos/calculo";
 
 interface Resultado {
   ok: boolean;
@@ -150,32 +151,63 @@ export async function cancelarSolicitud(id: string, motivo: string): Promise<Res
   return { ok: true };
 }
 
-// ============================================================= CERRAR EL VIAJE
-// El chofer entra con su usuario y, al volver, pone los dos kilometrajes de una vez.
+// ==================================================== REPORTE DEL SERVICIO
+// El chofer entra con su usuario y, al devolver el vehículo, llena el reporte completo
+// en un solo paso: kilometraje, lo que de verdad pasó (horas reales) y observaciones.
 
-export async function cerrarViaje(id: string, kmInicial: number | string, kmFinal: number | string): Promise<Resultado> {
+/** Lo que manda la pantalla: horas en texto HH:MM, km en texto o número. Se convierte
+ * y se valida de verdad contra `validarReporteServicio` (que trabaja con Date). */
+export interface EntradaFormularioReporte {
+  km_inicial: number | string;
+  km_final: number | string;
+  hora_inicio_real: string; // HH:MM, del mismo día que la solicitud
+  hora_fin_real: string; // HH:MM
+  observaciones: string;
+}
+
+export async function registrarReporteServicio(id: string, input: EntradaFormularioReporte): Promise<Resultado> {
   const s = await obtenerSesion();
   if (!s) return { ok: false, error: "Sesión expirada." };
 
   const sol = await prisma.solicitudVehiculo.findUnique({ where: { id } });
   if (!sol) return { ok: false, error: "Solicitud no encontrada." };
-  if (sol.estado !== "aprobada") return { ok: false, error: "Ese viaje no está aprobado ni pendiente de cerrar." };
+  if (sol.estado !== "aprobada") return { ok: false, error: "Ese viaje no está aprobado ni pendiente de reportar." };
   // Lo cierra el chofer asignado, o un administrador si hace falta corregir.
   if (sol.chofer_id !== s.id && !tieneRol(s.rol, "administrador")) {
-    return { ok: false, error: "Solo el chofer asignado (o un administrador) puede cerrar este viaje." };
+    return { ok: false, error: "Solo el chofer asignado (o un administrador) puede llenar este reporte." };
+  }
+  if (!input.hora_inicio_real || !input.hora_fin_real) {
+    return { ok: false, error: "Indica la hora real de salida y de llegada." };
   }
 
-  const ki = typeof kmInicial === "string" ? parseInt(kmInicial.replace(/\D/g, ""), 10) : kmInicial;
-  const kf = typeof kmFinal === "string" ? parseInt(kmFinal.replace(/\D/g, ""), 10) : kmFinal;
-  const errores = validarCierre(ki, kf);
+  const ki = typeof input.km_inicial === "string" ? parseInt(input.km_inicial.replace(/\D/g, ""), 10) : input.km_inicial;
+  const kf = typeof input.km_final === "string" ? parseInt(input.km_final.replace(/\D/g, ""), 10) : input.km_final;
+  // Las horas reales van en el día de la solicitud: quien reporta dice a qué hora salió
+  // y volvió ESE día, no otro.
+  const diaSolicitud = fechaBogota(sol.hora_inicio);
+  const horaInicioReal = new Date(`${diaSolicitud}T${input.hora_inicio_real}:00-05:00`);
+  const horaFinReal = new Date(`${diaSolicitud}T${input.hora_fin_real}:00-05:00`);
+
+  const errores = validarReporteServicio({
+    km_inicial: ki, km_final: kf, hora_inicio_real: horaInicioReal, hora_fin_real: horaFinReal,
+    observaciones: input.observaciones,
+  });
   if (errores.length) return { ok: false, error: errores.join(" ") };
 
   const ahora = new Date();
   await prisma.solicitudVehiculo.update({
     where: { id },
-    data: { estado: "completada", km_inicial: ki, km_final: kf, cerrado_en: ahora, actualizado_por: s.id },
+    data: {
+      estado: "completada", km_inicial: ki, km_final: kf,
+      hora_inicio_real: horaInicioReal, hora_fin_real: horaFinReal,
+      observaciones: input.observaciones.trim() || null,
+      cerrado_en: ahora, actualizado_por: s.id,
+    },
   });
-  await registrarAuditoria({ usuario_id: s.id, entidad: "solicitud_vehiculo", entidad_id: id, accion: "cerrar_viaje", datos_despues: { km_inicial: ki, km_final: kf } });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "solicitud_vehiculo", entidad_id: id, accion: "reporte_servicio",
+    datos_despues: { km_inicial: ki, km_final: kf, hora_inicio_real: horaInicioReal, hora_fin_real: horaFinReal, observaciones: input.observaciones },
+  });
   revalidatePath("/vehiculos/mis-viajes");
   revalidatePath("/vehiculos/aprobar");
   revalidatePath("/admin/reportes/vehiculos");
