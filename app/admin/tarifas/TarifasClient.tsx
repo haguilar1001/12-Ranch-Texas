@@ -49,6 +49,24 @@ const rangoEdad = (min: number | null, max: number | null) => {
   return "—";
 };
 
+/** Ventana modal genérica: fondo oscuro + tarjeta centrada, se cierra con clic afuera o con ✕. */
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ranch-marron/40 p-4" onClick={onClose}>
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-black text-ranch-marron">{title}</h3>
+          <button onClick={onClose} aria-label="Cerrar" className="grid h-8 w-8 place-items-center rounded-full text-ranch-marron/50 hover:bg-ranch-crema hover:text-ranch-marron">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export interface Motivo {
   id: string;
   nombre: string;
@@ -188,7 +206,7 @@ export default function TarifasClient({
         <button onClick={crear} disabled={busy} className="mt-3 rounded-lg bg-ranch-marron px-5 py-2 font-semibold text-ranch-crema disabled:opacity-50">Crear tipo</button>
       </section>
 
-      {/* Lista */}
+      {/* Lista — solo lectura; toda la edición vive en el formulario modal (✏️ Editar). */}
       <section className="rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
         <h2 className="mb-3 font-bold text-ranch-marron">Tipos ({tipos.length})</h2>
         <div className="overflow-x-auto">
@@ -201,124 +219,39 @@ export default function TarifasClient({
             <tbody>
               {tipos.map((t) => (
                 <tr key={t.id} className={`border-t border-ranch-marron/10 align-top ${!t.activo ? "opacity-50" : ""}`}>
-                  {/* Nombre */}
                   <td className="py-2">
-                    {edicion?.id === t.id ? (
-                      <span className="flex flex-col gap-1">
-                        <span className="flex items-center gap-1">
-                          <IconoTipo icono={edicion.icono || null} nombre={edicion.nombre} className="!h-9 !w-9" />
-                          <input
-                            value={edicion.nombre}
-                            onChange={(e) => setEdicion({ ...edicion, nombre: e.target.value })}
-                            placeholder="Nombre"
-                            className="w-36 rounded border px-1 py-0.5"
-                          />
-                        </span>
-                        <input
-                          value={edicion.icono}
-                          onChange={(e) => setEdicion({ ...edicion, icono: e.target.value })}
-                          placeholder="Icono: 🤠 o /logos/campbell.png"
-                          title="Un emoji, o la ruta de un logo dentro de /public"
-                          className="w-52 rounded border px-1 py-0.5 text-xs"
-                        />
-                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
-                          <input
-                            type="checkbox"
-                            checked={edicion.requiere_carnet}
-                            onChange={(e) => setEdicion({ ...edicion, requiere_carnet: e.target.checked })}
-                            className="h-3.5 w-3.5"
-                          />
-                          Debe presentar carnet
-                        </label>
-                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
-                          <input
-                            type="checkbox"
-                            checked={edicion.requiere_escaneo}
-                            onChange={(e) => setEdicion({ ...edicion, requiere_escaneo: e.target.checked })}
-                            className="h-3.5 w-3.5"
-                          />
-                          Se escanea en la app de bonos
-                        </label>
-                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
-                          <input
-                            type="checkbox"
-                            checked={edicion.permite_descuento}
-                            onChange={(e) => setEdicion({ ...edicion, permite_descuento: e.target.checked })}
-                            className="h-3.5 w-3.5"
-                          />
-                          Admite descuento unitario en taquilla
-                        </label>
-                        <span className="flex items-center gap-1 text-[10px] text-ranch-marron/50">
-                          orden
-                          <input
-                            value={edicion.orden}
-                            onChange={(e) => setEdicion({ ...edicion, orden: e.target.value.replace(/D/g, "") })}
-                            inputMode="numeric"
-                            title="Posición en la pantalla de taquilla"
-                            className="w-12 rounded border px-1 py-0.5 text-center"
-                          />
-                        </span>
+                    <span className="flex items-center gap-2">
+                      <IconoTipo icono={t.icono} nombre={t.nombre} className="!h-9 !w-9" />
+                      <span>
+                        <strong className="text-ranch-marron">{t.nombre}</strong>
+                        {t.requiere_carnet && (
+                          <span title="Debe presentar carnet" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
+                            * carnet
+                          </span>
+                        )}
+                        {t.requiere_escaneo && (
+                          <span title="Se escanea en la aplicación de bonos" className="ml-1 rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">
+                            ☑ escaneo
+                          </span>
+                        )}
+                        {t.permite_descuento && (
+                          <span title="Admite descuento unitario en taquilla" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
+                            % descuento
+                          </span>
+                        )}
+                        <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
                       </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <IconoTipo icono={t.icono} nombre={t.nombre} className="!h-9 !w-9" />
-                        <span>
-                          <strong className="text-ranch-marron">{t.nombre}</strong>
-                          {t.requiere_carnet && (
-                            <span title="Debe presentar carnet" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
-                              * carnet
-                            </span>
-                          )}
-                          {t.requiere_escaneo && (
-                            <span title="Se escanea en la aplicación de bonos" className="ml-1 rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">
-                              ☑ escaneo
-                            </span>
-                          )}
-                          {t.permite_descuento && (
-                            <span title="Admite descuento unitario en taquilla" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
-                              % descuento
-                            </span>
-                          )}
-                          <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
-                        </span>
-                      </span>
-                    )}
+                    </span>
                   </td>
 
-                  {/* Tarifa — una franja de semana y otra de fin de semana/festivo, cada una con su propio historial. */}
+                  {/* Tarifa — solo lectura aquí; se cambia desde el formulario. */}
                   <td>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
                       {([["semana", t.semana], ["fin_semana_festivo", t.finde]] as [DiaTarifa, Franja][]).map(([dia, franja]) => (
-                        <div key={dia}>
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-ranch-marron/40">{ETIQUETA_DIA[dia]}</p>
-                          {cambioTarifa?.id === t.id && cambioTarifa.dia === dia ? (
-                            <div className="flex flex-col gap-1 py-1">
-                              <input value={cambioTarifa.valor} onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })} placeholder="Nuevo valor" inputMode="numeric" className="w-28 rounded border px-1 py-0.5" />
-                              <input value={cambioTarifa.motivo} onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })} placeholder="Motivo del cambio" className="w-40 rounded border px-1 py-0.5" />
-                              <span className="flex gap-1">
-                                <button
-                                  onClick={async () => {
-                                    const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.dia, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
-                                    setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
-                                    if (r?.ok) setCambioTarifa(null);
-                                  }}
-                                  className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white"
-                                >Guardar</button>
-                                <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="text-red-500">✕</button>
-                              </span>
-                              {errorTarifa && <span className="max-w-[16rem] rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</span>}
-                            </div>
-                          ) : (
-                            <div>
-                              <span className="font-semibold text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</span>
-                              {" · "}
-                              <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, dia, valor: String(franja.valorVigente), motivo: "" }); }} className="text-xs text-ranch-dorado hover:underline">Cambiar</button>
-                              {franja.historial.length > 1 && (
-                                <> · <button onClick={() => setVerHist(verHist?.id === t.id && verHist.dia === dia ? null : { id: t.id, dia })} className="text-xs text-ranch-marron/50 hover:underline">{verHist?.id === t.id && verHist.dia === dia ? "ocultar" : "historial"}</button></>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <p key={dia} className="text-xs">
+                          <span className="text-ranch-marron/45">{ETIQUETA_DIA[dia]}:</span>{" "}
+                          <span className="font-semibold text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</span>
+                        </p>
                       ))}
                     </div>
                   </td>
@@ -333,28 +266,7 @@ export default function TarifasClient({
                     </span>
                   </td>
 
-                  {/* Edad */}
-                  <td className="text-xs text-ranch-marron/60">
-                    {edicion?.id === t.id ? (
-                      <span className="flex items-center gap-1">
-                        <input
-                          value={edicion.edad_min}
-                          onChange={(e) => setEdicion({ ...edicion, edad_min: e.target.value.replace(/D/g, "") })}
-                          inputMode="numeric" placeholder="mín"
-                          className="w-12 rounded border px-1 py-0.5 text-center"
-                        />
-                        <span className="text-ranch-marron/40">–</span>
-                        <input
-                          value={edicion.edad_max}
-                          onChange={(e) => setEdicion({ ...edicion, edad_max: e.target.value.replace(/D/g, "") })}
-                          inputMode="numeric" placeholder="máx"
-                          className="w-12 rounded border px-1 py-0.5 text-center"
-                        />
-                      </span>
-                    ) : (
-                      rangoEdad(t.edad_min, t.edad_max)
-                    )}
-                  </td>
+                  <td className="text-xs text-ranch-marron/60">{rangoEdad(t.edad_min, t.edad_max)}</td>
 
                   {/* Estado */}
                   <td>
@@ -366,43 +278,157 @@ export default function TarifasClient({
                     </button>
                   </td>
                   <td className="text-right">
-                    {edicion?.id === t.id ? (
-                      <span className="flex justify-end gap-1">
-                        <button onClick={guardarEdicion} disabled={busy} className="rounded bg-ranch-marron px-2 py-0.5 text-xs font-semibold text-ranch-crema disabled:opacity-50">Guardar</button>
-                        <button onClick={() => setEdicion(null)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs text-ranch-marron">Cancelar</button>
-                      </span>
-                    ) : (
-                      <button onClick={() => abrirEdicion(t)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60">✏️ Editar</button>
-                    )}
+                    <button onClick={() => abrirEdicion(t)} className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60">✏️ Editar</button>
                   </td>
                 </tr>
               ))}
-              {tipos.flatMap((t) => {
-                if (verHist?.id !== t.id) return [];
-                const franja = verHist.dia === "semana" ? t.semana : t.finde;
-                return [
-                  <tr key={`${t.id}-hist`} className="bg-ranch-crema/40">
-                    <td colSpan={6} className="px-3 py-2">
-                      <p className="mb-1 text-xs font-semibold text-ranch-marron/70">
-                        Historial de tarifas — {t.nombre} · {ETIQUETA_DIA[verHist.dia]}
-                      </p>
-                      <ul className="space-y-0.5 text-xs text-ranch-marron/70">
-                        {franja.historial.map((h, i) => (
-                          <li key={i}>
-                            <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
-                            <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
-                            {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                  </tr>,
-                ];
-              })}
             </tbody>
           </table>
         </div>
       </section>
+
+      {/* Formulario de edición — datos del tipo y sus dos franjas de tarifa, todo en un solo lugar. */}
+      {edicion && (() => {
+        const t = tipos.find((x) => x.id === edicion.id);
+        if (!t) return null;
+        return (
+          <Modal title={`Editar — ${t.nombre}`} onClose={() => setEdicion(null)}>
+            <div className="space-y-5">
+              <section>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ranch-marron/45">Datos básicos</p>
+                <div className="flex items-center gap-2">
+                  <IconoTipo icono={edicion.icono || null} nombre={edicion.nombre} className="!h-11 !w-11 shrink-0" />
+                  <input
+                    value={edicion.nombre}
+                    onChange={(e) => setEdicion({ ...edicion, nombre: e.target.value })}
+                    placeholder="Nombre"
+                    className="w-full rounded-lg border border-ranch-marron/25 px-3 py-2"
+                  />
+                </div>
+                <input
+                  value={edicion.icono}
+                  onChange={(e) => setEdicion({ ...edicion, icono: e.target.value })}
+                  placeholder="Icono: 🤠 o /logos/campbell.png"
+                  title="Un emoji, o la ruta de un logo dentro de /public"
+                  className="mt-2 w-full rounded-lg border border-ranch-marron/25 px-3 py-2 text-sm"
+                />
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <label className="text-xs text-ranch-marron/60">
+                    Edad mínima
+                    <input
+                      value={edicion.edad_min}
+                      onChange={(e) => setEdicion({ ...edicion, edad_min: e.target.value.replace(/\D/g, "") })}
+                      inputMode="numeric" placeholder="—"
+                      className="mt-1 w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-center text-sm text-ranch-marron"
+                    />
+                  </label>
+                  <label className="text-xs text-ranch-marron/60">
+                    Edad máxima
+                    <input
+                      value={edicion.edad_max}
+                      onChange={(e) => setEdicion({ ...edicion, edad_max: e.target.value.replace(/\D/g, "") })}
+                      inputMode="numeric" placeholder="—"
+                      className="mt-1 w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-center text-sm text-ranch-marron"
+                    />
+                  </label>
+                  <label className="text-xs text-ranch-marron/60">
+                    Orden en taquilla
+                    <input
+                      value={edicion.orden}
+                      onChange={(e) => setEdicion({ ...edicion, orden: e.target.value.replace(/\D/g, "") })}
+                      inputMode="numeric"
+                      className="mt-1 w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-center text-sm text-ranch-marron"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
+                    <input type="checkbox" checked={edicion.requiere_carnet} onChange={(e) => setEdicion({ ...edicion, requiere_carnet: e.target.checked })} className="h-4 w-4" />
+                    Debe presentar carnet
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
+                    <input type="checkbox" checked={edicion.requiere_escaneo} onChange={(e) => setEdicion({ ...edicion, requiere_escaneo: e.target.checked })} className="h-4 w-4" />
+                    Se escanea en la app de bonos
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
+                    <input type="checkbox" checked={edicion.permite_descuento} onChange={(e) => setEdicion({ ...edicion, permite_descuento: e.target.checked })} className="h-4 w-4" />
+                    Admite descuento unitario en taquilla
+                  </label>
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ranch-marron/45">Tarifas</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {([["semana", t.semana], ["fin_semana_festivo", t.finde]] as [DiaTarifa, Franja][]).map(([dia, franja]) => (
+                    <div key={dia} className="rounded-xl border-2 border-ranch-marron/15 bg-ranch-crema/30 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-ranch-marron/50">{ETIQUETA_DIA[dia]}</p>
+                      {cambioTarifa?.id === t.id && cambioTarifa.dia === dia ? (
+                        <div className="mt-2 space-y-1.5">
+                          <input
+                            value={cambioTarifa.valor}
+                            onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })}
+                            placeholder="Nuevo valor"
+                            inputMode="numeric"
+                            autoFocus
+                            className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
+                          />
+                          <input
+                            value={cambioTarifa.motivo}
+                            onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })}
+                            placeholder="Motivo del cambio"
+                            className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
+                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={async () => {
+                                const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.dia, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
+                                setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
+                                if (r?.ok) setCambioTarifa(null);
+                              }}
+                              className="rounded-lg bg-ranch-dorado px-3 py-1 text-xs font-semibold text-white"
+                            >Guardar</button>
+                            <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="rounded-lg border border-ranch-marron/25 px-3 py-1 text-xs text-ranch-marron">Cancelar</button>
+                          </div>
+                          {errorTarifa && <p className="rounded-lg bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</p>}
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <p className="text-lg font-black text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</p>
+                          <div className="mt-1 flex items-center gap-2 text-xs">
+                            <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, dia, valor: String(franja.valorVigente), motivo: "" }); }} className="font-semibold text-ranch-dorado hover:underline">Cambiar</button>
+                            {franja.historial.length > 1 && (
+                              <button onClick={() => setVerHist(verHist?.id === t.id && verHist.dia === dia ? null : { id: t.id, dia })} className="text-ranch-marron/50 hover:underline">
+                                {verHist?.id === t.id && verHist.dia === dia ? "ocultar historial" : "ver historial"}
+                              </button>
+                            )}
+                          </div>
+                          {verHist?.id === t.id && verHist.dia === dia && (
+                            <ul className="mt-2 space-y-0.5 border-t border-ranch-marron/10 pt-2 text-[11px] text-ranch-marron/70">
+                              {franja.historial.map((h, i) => (
+                                <li key={i}>
+                                  <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
+                                  <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
+                                  {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div className="flex justify-end gap-2 border-t border-ranch-marron/10 pt-3">
+                <button onClick={() => setEdicion(null)} className="rounded-lg border border-ranch-marron/25 px-4 py-2 text-sm font-semibold text-ranch-marron">Cerrar</button>
+                <button onClick={guardarEdicion} disabled={busy} className="rounded-lg bg-ranch-marron px-4 py-2 text-sm font-semibold text-ranch-crema disabled:opacity-50">Guardar datos básicos</button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Motivos de cortesía — alimentan el selector "Motivo…" de taquilla. */}
       <section className="mt-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
