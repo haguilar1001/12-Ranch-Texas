@@ -11,6 +11,8 @@ import {
 } from "./actions";
 
 interface HistLinea { valor: number; desde: string; hasta: string | null; motivo: string }
+interface Franja { valorVigente: number; vigenteDesde: string; historial: HistLinea[] }
+type DiaTarifa = "semana" | "fin_semana_festivo";
 interface Tipo {
   id: string;
   codigo: string;
@@ -23,10 +25,13 @@ interface Tipo {
   icono: string | null;
   requiere_carnet: boolean;
   requiere_escaneo: boolean;
-  valorVigente: number;
-  vigenteDesde: string;
-  historial: HistLinea[];
+  /** Solo estos tipos muestran el botón de descuento unitario en taquilla. */
+  permite_descuento: boolean;
+  semana: Franja;
+  finde: Franja;
 }
+
+const ETIQUETA_DIA: Record<DiaTarifa, string> = { semana: "📅 Entre semana", fin_semana_festivo: "🎉 Fin de semana/festivo" };
 
 export interface Autorizador {
   id: string;
@@ -64,7 +69,7 @@ export default function TarifasClient({
   const [edicion, setEdicion] = useState<
     {
       id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string;
-      requiere_carnet: boolean; requiere_escaneo: boolean;
+      requiere_carnet: boolean; requiere_escaneo: boolean; permite_descuento: boolean;
     } | null
   >(null);
 
@@ -78,6 +83,7 @@ export default function TarifasClient({
       icono: t.icono ?? "",
       requiere_carnet: t.requiere_carnet,
       requiere_escaneo: t.requiere_escaneo,
+      permite_descuento: t.permite_descuento,
     });
   }
 
@@ -92,18 +98,19 @@ export default function TarifasClient({
         icono: edicion.icono,
         requiere_carnet: edicion.requiere_carnet,
         requiere_escaneo: edicion.requiere_escaneo,
+        permite_descuento: edicion.permite_descuento,
       }),
       "Tipo actualizado.",
     );
     if (r?.ok) setEdicion(null);
   }
-  const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
+  const [cambioTarifa, setCambioTarifa] = useState<{ id: string; dia: DiaTarifa; valor: string; motivo: string } | null>(null);
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
   const [nuevoMotivo, setNuevoMotivo] = useState("");
   const [editMotivo, setEditMotivo] = useState<{ id: string; v: string } | null>(null);
   const [nuevoAutorizador, setNuevoAutorizador] = useState({ nombre: "", cargo: "" });
   const [editAutorizador, setEditAutorizador] = useState<{ id: string; nombre: string; cargo: string } | null>(null);
-  const [verHist, setVerHist] = useState<string | null>(null);
+  const [verHist, setVerHist] = useState<{ id: string; dia: DiaTarifa } | null>(null);
 
   const aviso = (r: { ok: boolean; error?: string }, exito: string) => {
     setMsg({ ok: r.ok, t: r.ok ? exito : r.error ?? "Error" });
@@ -232,6 +239,15 @@ export default function TarifasClient({
                           />
                           Se escanea en la app de bonos
                         </label>
+                        <label className="flex items-center gap-1 text-[11px] text-ranch-marron/70">
+                          <input
+                            type="checkbox"
+                            checked={edicion.permite_descuento}
+                            onChange={(e) => setEdicion({ ...edicion, permite_descuento: e.target.checked })}
+                            className="h-3.5 w-3.5"
+                          />
+                          Admite descuento unitario en taquilla
+                        </label>
                         <span className="flex items-center gap-1 text-[10px] text-ranch-marron/50">
                           orden
                           <input
@@ -258,41 +274,53 @@ export default function TarifasClient({
                               ☑ escaneo
                             </span>
                           )}
+                          {t.permite_descuento && (
+                            <span title="Admite descuento unitario en taquilla" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
+                              % descuento
+                            </span>
+                          )}
                           <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
                         </span>
                       </span>
                     )}
                   </td>
 
-                  {/* Tarifa */}
+                  {/* Tarifa — una franja de semana y otra de fin de semana/festivo, cada una con su propio historial. */}
                   <td>
-                    {cambioTarifa?.id === t.id ? (
-                      <div className="flex flex-col gap-1 py-1">
-                        <input value={cambioTarifa.valor} onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })} placeholder="Nuevo valor" inputMode="numeric" className="w-28 rounded border px-1 py-0.5" />
-                        <input value={cambioTarifa.motivo} onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })} placeholder="Motivo del cambio" className="w-40 rounded border px-1 py-0.5" />
-                        <span className="flex gap-1">
-                          <button
-                            onClick={async () => {
-                              const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
-                              setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
-                              if (r?.ok) setCambioTarifa(null);
-                            }}
-                            className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white"
-                          >Guardar</button>
-                          <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="text-red-500">✕</button>
-                        </span>
-                        {errorTarifa && <span className="max-w-[16rem] rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</span>}
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="font-semibold text-ranch-marron">{t.valorVigente > 0 ? formatearCOP(t.valorVigente) : "Gratis"}</span>
-                        <br />
-                        <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, valor: String(t.valorVigente), motivo: "" }); }} className="text-xs text-ranch-dorado hover:underline">Cambiar tarifa</button>
-                        {t.historial.length > 1 && (
-                          <> · <button onClick={() => setVerHist(verHist === t.id ? null : t.id)} className="text-xs text-ranch-marron/50 hover:underline">{verHist === t.id ? "ocultar" : "historial"}</button></>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-2">
+                      {([["semana", t.semana], ["fin_semana_festivo", t.finde]] as [DiaTarifa, Franja][]).map(([dia, franja]) => (
+                        <div key={dia}>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-ranch-marron/40">{ETIQUETA_DIA[dia]}</p>
+                          {cambioTarifa?.id === t.id && cambioTarifa.dia === dia ? (
+                            <div className="flex flex-col gap-1 py-1">
+                              <input value={cambioTarifa.valor} onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })} placeholder="Nuevo valor" inputMode="numeric" className="w-28 rounded border px-1 py-0.5" />
+                              <input value={cambioTarifa.motivo} onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })} placeholder="Motivo del cambio" className="w-40 rounded border px-1 py-0.5" />
+                              <span className="flex gap-1">
+                                <button
+                                  onClick={async () => {
+                                    const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.dia, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
+                                    setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
+                                    if (r?.ok) setCambioTarifa(null);
+                                  }}
+                                  className="rounded bg-ranch-dorado px-2 py-0.5 text-xs font-semibold text-white"
+                                >Guardar</button>
+                                <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="text-red-500">✕</button>
+                              </span>
+                              {errorTarifa && <span className="max-w-[16rem] rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</span>}
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="font-semibold text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</span>
+                              {" · "}
+                              <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, dia, valor: String(franja.valorVigente), motivo: "" }); }} className="text-xs text-ranch-dorado hover:underline">Cambiar</button>
+                              {franja.historial.length > 1 && (
+                                <> · <button onClick={() => setVerHist(verHist?.id === t.id && verHist.dia === dia ? null : { id: t.id, dia })} className="text-xs text-ranch-marron/50 hover:underline">{verHist?.id === t.id && verHist.dia === dia ? "ocultar" : "historial"}</button></>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </td>
 
                   {/* Cobra — se deduce de la tarifa, no se marca aparte. */}
@@ -349,26 +377,28 @@ export default function TarifasClient({
                   </td>
                 </tr>
               ))}
-              {tipos.flatMap((t) =>
-                verHist === t.id
-                  ? [
-                      <tr key={`${t.id}-hist`} className="bg-ranch-crema/40">
-                        <td colSpan={6} className="px-3 py-2">
-                          <p className="mb-1 text-xs font-semibold text-ranch-marron/70">Historial de tarifas — {t.nombre}</p>
-                          <ul className="space-y-0.5 text-xs text-ranch-marron/70">
-                            {t.historial.map((h, i) => (
-                              <li key={i}>
-                                <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
-                                <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
-                                {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </tr>,
-                    ]
-                  : [],
-              )}
+              {tipos.flatMap((t) => {
+                if (verHist?.id !== t.id) return [];
+                const franja = verHist.dia === "semana" ? t.semana : t.finde;
+                return [
+                  <tr key={`${t.id}-hist`} className="bg-ranch-crema/40">
+                    <td colSpan={6} className="px-3 py-2">
+                      <p className="mb-1 text-xs font-semibold text-ranch-marron/70">
+                        Historial de tarifas — {t.nombre} · {ETIQUETA_DIA[verHist.dia]}
+                      </p>
+                      <ul className="space-y-0.5 text-xs text-ranch-marron/70">
+                        {franja.historial.map((h, i) => (
+                          <li key={i}>
+                            <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
+                            <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
+                            {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>,
+                ];
+              })}
             </tbody>
           </table>
         </div>

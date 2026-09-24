@@ -24,6 +24,12 @@ export interface LineaVenta {
   beneficiario?: string | null;
   /** El bono/QR ya se verificó en la aplicación de bonos. Solo aplica a los tipos que lo exigen. */
   escaneado?: boolean;
+  /**
+   * ¿Este tipo admite descuento unitario? Lo decide la BD (`TipoVisitante.permite_descuento`),
+   * nunca el cliente. Si se omite, no se valida (para no romper pruebas/llamadas que no
+   * les importa esta regla) — el servidor SIEMPRE lo llena con el valor real.
+   */
+  permite_descuento?: boolean;
 }
 
 export interface Pago {
@@ -99,6 +105,7 @@ export function validarVenta(lineas: LineaVenta[], pagos: Pago[]): ResultadoVali
       if (hayDescuento) {
         if (!l.motivo_descuento) errores.push(`${et}: el descuento requiere motivo.`);
         if (!l.autorizado_por) errores.push(`${et}: el descuento requiere autorización.`);
+        if (l.permite_descuento === false) errores.push(`${et}: esta tarifa no admite descuento unitario.`);
       }
     }
   });

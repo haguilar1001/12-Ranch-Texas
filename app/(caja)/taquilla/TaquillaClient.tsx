@@ -20,6 +20,8 @@ interface Tipo {
   requiere_carnet: boolean;
   /** Bono o compra web: hay que verificarlo en la aplicación de bonos antes de vender. */
   requiere_escaneo: boolean;
+  /** Solo estos tipos muestran el botón de descuento unitario (tarifas de evento/comercial). */
+  permite_descuento: boolean;
 }
 interface Medio { id: string; nombre: string; codigo: string; es_efectivo: boolean }
 interface Motivo { id: string; nombre: string }
@@ -72,12 +74,14 @@ export interface VentaACorregir {
 }
 
 export default function TaquillaClient({
-  cajero, caja, tipos, medios, motivos, autorizadores, correccion, puedeCorregir = false,
+  cajero, caja, tipos, medios, motivos, autorizadores, correccion, puedeCorregir = false, esFinde = false,
 }: {
   cajero: string; caja: string; tipos: Tipo[]; medios: Medio[]; motivos: Motivo[];
   autorizadores: Autorizador[]; correccion?: VentaACorregir | null;
   /** Solo supervisor y administrador ven el atajo para arreglar una venta ya hecha. */
   puedeCorregir?: boolean;
+  /** Hoy aplica la tarifa de fin de semana/festivo (si no, la de entre semana). */
+  esFinde?: boolean;
 }) {
   const [cant, setCant] = useState<Record<string, number>>(() => {
     const inicial: Record<string, number> = {};
@@ -196,6 +200,7 @@ export default function TaquillaClient({
         motivo_descuento: d?.motivo || null,
         autorizado_por: d?.autoriza || null,
         escaneado: !!escaneados[t.id],
+        permite_descuento: t.permite_descuento,
       });
     }
     for (const co of cortesias) {
@@ -515,6 +520,14 @@ export default function TaquillaClient({
           <p className="rounded-full bg-white px-3 py-1 text-sm text-ranch-marron/70 ring-1 ring-ranch-marron/10">
             🏛️ {caja} · 👤 {cajero}
           </p>
+          <p
+            title="Las tarifas que ves abajo son las de hoy: cambian solas según el día."
+            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
+              esFinde ? "bg-ranch-dorado/15 text-ranch-marron ring-ranch-dorado/40" : "bg-white text-ranch-marron/70 ring-ranch-marron/10"
+            }`}
+          >
+            {esFinde ? "🎉 Tarifa fin de semana/festivo" : "📅 Tarifa entre semana"}
+          </p>
         </div>
       </header>
 
@@ -703,8 +716,8 @@ export default function TaquillaClient({
                     </label>
                   )}
 
-                  {/* Descuento: solo tiene sentido si el tipo cobra y hay unidades. */}
-                  {t.requiere_pago && t.valor > 0 && c > 0 && (
+                  {/* Descuento: solo tiene sentido si el tipo cobra, hay unidades, y el tipo lo admite. */}
+                  {t.requiere_pago && t.valor > 0 && c > 0 && t.permite_descuento && (
                     <div className="mt-2 border-t border-ranch-marron/10 pt-2">
                       <button
                         onClick={() => alternarDescuento(t.id, t.valor)}

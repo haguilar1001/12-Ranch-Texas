@@ -253,6 +253,62 @@ y no los $20.866.480 que suman los dos cuadros.
   alimenta hacia adelante); si se quiere un reporte de clientes frecuentes o dedup
   del histórico, tocaría un script aparte.
 
+### Tarifas por día: semana vs. fin de semana y festivo (2026-09-24)
+- **Cada tipo de visitante tiene DOS tarifas vigentes a la vez**, no una: una para
+  `semana` y otra para `fin_semana_festivo`. Un festivo colombiano entre semana (con
+  traslado Emiliani ya aplicado) cuenta como `fin_semana_festivo`, aunque no caiga
+  sábado ni domingo.
+  - `Tarifa.dia_tipo` (`prisma/schema.prisma`); índice por `(tipo_visitante_id,
+    dia_tipo, vigente_desde)`. Cada franja mantiene su propio historial (nunca se
+    sobrescribe, igual que antes).
+  - Qué franja aplica "hoy" lo decide `diaTarifaDe()`
+    (`lib/tarifas/diaTarifa.ts`), reutilizando `festivosColombia()`
+    (`scripts/festivos-co.ts`).
+  - **Taquilla solo trae/muestra la tarifa de la franja de hoy** (una sola, no las
+    dos) — el cajero ni ve la del otro día. El cobro se recalcula en el SERVIDOR con
+    esa misma franja al registrar la venta (`lib/ventas/registrar.ts`), igual que ya
+    se hacía con la tarifa vigente: nunca se confía en lo que mandó el cliente.
+  - `/admin/tarifas` edita las dos franjas por separado (cada una con su botón
+    "Cambiar" e historial propio); un tipo nuevo nace con el mismo valor en las dos,
+    y el administrador ajusta la de fin de semana/festivo si debe ser distinta.
+  - Migración: todo tipo existente arrancó con la MISMA tarifa en ambas franjas
+    (`scripts/_tmp-crear-tarifas-finde.ts`, uso único) para no dejar ningún tipo sin
+    precio el día del despliegue.
+
+### Tarifa Comercial Especial: descuento unitario solo en un tipo (2026-09-24)
+- **El descuento unitario en taquilla ("% Aplicar descuento", precio libre por unidad +
+  motivo + autorización) ya existía para CUALQUIER tipo que cobrara.** El responsable
+  pidió restringirlo: solo un tipo dedicado a precios de evento/convenio ("Tarifa
+  Comercial Especial", $55.000 de lista) debe poder descontarse — porque los eventos
+  negocian valores distintos cada vez (47.000, 48.000, 43.000, 35.000…) y no quiere
+  crear una tarifa nueva por cada uno.
+  - `TipoVisitante.permite_descuento` (editable en `/admin/tarifas`, junto a "requiere
+    carnet"/"requiere escaneo"); en taquilla el botón de descuento solo aparece si el
+    tipo lo tiene en `true`.
+  - **Se valida también en el SERVIDOR** (`lib/ventas/calculo.ts` → `validarVenta`,
+    poblado desde la BD en `lib/ventas/registrar.ts`): quién puede descontarse lo decide
+    la BD, no lo que mande el navegador — mismo criterio que ya se usaba para el
+    escaneo de bonos.
+  - Tipo creado con `scripts/_tmp-crear-tarifa-comercial.ts` (uso único), con la misma
+    tarifa en las dos franjas (semana / fin de semana y festivo).
+
+### Caja de Pruebas: probar taquilla sin ensuciar las cifras reales (2026-09-24)
+- El responsable no tenía forma de entrar a revisar taquilla (tarifas nuevas, recibo,
+  etc.) sin que la venta de prueba contara en el ingreso real. Nada se borra en este
+  sistema, así que la salida no es "borrar la venta de prueba" sino que **nunca cuente**.
+  - `Caja.es_prueba` (una sola caja, "🧪 Caja de Pruebas", creada con
+    `scripts/_tmp-crear-caja-pruebas.ts`, uso único). Se abre turno y se vende ahí
+    exactamente igual que en cualquier caja real.
+  - Sus ventas quedan **excluidas por defecto** de los indicadores de ingreso
+    (`lib/reportes/ventas.ts`: dashboard, reporte de ventas, ticket promedio, CSV) —
+    salvo que alguien filtre esa caja a propósito desde el selector de caja del reporte.
+  - A propósito **NO** se excluye de las pantallas operativas (estado de cajas, cuadre,
+    cierre por caja): ahí la caja de prueba se ve igual que cualquier otra, pero
+    claramente rotulada, porque esas pantallas son de arqueo/operación, no de ingreso.
+  - **Pendiente/no cubierto:** si alguna manilla de una venta de prueba se llega a
+    escanear en un punto de control real, sí sumaría al aforo del día (el aforo se mide
+    por escaneo, no por caja) — evitar escanear manillas de prueba en control de acceso.
+
 ## Decisiones técnicas a resolver en su fase
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
 import { parseCOP } from "@/lib/dinero/cop";
+import type { DiaTarifa } from "@prisma/client";
 
 interface Resultado {
   ok: boolean;
@@ -96,9 +97,14 @@ export async function crearTipo(e: EntradaCrearTipo): Promise<Resultado> {
     const t = await tx.tipoVisitante.create({
       data: { codigo, nombre, requiere_pago: requierePago, edad_min: edadMin, edad_max: edadMax, orden, creado_por: s.id },
     });
-    await tx.tarifa.create({
-      data: { tipo_visitante_id: t.id, valor: tarifa.valor, vigente_desde: new Date(), motivo_cambio: "Tarifa inicial", creado_por: s.id },
-    });
+    // Nace con la MISMA tarifa en las dos franjas: el administrador ajusta la de fin de
+    // semana/festivo después, si de verdad debe ser distinta.
+    const ahora = new Date();
+    for (const dia of ["semana", "fin_semana_festivo"] as const) {
+      await tx.tarifa.create({
+        data: { tipo_visitante_id: t.id, dia_tipo: dia, valor: tarifa.valor, vigente_desde: ahora, motivo_cambio: "Tarifa inicial", creado_por: s.id },
+      });
+    }
     return t;
   });
 
@@ -120,6 +126,8 @@ interface CambiosTipo {
   requiere_carnet?: boolean;
   /** El bono/QR se verifica en la aplicación de bonos antes de vender. */
   requiere_escaneo?: boolean;
+  /** Solo con esto en true aparece el botón de descuento unitario en taquilla. */
+  permite_descuento?: boolean;
 }
 
 export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resultado> {
@@ -174,6 +182,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
 
   if (cambios.requiere_carnet !== undefined) data.requiere_carnet = !!cambios.requiere_carnet;
   if (cambios.requiere_escaneo !== undefined) data.requiere_escaneo = !!cambios.requiere_escaneo;
+  if (cambios.permite_descuento !== undefined) data.permite_descuento = !!cambios.permite_descuento;
 
   await prisma.tipoVisitante.update({ where: { id }, data });
   await registrarAuditoria({
@@ -181,7 +190,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     datos_antes: {
       nombre: tipo.nombre, requiere_pago: tipo.requiere_pago, edad_min: tipo.edad_min,
       edad_max: tipo.edad_max, orden: tipo.orden, icono: tipo.icono, requiere_carnet: tipo.requiere_carnet,
-      requiere_escaneo: tipo.requiere_escaneo,
+      requiere_escaneo: tipo.requiere_escaneo, permite_descuento: tipo.permite_descuento,
     },
     datos_despues: JSON.parse(JSON.stringify(cambios)),
   });
@@ -202,10 +211,11 @@ export async function cambiarEstadoTipo(id: string, activo: boolean): Promise<Re
 }
 
 /**
- * Cambia la tarifa vigente de un tipo. Nunca sobrescribe: cierra la tarifa abierta
+ * Cambia la tarifa vigente de un tipo EN UNA FRANJA (semana, o fin de semana/festivo).
+ * La otra franja no se toca. Nunca sobrescribe: cierra la tarifa abierta de esa franja
  * (vigente_hasta = ahora) y crea una nueva fila con vigente_desde = ahora.
  */
-export async function cambiarTarifa(tipoId: string, nuevoValor: string | number, motivo: string): Promise<Resultado> {
+export async function cambiarTarifa(tipoId: string, diaTipo: DiaTarifa, nuevoValor: string | number, motivo: string): Promise<Resultado> {
   const s = await admin();
   if (!s) return { ok: false, error: "Solo un administrador." };
 
@@ -214,13 +224,17 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
 
   const tarifa = validarTarifa(nuevoValor);
   if (!tarifa.ok) return { ok: false, error: tarifa.error };
-  const requierePago = cobra(tarifa.valor);
 
   const motivoLimpio = motivo?.trim();
   if (!motivoLimpio) return { ok: false, error: "Indica el motivo del cambio de tarifa (queda en la auditoría)." };
 
-  const vigente = await prisma.tarifa.findFirst({ where: { tipo_visitante_id: tipoId, vigente_hasta: null }, orderBy: { vigente_desde: "desc" } });
+  const vigente = await prisma.tarifa.findFirst({ where: { tipo_visitante_id: tipoId, dia_tipo: diaTipo, vigente_hasta: null }, orderBy: { vigente_desde: "desc" } });
   if (vigente && vigente.valor === tarifa.valor) return { ok: false, error: "La tarifa no cambió respecto a la vigente." };
+
+  // El tipo "cobra" si cualquiera de las dos franjas cobra: no se decide solo con la que se edita.
+  const otraFranja: DiaTarifa = diaTipo === "semana" ? "fin_semana_festivo" : "semana";
+  const otraVigente = await prisma.tarifa.findFirst({ where: { tipo_visitante_id: tipoId, dia_tipo: otraFranja, vigente_hasta: null }, orderBy: { vigente_desde: "desc" } });
+  const requierePago = cobra(tarifa.valor) || cobra(otraVigente?.valor ?? 0);
 
   const ahora = new Date();
   await prisma.$transaction(async (tx) => {
@@ -228,7 +242,7 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
       await tx.tarifa.update({ where: { id: vigente.id }, data: { vigente_hasta: ahora, actualizado_por: s.id } });
     }
     await tx.tarifa.create({
-      data: { tipo_visitante_id: tipoId, valor: tarifa.valor, vigente_desde: ahora, motivo_cambio: motivoLimpio, creado_por: s.id },
+      data: { tipo_visitante_id: tipoId, dia_tipo: diaTipo, valor: tarifa.valor, vigente_desde: ahora, motivo_cambio: motivoLimpio, creado_por: s.id },
     });
     // El flag se deriva del valor y viaja con él: no puede quedar desfasado.
     if (tipo.requiere_pago !== requierePago) {
@@ -238,8 +252,8 @@ export async function cambiarTarifa(tipoId: string, nuevoValor: string | number,
 
   await registrarAuditoria({
     usuario_id: s.id, entidad: "tarifa", entidad_id: tipoId, accion: "cambiar_tarifa",
-    datos_antes: { valor: vigente?.valor ?? null, requiere_pago: tipo.requiere_pago },
-    datos_despues: { valor: tarifa.valor, requiere_pago: requierePago, motivo: motivoLimpio },
+    datos_antes: { dia_tipo: diaTipo, valor: vigente?.valor ?? null, requiere_pago: tipo.requiere_pago },
+    datos_despues: { dia_tipo: diaTipo, valor: tarifa.valor, requiere_pago: requierePago, motivo: motivoLimpio },
   });
   revalidatePath("/admin/tarifas");
   revalidatePath("/taquilla");

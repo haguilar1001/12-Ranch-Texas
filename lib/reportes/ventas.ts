@@ -44,10 +44,13 @@ function whereVentas(desde: Date, hasta: Date, f?: FiltrosVentas) {
     estado: "completada";
     creado_en: { gte: Date; lt: Date };
     usuario_id?: string;
-    turno?: { caja_id: string };
+    turno?: { caja_id: string } | { caja: { es_prueba: boolean } };
   } = { estado: "completada", creado_en: { gte: desde, lt: hasta } };
   if (f?.cajeroId) where.usuario_id = f.cajeroId;
-  if (f?.cajaId) where.turno = { caja_id: f.cajaId };
+  // Sin caja puntual, se excluye la(s) caja(s) de prueba: no deben inflar ni distorsionar
+  // el ingreso real. Si el admin SÍ eligió una caja a propósito (incluida una de prueba),
+  // se respeta su elección.
+  where.turno = f?.cajaId ? { caja_id: f.cajaId } : { caja: { es_prueba: false } };
   return where;
 }
 

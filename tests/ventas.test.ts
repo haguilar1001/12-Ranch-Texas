@@ -116,6 +116,22 @@ describe("validación de venta", () => {
     expect(validarVenta([linea], [{ medio_pago_id: "efectivo", monto: 50000 }]).ok).toBe(true);
   });
 
+  it("rechaza el descuento si el tipo no lo admite (lo decide la BD, no el cliente)", () => {
+    const linea: LineaVenta = {
+      tipo_visitante_id: "adulto",
+      cantidad: 1,
+      valor_lista: 60000,
+      valor_cobrado: 50000,
+      tipo_linea: "pago",
+      motivo_descuento: "convenio",
+      autorizado_por: "sup-1",
+      permite_descuento: false,
+    };
+    const r = validarVenta([linea], [{ medio_pago_id: "efectivo", monto: 50000 }]);
+    expect(r.ok).toBe(false);
+    expect(r.errores.some((e) => e.includes("no admite descuento unitario"))).toBe(true);
+  });
+
   it("rechaza cantidades no enteras o cero", () => {
     expect(validarVenta([adulto(0)], []).ok).toBe(false);
     expect(validarVenta([{ ...adulto(1), cantidad: 1.5 }], [{ medio_pago_id: "e", monto: 60000 }]).ok).toBe(false);

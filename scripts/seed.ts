@@ -81,23 +81,27 @@ async function seedTiposYTarifas() {
         creado_por: POR,
       },
     });
-    // Tarifa vigente (solo si no tiene una abierta)
-    const abierta = await prisma.tarifa.findFirst({
-      where: { tipo_visitante_id: tipo.id, vigente_hasta: null },
-    });
-    if (!abierta) {
-      await prisma.tarifa.create({
-        data: {
-          tipo_visitante_id: tipo.id,
-          valor: t.valor,
-          vigente_desde: VIGENTE_DESDE,
-          motivo_cambio: "Tarifa inicial (seed)",
-          creado_por: POR,
-        },
+    // Tarifa vigente en cada franja (solo si no tiene una abierta). Nace igual en las
+    // dos franjas; se diferencia después desde /admin/tarifas.
+    for (const dia of ["semana", "fin_semana_festivo"] as const) {
+      const abierta = await prisma.tarifa.findFirst({
+        where: { tipo_visitante_id: tipo.id, dia_tipo: dia, vigente_hasta: null },
       });
+      if (!abierta) {
+        await prisma.tarifa.create({
+          data: {
+            tipo_visitante_id: tipo.id,
+            dia_tipo: dia,
+            valor: t.valor,
+            vigente_desde: VIGENTE_DESDE,
+            motivo_cambio: "Tarifa inicial (seed)",
+            creado_por: POR,
+          },
+        });
+      }
     }
   }
-  console.log("  ✓ tipos de visitante + tarifas (adulto/niño $60.000; bebé y adulto mayor $0)");
+  console.log("  ✓ tipos de visitante + tarifas (adulto/niño $60.000; bebé y adulto mayor $0; misma tarifa en las dos franjas)");
 }
 
 async function seedMediosPago() {

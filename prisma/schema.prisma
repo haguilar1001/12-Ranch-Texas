@@ -126,6 +126,12 @@ model Caja {
   ubicacion String?
   activo    Boolean @default(true)
 
+  /// Caja de uso interno para pruebas (revisar taquilla, ver una tarifa nueva, etc.).
+  /// Sus ventas cuentan igual para el cuadre de SU turno, pero quedan fuera de los
+  /// indicadores de ingreso (dashboard, reporte de ventas, ticket promedio) para no
+  /// ensuciar las cifras reales del parque.
+  es_prueba Boolean @default(false)
+
   turnos TurnoCaja[]
 
   creado_en       DateTime @default(now())
@@ -229,6 +235,13 @@ model TipoVisitante {
   /// de vender. En taquilla obliga a marcar "escaneado" para poder registrar.
   requiere_escaneo Boolean @default(false)
 
+  /// Solo los tipos con esto en true muestran el botón "Aplicar descuento" en taquilla
+  /// (precio libre por unidad, con motivo y autorización) — pensado para tarifas de
+  /// evento/comercial donde el valor negociado cambia cada vez. Se valida también en
+  /// el servidor: un tipo sin este permiso no puede venderse con descuento aunque el
+  /// cliente lo pida.
+  permite_descuento Boolean @default(false)
+
   tarifas  Tarifa[]
   detalle  VentaDetalle[]
   manillas Manilla[]
@@ -241,9 +254,19 @@ model TipoVisitante {
   @@map("tipos_visitante")
 }
 
+/// A qué franja del día operativo aplica una tarifa. El día festivo colombiano
+/// (con traslado Emiliani) cuenta como `fin_semana_festivo`, no como `semana`.
+enum DiaTarifa {
+  semana
+  fin_semana_festivo
+}
+
 model Tarifa {
   id                String    @id @default(uuid())
   tipo_visitante_id String
+  /// Cada tipo de visitante tiene, a la vez, UNA tarifa vigente de semana y UNA de
+  /// fin de semana/festivo (nunca una sola "para todos los días").
+  dia_tipo          DiaTarifa @default(semana)
   valor             Int
   vigente_desde     DateTime
   vigente_hasta     DateTime?
@@ -257,7 +280,7 @@ model Tarifa {
   actualizado_en  DateTime @updatedAt
   actualizado_por String?
 
-  @@index([tipo_visitante_id, vigente_desde])
+  @@index([tipo_visitante_id, dia_tipo, vigente_desde])
   @@map("tarifas")
 }
 

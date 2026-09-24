@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { turnoAbiertoDe } from "@/lib/caja/turno";
+import { diaTarifaDe } from "@/lib/tarifas/diaTarifa";
 import TaquillaClient, { type VentaACorregir } from "./TaquillaClient";
 
 export const dynamic = "force-dynamic";
@@ -112,11 +113,14 @@ export default async function TaquillaPage({
     cajaNombre = turno.caja.nombre;
   }
 
+  // El cajero solo ve/cobra la tarifa de la franja de HOY (semana, o fin de semana y
+  // festivo): la otra franja ni siquiera llega al cliente.
+  const diaHoy = diaTarifaDe();
   const [tiposRaw, medios, motivos, autorizadores] = await Promise.all([
     prisma.tipoVisitante.findMany({
       where: { activo: true },
       orderBy: { orden: "asc" },
-      include: { tarifas: { where: { vigente_hasta: null }, orderBy: { vigente_desde: "desc" }, take: 1 } },
+      include: { tarifas: { where: { vigente_hasta: null, dia_tipo: diaHoy }, orderBy: { vigente_desde: "desc" }, take: 1 } },
     }),
     prisma.medioPago.findMany({ where: { activo: true }, orderBy: { orden: "asc" } }),
     prisma.motivoCortesia.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
@@ -137,6 +141,7 @@ export default async function TaquillaPage({
     icono: t.icono,
     requiere_carnet: t.requiere_carnet,
     requiere_escaneo: t.requiere_escaneo,
+    permite_descuento: t.permite_descuento,
   }));
 
   return (
@@ -149,6 +154,7 @@ export default async function TaquillaPage({
       autorizadores={autorizadores}
       correccion={correccion}
       puedeCorregir={tieneRol(s.rol, "supervisor")}
+      esFinde={diaHoy === "fin_semana_festivo"}
     />
   );
 }
