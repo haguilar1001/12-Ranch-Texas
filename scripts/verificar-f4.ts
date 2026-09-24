@@ -22,7 +22,7 @@ async function main() {
     lineas: [{ tipo_visitante_id: tipos.find((t) => t.codigo === "adulto")!.id, cantidad: 1, tipo_linea: "pago" }],
     pagos: [{ medio_pago_id: efectivo.id, monto: 60000 }],
   };
-  const venta = await crearVenta({ usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, turnoId: turno.id, cajaNombre: turno.caja.nombre }, entrada);
+  const venta = await crearVenta({ usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, usuarioRol: turno.usuario.rol, turnoId: turno.id, cajaNombre: turno.caja.nombre }, entrada);
   if (!venta.ok) throw new Error("venta");
   const manilla = await prisma.manilla.findFirstOrThrow({ where: { venta_detalle: { venta_id: venta.venta_id } } });
   const payload = `${manilla.codigo_uuid}.${manilla.firma_hmac}`;

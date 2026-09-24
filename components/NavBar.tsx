@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { obtenerSesion, tieneRol, puedeOperarGranja } from "@/lib/auth/sesion";
+import { obtenerSesion, tieneRol, puedeOperarGranja, puedeConducir } from "@/lib/auth/sesion";
 import { logout } from "@/lib/auth/actions";
 import NavLinks, { type GrupoNav } from "./NavLinks";
 
@@ -12,6 +12,7 @@ export default async function NavBar() {
   const consulta = tieneRol(s.rol, "consulta");
   const supervisor = tieneRol(s.rol, "supervisor");
   const admin = tieneRol(s.rol, "administrador");
+  const chofer = puedeConducir(s.rol);
 
   // El menú se agrupa por ÁREA, no por pantalla: antes eran 14 enlaces sueltos en una fila.
   // Cada enlace lleva su permiso; un grupo que queda vacío no se muestra.
@@ -40,6 +41,17 @@ export default async function NavBar() {
         ["🐄", "Animales", "/admin/animales", "Inventario, ubicación y alimentación", puedeOperarGranja(s.rol)],
         ["🔧", "Equipos", "/admin/equipos", "Inventario y mantenimientos", supervisor],
         ["👷", "Personal", "/admin/personal", "Empleados, áreas y costo de nómina", supervisor],
+      ],
+    },
+    {
+      icono: "🚚",
+      label: "Vehículos",
+      enlaces: [
+        ["📝", "Solicitar vehículo", "/vehiculos/solicitar", "Registrar una solicitud a nombre de quien la pide", supervisor],
+        ["✅", "Aprobar solicitudes", "/vehiculos/aprobar", "Asignar vehículo y chofer, o rechazar", supervisor],
+        ["🚗", "Mis viajes", "/vehiculos/mis-viajes", "Cerrar un viaje con el kilometraje", chofer],
+        ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
+        ["📊", "Uso de vehículos", "/admin/reportes/vehiculos", "Quién pide más, quién maneja más", consulta],
       ],
     },
     {

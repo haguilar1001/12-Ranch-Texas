@@ -21,7 +21,7 @@ async function main() {
     lineas: [{ tipo_visitante_id: tipos.find((t) => t.codigo === "adulto")!.id, cantidad: 2, tipo_linea: "pago" }],
     pagos: [{ medio_pago_id: efectivo.id, monto: 120000 }],
   };
-  const venta = await crearVenta({ usuarioId: admin.id, usuarioNombre: admin.nombre, turnoId: turno.id, cajaNombre: caja.nombre }, entrada);
+  const venta = await crearVenta({ usuarioId: admin.id, usuarioNombre: admin.nombre, usuarioRol: admin.rol, turnoId: turno.id, cajaNombre: caja.nombre }, entrada);
   if (!venta.ok) throw new Error("venta");
 
   // Movimientos: +20.000 ingreso, -15.000 egreso

@@ -71,7 +71,7 @@ export async function registrarVenta(entrada: EntradaVenta): Promise<ResultadoVe
   if (!turno) return { ok: false, error: "No tienes un turno abierto." };
 
   return crearVenta(
-    { usuarioId: s.id, usuarioNombre: s.nombre, turnoId: turno.id, cajaNombre: turno.caja.nombre },
+    { usuarioId: s.id, usuarioNombre: s.nombre, usuarioRol: s.rol, turnoId: turno.id, cajaNombre: turno.caja.nombre },
     entrada,
   );
 }
@@ -122,6 +122,7 @@ export async function corregirVenta(
     {
       usuarioId: s.id,
       usuarioNombre: s.nombre,
+      usuarioRol: s.rol,
       turnoId: original.turno_id,
       cajaNombre: original.turno.caja.nombre,
     },

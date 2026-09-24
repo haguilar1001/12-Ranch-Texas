@@ -53,6 +53,7 @@ export type ResultadoVenta =
 export interface ContextoVenta {
   usuarioId: string;
   usuarioNombre: string;
+  usuarioRol: string;
   turnoId: string;
   cajaNombre: string;
 }

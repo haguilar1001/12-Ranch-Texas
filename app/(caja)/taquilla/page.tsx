@@ -114,11 +114,17 @@ export default async function TaquillaPage({
   }
 
   // El cajero solo ve los tipos que aplican HOY (todos los días, o la franja de hoy):
-  // los que son de la otra franja ni siquiera llegan a la pantalla.
+  // los que son de la otra franja ni siquiera llegan a la pantalla. Y los tipos
+  // "solo administrador" (p. ej. Eventos Varios) ni aparecen si quien vende no lo es.
   const diaHoy = diaOperativoDe();
+  const esAdmin = tieneRol(s.rol, "administrador");
   const [tiposRaw, medios, motivos, autorizadores] = await Promise.all([
     prisma.tipoVisitante.findMany({
-      where: { activo: true, OR: [{ disponible_dias: "todos" }, { disponible_dias: diaHoy }] },
+      where: {
+        activo: true,
+        OR: [{ disponible_dias: "todos" }, { disponible_dias: diaHoy }],
+        ...(esAdmin ? {} : { solo_administrador: false }),
+      },
       orderBy: { orden: "asc" },
       include: { tarifas: { where: { vigente_hasta: null }, orderBy: { vigente_desde: "desc" }, take: 1 } },
     }),

@@ -125,6 +125,8 @@ interface CambiosTipo {
   permite_descuento?: boolean;
   /** Qué días se ve este tipo en taquilla: "todos", "semana" o "fin_semana_festivo". */
   disponible_dias?: DisponibilidadTipo;
+  /** Solo administrador ve y puede vender este tipo en taquilla. */
+  solo_administrador?: boolean;
 }
 
 export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resultado> {
@@ -181,6 +183,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
   if (cambios.requiere_escaneo !== undefined) data.requiere_escaneo = !!cambios.requiere_escaneo;
   if (cambios.permite_descuento !== undefined) data.permite_descuento = !!cambios.permite_descuento;
   if (cambios.disponible_dias !== undefined) data.disponible_dias = cambios.disponible_dias;
+  if (cambios.solo_administrador !== undefined) data.solo_administrador = !!cambios.solo_administrador;
 
   await prisma.tipoVisitante.update({ where: { id }, data });
   await registrarAuditoria({

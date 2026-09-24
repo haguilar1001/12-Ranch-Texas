@@ -156,7 +156,7 @@ async function main() {
         : [{ medio_pago_id: efectivo.id, monto: aCobrar }];
 
     const r = await crearVenta(
-      { usuarioId: usuario.id, usuarioNombre: usuario.nombre, turnoId: turno.id, cajaNombre: turno.caja.nombre },
+      { usuarioId: usuario.id, usuarioNombre: usuario.nombre, usuarioRol: usuario.rol, turnoId: turno.id, cajaNombre: turno.caja.nombre },
       { lineas: g.lineas, pagos, comprador_nombre: g.comprador },
     );
     if (!r.ok) {

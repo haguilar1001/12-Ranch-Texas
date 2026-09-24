@@ -6,6 +6,7 @@ import {
 import { firmarUuid } from "../qr/firma";
 import { finDelDiaOperativo, formatearFechaHoraBogota } from "../tiempo";
 import { disponibleHoy } from "../tarifas/disponibilidad";
+import { tieneRol } from "../auth/sesion";
 import { textoManilla, type DatosManilla } from "../impresion";
 import type { ContextoVenta, EntradaVenta, ResultadoVenta } from "./tipos";
 
@@ -48,7 +49,7 @@ export async function crearVenta(
   const tiposInfo = new Map(
     (await prisma.tipoVisitante.findMany({
       where: { id: { in: ids } },
-      select: { id: true, codigo: true, nombre: true, requiere_escaneo: true, permite_descuento: true, disponible_dias: true },
+      select: { id: true, codigo: true, nombre: true, requiere_escaneo: true, permite_descuento: true, disponible_dias: true, solo_administrador: true },
     })).map((t) => [t.id, t]),
   );
 
@@ -82,6 +83,8 @@ export async function crearVenta(
       permite_descuento: !!tiposInfo.get(l.tipo_visitante_id)?.permite_descuento,
       // Qué tipo se ve hoy lo dice la BD, no la pantalla que el cajero tenía abierta.
       disponible_hoy: disponibleHoy(tiposInfo.get(l.tipo_visitante_id)?.disponible_dias ?? "todos"),
+      // Quién puede vender un tipo restringido a administrador lo dice la BD, no el cliente.
+      permitido_rol: !tiposInfo.get(l.tipo_visitante_id)?.solo_administrador || tieneRol(ctx.usuarioRol, "administrador"),
     };
   });
 

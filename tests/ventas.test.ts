@@ -132,6 +132,13 @@ describe("validación de venta", () => {
     expect(r.errores.some((e) => e.includes("no admite descuento unitario"))).toBe(true);
   });
 
+  it("rechaza una línea de un tipo restringido a administrador si el rol no lo es (lo decide la BD, no el cliente)", () => {
+    const linea: LineaVenta = { ...adulto(1), permitido_rol: false };
+    const r = validarVenta([linea], [{ medio_pago_id: "efectivo", monto: 60000 }]);
+    expect(r.ok).toBe(false);
+    expect(r.errores.some((e) => e.includes("tu rol no puede vender"))).toBe(true);
+  });
+
   it("rechaza una línea de un tipo que hoy no está disponible (lo decide la BD, no la pantalla)", () => {
     const linea: LineaVenta = { ...adulto(1), disponible_hoy: false };
     const r = validarVenta([linea], [{ medio_pago_id: "efectivo", monto: 60000 }]);

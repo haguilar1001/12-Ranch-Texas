@@ -33,6 +33,7 @@ async function main() {
   const ctx = {
     usuarioId: turno.usuario_id,
     usuarioNombre: turno.usuario.nombre,
+    usuarioRol: turno.usuario.rol,
     turnoId: turno.id,
     cajaNombre: turno.caja.nombre,
   };

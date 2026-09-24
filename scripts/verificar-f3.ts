@@ -22,7 +22,7 @@ async function main() {
     lineas: [{ tipo_visitante_id: idDe("adulto"), cantidad: 2, tipo_linea: "pago" }],
     pagos: [{ medio_pago_id: efectivo.id, monto: 120000 }],
   };
-  const venta = await crearVenta({ usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, turnoId: turno.id, cajaNombre: turno.caja.nombre }, entrada);
+  const venta = await crearVenta({ usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, usuarioRol: turno.usuario.rol, turnoId: turno.id, cajaNombre: turno.caja.nombre }, entrada);
   if (!venta.ok) throw new Error("No se pudo crear la venta");
 
   const manillas = await prisma.manilla.findMany({ where: { venta_detalle: { venta_id: venta.venta_id } } });

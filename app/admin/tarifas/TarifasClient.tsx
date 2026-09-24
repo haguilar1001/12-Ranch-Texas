@@ -28,6 +28,8 @@ interface Tipo {
   permite_descuento: boolean;
   /** Qué días se ve este tipo en taquilla. */
   disponible_dias: Disponibilidad;
+  /** Solo administrador ve y puede vender este tipo en taquilla. */
+  solo_administrador: boolean;
   valorVigente: number;
   vigenteDesde: string;
   historial: HistLinea[];
@@ -94,6 +96,7 @@ export default function TarifasClient({
     {
       id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string;
       requiere_carnet: boolean; requiere_escaneo: boolean; permite_descuento: boolean; disponible_dias: Disponibilidad;
+      solo_administrador: boolean;
     } | null
   >(null);
 
@@ -109,6 +112,7 @@ export default function TarifasClient({
       requiere_escaneo: t.requiere_escaneo,
       permite_descuento: t.permite_descuento,
       disponible_dias: t.disponible_dias,
+      solo_administrador: t.solo_administrador,
     });
   }
 
@@ -125,6 +129,7 @@ export default function TarifasClient({
         requiere_escaneo: edicion.requiere_escaneo,
         permite_descuento: edicion.permite_descuento,
         disponible_dias: edicion.disponible_dias,
+        solo_administrador: edicion.solo_administrador,
       }),
       "Tipo actualizado.",
     );
@@ -252,6 +257,11 @@ export default function TarifasClient({
                             {ETIQUETA_DISPONIBILIDAD[t.disponible_dias]}
                           </span>
                         )}
+                        {t.solo_administrador && (
+                          <span title="Solo un administrador la ve y la vende en taquilla" className="ml-1 rounded bg-red-100 px-1 text-[10px] font-bold text-red-700">
+                            🔒 solo admin
+                          </span>
+                        )}
                         <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
                       </span>
                     </span>
@@ -359,6 +369,10 @@ export default function TarifasClient({
                   <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
                     <input type="checkbox" checked={edicion.permite_descuento} onChange={(e) => setEdicion({ ...edicion, permite_descuento: e.target.checked })} className="h-4 w-4" />
                     Admite descuento unitario en taquilla
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
+                    <input type="checkbox" checked={edicion.solo_administrador} onChange={(e) => setEdicion({ ...edicion, solo_administrador: e.target.checked })} className="h-4 w-4" />
+                    Solo administrador puede verlo y venderlo en taquilla
                   </label>
                 </div>
                 <label className="mt-3 block text-xs text-ranch-marron/60">

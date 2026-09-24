@@ -51,6 +51,7 @@ export default async function TarifasPage() {
       requiere_escaneo: t.requiere_escaneo,
       permite_descuento: t.permite_descuento,
       disponible_dias: t.disponible_dias,
+      solo_administrador: t.solo_administrador,
       valorVigente: vigente?.valor ?? 0,
       vigenteDesde: vigente ? formatearFechaHoraBogota(vigente.vigente_desde) : "—",
       historial: t.tarifas.map((x) => ({

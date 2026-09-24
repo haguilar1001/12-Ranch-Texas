@@ -39,7 +39,7 @@ async function main() {
   };
 
   const r = await crearVenta(
-    { usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, turnoId: turno.id, cajaNombre: turno.caja.nombre },
+    { usuarioId: turno.usuario_id, usuarioNombre: turno.usuario.nombre, usuarioRol: turno.usuario.rol, turnoId: turno.id, cajaNombre: turno.caja.nombre },
     entrada,
   );
   if (!r.ok) throw new Error("crearVenta falló: " + r.error);

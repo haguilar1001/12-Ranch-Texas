@@ -251,6 +251,11 @@ model TipoVisitante {
   /// entre semana, "ADULTO" solo fin de semana/festivo, y "BEBÉ" o un bono, todos los días).
   disponible_dias DisponibilidadTipo @default(todos)
 
+  /// Solo el rol administrador ve y puede vender este tipo en taquilla — pensado para
+  /// tarifas sensibles (p. ej. "Eventos Varios") donde no se quiere que un cajero
+  /// aplique descuentos por su cuenta. Se valida también en el servidor.
+  solo_administrador Boolean @default(false)
+
   tarifas  Tarifa[]
   detalle  VentaDetalle[]
   manillas Manilla[]

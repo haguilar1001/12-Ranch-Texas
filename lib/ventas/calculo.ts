@@ -36,6 +36,12 @@ export interface LineaVenta {
    * que `permite_descuento`) — el servidor SIEMPRE lo llena con el valor real.
    */
   disponible_hoy?: boolean;
+  /**
+   * ¿El rol de quien vende puede vender este tipo? Lo decide la BD
+   * (`TipoVisitante.solo_administrador` contra el rol de la sesión), nunca el cliente.
+   * Si se omite, no se valida — el servidor SIEMPRE lo llena con el valor real.
+   */
+  permitido_rol?: boolean;
 }
 
 export interface Pago {
@@ -101,6 +107,7 @@ export function validarVenta(lineas: LineaVenta[], pagos: Pago[]): ResultadoVali
     if (!esEnteroNoNeg(l.valor_cobrado)) errores.push(`${et}: valor cobrado inválido.`);
     if (l.valor_cobrado > l.valor_lista) errores.push(`${et}: el valor cobrado no puede superar el de lista.`);
     if (l.disponible_hoy === false) errores.push(`${et}: esta tarifa no está disponible hoy.`);
+    if (l.permitido_rol === false) errores.push(`${et}: tu rol no puede vender esta tarifa.`);
 
     if (esCortesia(l.tipo_linea)) {
       if (l.valor_cobrado !== 0) errores.push(`${et}: una cortesía (${l.tipo_linea}) debe cobrar 0.`);

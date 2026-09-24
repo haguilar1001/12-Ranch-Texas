@@ -61,7 +61,7 @@ export async function crearSolicitud(input: EntradaCrearSolicitud): Promise<Resu
       creado_por: s.id,
     },
   });
-  await registrarAuditoria({ usuario_id: s.id, entidad: "solicitud_vehiculo", entidad_id: sol.id, accion: "crear", datos_despues: input });
+  await registrarAuditoria({ usuario_id: s.id, entidad: "solicitud_vehiculo", entidad_id: sol.id, accion: "crear", datos_despues: JSON.parse(JSON.stringify(input)) });
   revalidatePath("/vehiculos/aprobar");
   revalidatePath("/vehiculos/solicitar");
   return { ok: true };
