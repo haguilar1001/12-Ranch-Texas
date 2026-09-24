@@ -5,7 +5,7 @@ import {
 } from "./calculo";
 import { firmarUuid } from "../qr/firma";
 import { finDelDiaOperativo, formatearFechaHoraBogota } from "../tiempo";
-import { diaTarifaDe } from "../tarifas/diaTarifa";
+import { disponibleHoy } from "../tarifas/disponibilidad";
 import { textoManilla, type DatosManilla } from "../impresion";
 import type { ContextoVenta, EntradaVenta, ResultadoVenta } from "./tipos";
 
@@ -48,17 +48,15 @@ export async function crearVenta(
   const tiposInfo = new Map(
     (await prisma.tipoVisitante.findMany({
       where: { id: { in: ids } },
-      select: { id: true, codigo: true, nombre: true, requiere_escaneo: true, permite_descuento: true },
+      select: { id: true, codigo: true, nombre: true, requiere_escaneo: true, permite_descuento: true, disponible_dias: true },
     })).map((t) => [t.id, t]),
   );
 
-  // Recalcular precios en el SERVIDOR desde la tarifa vigente de HOY (no confiar en el
-  // cliente, ni en qué franja diga haber mostrado la pantalla).
-  const diaHoy = diaTarifaDe();
+  // Recalcular precios en el SERVIDOR desde la tarifa vigente (no confiar en el cliente).
   const tarifas = new Map<string, { tarifa_id: string | null; valor: number }>();
   for (const id of ids) {
     const t = await prisma.tarifa.findFirst({
-      where: { tipo_visitante_id: id, dia_tipo: diaHoy, vigente_hasta: null },
+      where: { tipo_visitante_id: id, vigente_hasta: null },
       orderBy: { vigente_desde: "desc" },
     });
     tarifas.set(id, { tarifa_id: t?.id ?? null, valor: t?.valor ?? 0 });
@@ -82,6 +80,8 @@ export async function crearVenta(
       autorizado_por: l.autorizado_por ?? null,
       // Quién puede descontarse lo dice la BD, no el cliente.
       permite_descuento: !!tiposInfo.get(l.tipo_visitante_id)?.permite_descuento,
+      // Qué tipo se ve hoy lo dice la BD, no la pantalla que el cajero tenía abierta.
+      disponible_hoy: disponibleHoy(tiposInfo.get(l.tipo_visitante_id)?.disponible_dias ?? "todos"),
     };
   });
 

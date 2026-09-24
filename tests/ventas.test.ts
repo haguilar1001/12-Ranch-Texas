@@ -132,6 +132,13 @@ describe("validación de venta", () => {
     expect(r.errores.some((e) => e.includes("no admite descuento unitario"))).toBe(true);
   });
 
+  it("rechaza una línea de un tipo que hoy no está disponible (lo decide la BD, no la pantalla)", () => {
+    const linea: LineaVenta = { ...adulto(1), disponible_hoy: false };
+    const r = validarVenta([linea], [{ medio_pago_id: "efectivo", monto: 60000 }]);
+    expect(r.ok).toBe(false);
+    expect(r.errores.some((e) => e.includes("no está disponible hoy"))).toBe(true);
+  });
+
   it("rechaza cantidades no enteras o cero", () => {
     expect(validarVenta([adulto(0)], []).ok).toBe(false);
     expect(validarVenta([{ ...adulto(1), cantidad: 1.5 }], [{ medio_pago_id: "e", monto: 60000 }]).ok).toBe(false);

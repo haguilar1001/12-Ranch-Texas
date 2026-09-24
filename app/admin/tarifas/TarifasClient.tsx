@@ -11,8 +11,7 @@ import {
 } from "./actions";
 
 interface HistLinea { valor: number; desde: string; hasta: string | null; motivo: string }
-interface Franja { valorVigente: number; vigenteDesde: string; historial: HistLinea[] }
-type DiaTarifa = "semana" | "fin_semana_festivo";
+type Disponibilidad = "todos" | "semana" | "fin_semana_festivo";
 interface Tipo {
   id: string;
   codigo: string;
@@ -27,11 +26,18 @@ interface Tipo {
   requiere_escaneo: boolean;
   /** Solo estos tipos muestran el botón de descuento unitario en taquilla. */
   permite_descuento: boolean;
-  semana: Franja;
-  finde: Franja;
+  /** Qué días se ve este tipo en taquilla. */
+  disponible_dias: Disponibilidad;
+  valorVigente: number;
+  vigenteDesde: string;
+  historial: HistLinea[];
 }
 
-const ETIQUETA_DIA: Record<DiaTarifa, string> = { semana: "📅 Entre semana", fin_semana_festivo: "🎉 Fin de semana/festivo" };
+const ETIQUETA_DISPONIBILIDAD: Record<Disponibilidad, string> = {
+  todos: "Todos los días",
+  semana: "📅 Solo entre semana",
+  fin_semana_festivo: "🎉 Solo fin de semana/festivo",
+};
 
 export interface Autorizador {
   id: string;
@@ -87,7 +93,7 @@ export default function TarifasClient({
   const [edicion, setEdicion] = useState<
     {
       id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string;
-      requiere_carnet: boolean; requiere_escaneo: boolean; permite_descuento: boolean;
+      requiere_carnet: boolean; requiere_escaneo: boolean; permite_descuento: boolean; disponible_dias: Disponibilidad;
     } | null
   >(null);
 
@@ -102,6 +108,7 @@ export default function TarifasClient({
       requiere_carnet: t.requiere_carnet,
       requiere_escaneo: t.requiere_escaneo,
       permite_descuento: t.permite_descuento,
+      disponible_dias: t.disponible_dias,
     });
   }
 
@@ -117,18 +124,19 @@ export default function TarifasClient({
         requiere_carnet: edicion.requiere_carnet,
         requiere_escaneo: edicion.requiere_escaneo,
         permite_descuento: edicion.permite_descuento,
+        disponible_dias: edicion.disponible_dias,
       }),
       "Tipo actualizado.",
     );
     if (r?.ok) setEdicion(null);
   }
-  const [cambioTarifa, setCambioTarifa] = useState<{ id: string; dia: DiaTarifa; valor: string; motivo: string } | null>(null);
+  const [cambioTarifa, setCambioTarifa] = useState<{ id: string; valor: string; motivo: string } | null>(null);
   const [errorTarifa, setErrorTarifa] = useState<string | null>(null);
   const [nuevoMotivo, setNuevoMotivo] = useState("");
   const [editMotivo, setEditMotivo] = useState<{ id: string; v: string } | null>(null);
   const [nuevoAutorizador, setNuevoAutorizador] = useState({ nombre: "", cargo: "" });
   const [editAutorizador, setEditAutorizador] = useState<{ id: string; nombre: string; cargo: string } | null>(null);
-  const [verHist, setVerHist] = useState<{ id: string; dia: DiaTarifa } | null>(null);
+  const [verHist, setVerHist] = useState<string | null>(null);
 
   const aviso = (r: { ok: boolean; error?: string }, exito: string) => {
     setMsg({ ok: r.ok, t: r.ok ? exito : r.error ?? "Error" });
@@ -239,6 +247,11 @@ export default function TarifasClient({
                             % descuento
                           </span>
                         )}
+                        {t.disponible_dias !== "todos" && (
+                          <span title="Solo se ve en taquilla ese día" className="ml-1 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-700">
+                            {ETIQUETA_DISPONIBILIDAD[t.disponible_dias]}
+                          </span>
+                        )}
                         <br /><span className="text-[10px] text-ranch-marron/40">{t.codigo}</span>
                       </span>
                     </span>
@@ -246,14 +259,7 @@ export default function TarifasClient({
 
                   {/* Tarifa — solo lectura aquí; se cambia desde el formulario. */}
                   <td>
-                    <div className="flex flex-col gap-1">
-                      {([["semana", t.semana], ["fin_semana_festivo", t.finde]] as [DiaTarifa, Franja][]).map(([dia, franja]) => (
-                        <p key={dia} className="text-xs">
-                          <span className="text-ranch-marron/45">{ETIQUETA_DIA[dia]}:</span>{" "}
-                          <span className="font-semibold text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</span>
-                        </p>
-                      ))}
-                    </div>
+                    <span className="font-semibold text-ranch-marron">{t.valorVigente > 0 ? formatearCOP(t.valorVigente) : "Gratis"}</span>
                   </td>
 
                   {/* Cobra — se deduce de la tarifa, no se marca aparte. */}
@@ -355,69 +361,79 @@ export default function TarifasClient({
                     Admite descuento unitario en taquilla
                   </label>
                 </div>
+                <label className="mt-3 block text-xs text-ranch-marron/60">
+                  Disponible en taquilla
+                  <select
+                    value={edicion.disponible_dias}
+                    onChange={(e) => setEdicion({ ...edicion, disponible_dias: e.target.value as Disponibilidad })}
+                    className="mt-1 w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm text-ranch-marron"
+                  >
+                    <option value="todos">Todos los días</option>
+                    <option value="semana">Solo entre semana</option>
+                    <option value="fin_semana_festivo">Solo fin de semana/festivo</option>
+                  </select>
+                  <span className="mt-1 block text-[11px] text-ranch-marron/45">
+                    El día que no corresponda, este tipo NO aparece en taquilla — así el cajero no se equivoca.
+                  </span>
+                </label>
               </section>
 
               <section>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ranch-marron/45">Tarifas</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {([["semana", t.semana], ["fin_semana_festivo", t.finde]] as [DiaTarifa, Franja][]).map(([dia, franja]) => (
-                    <div key={dia} className="rounded-xl border-2 border-ranch-marron/15 bg-ranch-crema/30 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-ranch-marron/50">{ETIQUETA_DIA[dia]}</p>
-                      {cambioTarifa?.id === t.id && cambioTarifa.dia === dia ? (
-                        <div className="mt-2 space-y-1.5">
-                          <input
-                            value={cambioTarifa.valor}
-                            onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })}
-                            placeholder="Nuevo valor"
-                            inputMode="numeric"
-                            autoFocus
-                            className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
-                          />
-                          <input
-                            value={cambioTarifa.motivo}
-                            onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })}
-                            placeholder="Motivo del cambio"
-                            className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
-                          />
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={async () => {
-                                const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.dia, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
-                                setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
-                                if (r?.ok) setCambioTarifa(null);
-                              }}
-                              className="rounded-lg bg-ranch-dorado px-3 py-1 text-xs font-semibold text-white"
-                            >Guardar</button>
-                            <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="rounded-lg border border-ranch-marron/25 px-3 py-1 text-xs text-ranch-marron">Cancelar</button>
-                          </div>
-                          {errorTarifa && <p className="rounded-lg bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</p>}
-                        </div>
-                      ) : (
-                        <div className="mt-1">
-                          <p className="text-lg font-black text-ranch-marron">{franja.valorVigente > 0 ? formatearCOP(franja.valorVigente) : "Gratis"}</p>
-                          <div className="mt-1 flex items-center gap-2 text-xs">
-                            <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, dia, valor: String(franja.valorVigente), motivo: "" }); }} className="font-semibold text-ranch-dorado hover:underline">Cambiar</button>
-                            {franja.historial.length > 1 && (
-                              <button onClick={() => setVerHist(verHist?.id === t.id && verHist.dia === dia ? null : { id: t.id, dia })} className="text-ranch-marron/50 hover:underline">
-                                {verHist?.id === t.id && verHist.dia === dia ? "ocultar historial" : "ver historial"}
-                              </button>
-                            )}
-                          </div>
-                          {verHist?.id === t.id && verHist.dia === dia && (
-                            <ul className="mt-2 space-y-0.5 border-t border-ranch-marron/10 pt-2 text-[11px] text-ranch-marron/70">
-                              {franja.historial.map((h, i) => (
-                                <li key={i}>
-                                  <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
-                                  <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
-                                  {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ranch-marron/45">Tarifa</p>
+                <div className="rounded-xl border-2 border-ranch-marron/15 bg-ranch-crema/30 p-3">
+                  {cambioTarifa?.id === t.id ? (
+                    <div className="space-y-1.5">
+                      <input
+                        value={cambioTarifa.valor}
+                        onChange={(e) => setCambioTarifa({ ...cambioTarifa, valor: e.target.value })}
+                        placeholder="Nuevo valor"
+                        inputMode="numeric"
+                        autoFocus
+                        className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        value={cambioTarifa.motivo}
+                        onChange={(e) => setCambioTarifa({ ...cambioTarifa, motivo: e.target.value })}
+                        placeholder="Motivo del cambio"
+                        className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={async () => {
+                            const r = await ejecutar(() => cambiarTarifa(t.id, cambioTarifa.valor, cambioTarifa.motivo), "Tarifa actualizada.");
+                            setErrorTarifa(!r ? "No se pudo guardar: revisa la conexión." : r.ok ? null : r.error ?? "Error");
+                            if (r?.ok) setCambioTarifa(null);
+                          }}
+                          className="rounded-lg bg-ranch-dorado px-3 py-1 text-xs font-semibold text-white"
+                        >Guardar</button>
+                        <button onClick={() => { setCambioTarifa(null); setErrorTarifa(null); }} className="rounded-lg border border-ranch-marron/25 px-3 py-1 text-xs text-ranch-marron">Cancelar</button>
+                      </div>
+                      {errorTarifa && <p className="rounded-lg bg-red-50 px-2 py-1 text-[11px] text-red-700">{errorTarifa}</p>}
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-lg font-black text-ranch-marron">{t.valorVigente > 0 ? formatearCOP(t.valorVigente) : "Gratis"}</p>
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <button onClick={() => { setErrorTarifa(null); setCambioTarifa({ id: t.id, valor: String(t.valorVigente), motivo: "" }); }} className="font-semibold text-ranch-dorado hover:underline">Cambiar</button>
+                        {t.historial.length > 1 && (
+                          <button onClick={() => setVerHist(verHist === t.id ? null : t.id)} className="text-ranch-marron/50 hover:underline">
+                            {verHist === t.id ? "ocultar historial" : "ver historial"}
+                          </button>
+                        )}
+                      </div>
+                      {verHist === t.id && (
+                        <ul className="mt-2 space-y-0.5 border-t border-ranch-marron/10 pt-2 text-[11px] text-ranch-marron/70">
+                          {t.historial.map((h, i) => (
+                            <li key={i}>
+                              <span className="font-semibold">{h.valor > 0 ? formatearCOP(h.valor) : "Gratis"}</span>{" "}
+                              <span className="text-ranch-marron/50">desde {h.desde}{h.hasta ? ` hasta ${h.hasta}` : " (vigente)"}</span>
+                              {h.motivo && <span className="text-ranch-marron/40"> · {h.motivo}</span>}
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
-                  ))}
+                  )}
                 </div>
               </section>
 

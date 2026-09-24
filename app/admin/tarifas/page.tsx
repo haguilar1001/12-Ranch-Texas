@@ -35,37 +35,32 @@ export default async function TarifasPage() {
     usos: m._count.detalle,
   }));
 
-  function franja(t: (typeof tiposRaw)[number], dia: "semana" | "fin_semana_festivo") {
-    const deLaFranja = t.tarifas.filter((x) => x.dia_tipo === dia);
-    const vigente = deLaFranja.find((x) => x.vigente_hasta === null) ?? deLaFranja[0] ?? null;
+  const tipos = tiposRaw.map((t) => {
+    const vigente = t.tarifas.find((x) => x.vigente_hasta === null) ?? t.tarifas[0] ?? null;
     return {
+      id: t.id,
+      codigo: t.codigo,
+      nombre: t.nombre,
+      requiere_pago: t.requiere_pago,
+      edad_min: t.edad_min,
+      edad_max: t.edad_max,
+      orden: t.orden,
+      activo: t.activo,
+      icono: t.icono,
+      requiere_carnet: t.requiere_carnet,
+      requiere_escaneo: t.requiere_escaneo,
+      permite_descuento: t.permite_descuento,
+      disponible_dias: t.disponible_dias,
       valorVigente: vigente?.valor ?? 0,
       vigenteDesde: vigente ? formatearFechaHoraBogota(vigente.vigente_desde) : "—",
-      historial: deLaFranja.map((x) => ({
+      historial: t.tarifas.map((x) => ({
         valor: x.valor,
         desde: formatearFechaHoraBogota(x.vigente_desde),
         hasta: x.vigente_hasta ? formatearFechaHoraBogota(x.vigente_hasta) : null,
         motivo: x.motivo_cambio ?? "",
       })),
     };
-  }
-
-  const tipos = tiposRaw.map((t) => ({
-    id: t.id,
-    codigo: t.codigo,
-    nombre: t.nombre,
-    requiere_pago: t.requiere_pago,
-    edad_min: t.edad_min,
-    edad_max: t.edad_max,
-    orden: t.orden,
-    activo: t.activo,
-    icono: t.icono,
-    requiere_carnet: t.requiere_carnet,
-    requiere_escaneo: t.requiere_escaneo,
-    permite_descuento: t.permite_descuento,
-    semana: franja(t, "semana"),
-    finde: franja(t, "fin_semana_festivo"),
-  }));
+  });
 
   return (
     <TarifasClient

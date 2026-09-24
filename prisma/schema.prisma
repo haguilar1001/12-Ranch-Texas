@@ -242,6 +242,11 @@ model TipoVisitante {
   /// cliente lo pida.
   permite_descuento Boolean @default(false)
 
+  /// Qué días se ve este tipo en taquilla. Un tipo = un precio; lo que cambia con el día
+  /// es cuáles tipos aparecen, no cuánto cuesta cada uno (p. ej. "SEMANAL ADULTO" solo
+  /// entre semana, "ADULTO" solo fin de semana/festivo, y "BEBÉ" o un bono, todos los días).
+  disponible_dias DisponibilidadTipo @default(todos)
+
   tarifas  Tarifa[]
   detalle  VentaDetalle[]
   manillas Manilla[]
@@ -254,9 +259,10 @@ model TipoVisitante {
   @@map("tipos_visitante")
 }
 
-/// A qué franja del día operativo aplica una tarifa. El día festivo colombiano
-/// (con traslado Emiliani) cuenta como `fin_semana_festivo`, no como `semana`.
-enum DiaTarifa {
+/// Qué días de la operación ve un tipo de visitante en taquilla. Un festivo colombiano
+/// (con traslado Emiliani) cuenta como `fin_semana_festivo`, aunque no caiga sábado ni domingo.
+enum DisponibilidadTipo {
+  todos
   semana
   fin_semana_festivo
 }
@@ -264,9 +270,6 @@ enum DiaTarifa {
 model Tarifa {
   id                String    @id @default(uuid())
   tipo_visitante_id String
-  /// Cada tipo de visitante tiene, a la vez, UNA tarifa vigente de semana y UNA de
-  /// fin de semana/festivo (nunca una sola "para todos los días").
-  dia_tipo          DiaTarifa @default(semana)
   valor             Int
   vigente_desde     DateTime
   vigente_hasta     DateTime?
@@ -280,7 +283,7 @@ model Tarifa {
   actualizado_en  DateTime @updatedAt
   actualizado_por String?
 
-  @@index([tipo_visitante_id, dia_tipo, vigente_desde])
+  @@index([tipo_visitante_id, vigente_desde])
   @@map("tarifas")
 }
 

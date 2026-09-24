@@ -30,6 +30,12 @@ export interface LineaVenta {
    * les importa esta regla) — el servidor SIEMPRE lo llena con el valor real.
    */
   permite_descuento?: boolean;
+  /**
+   * ¿Este tipo se ve hoy en taquilla? Lo decide la BD (`TipoVisitante.disponible_dias`
+   * contra el día operativo), nunca el cliente. Si se omite, no se valida (mismo criterio
+   * que `permite_descuento`) — el servidor SIEMPRE lo llena con el valor real.
+   */
+  disponible_hoy?: boolean;
 }
 
 export interface Pago {
@@ -94,6 +100,7 @@ export function validarVenta(lineas: LineaVenta[], pagos: Pago[]): ResultadoVali
     if (!esEnteroNoNeg(l.valor_lista)) errores.push(`${et}: valor de lista inválido.`);
     if (!esEnteroNoNeg(l.valor_cobrado)) errores.push(`${et}: valor cobrado inválido.`);
     if (l.valor_cobrado > l.valor_lista) errores.push(`${et}: el valor cobrado no puede superar el de lista.`);
+    if (l.disponible_hoy === false) errores.push(`${et}: esta tarifa no está disponible hoy.`);
 
     if (esCortesia(l.tipo_linea)) {
       if (l.valor_cobrado !== 0) errores.push(`${et}: una cortesía (${l.tipo_linea}) debe cobrar 0.`);

@@ -80,7 +80,7 @@ export default function TaquillaClient({
   autorizadores: Autorizador[]; correccion?: VentaACorregir | null;
   /** Solo supervisor y administrador ven el atajo para arreglar una venta ya hecha. */
   puedeCorregir?: boolean;
-  /** Hoy aplica la tarifa de fin de semana/festivo (si no, la de entre semana). */
+  /** Hoy aplica el catálogo de fin de semana/festivo (si no, el de entre semana). */
   esFinde?: boolean;
 }) {
   const [cant, setCant] = useState<Record<string, number>>(() => {
@@ -521,12 +521,12 @@ export default function TaquillaClient({
             🏛️ {caja} · 👤 {cajero}
           </p>
           <p
-            title="Las tarifas que ves abajo son las de hoy: cambian solas según el día."
+            title="Los tipos que ves abajo son los de hoy: cambian solos según el día."
             className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
               esFinde ? "bg-ranch-dorado/15 text-ranch-marron ring-ranch-dorado/40" : "bg-white text-ranch-marron/70 ring-ranch-marron/10"
             }`}
           >
-            {esFinde ? "🎉 Tarifa fin de semana/festivo" : "📅 Tarifa entre semana"}
+            {esFinde ? "🎉 Catálogo fin de semana/festivo" : "📅 Catálogo entre semana"}
           </p>
         </div>
       </header>

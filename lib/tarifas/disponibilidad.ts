@@ -1,6 +1,5 @@
 import { fechaBogota } from "../tiempo";
 import { festivosColombia } from "../../scripts/festivos-co";
-import type { DiaTarifa } from "@prisma/client";
 
 /** ¿El día operativo (fecha Bogotá) es sábado, domingo o festivo colombiano? */
 export function esFinDeSemanaOFestivo(now: Date = new Date()): boolean {
@@ -10,7 +9,15 @@ export function esFinDeSemanaOFestivo(now: Date = new Date()): boolean {
   return fecha in festivosColombia(parseInt(fecha.slice(0, 4), 10));
 }
 
-/** Franja de tarifa que aplica hoy (o al instante dado) según el día operativo. */
-export function diaTarifaDe(now: Date = new Date()): DiaTarifa {
+/**
+ * Día operativo de hoy, en los mismos términos que `TipoVisitante.disponible_dias`
+ * (sin "todos": eso significa "se ve siempre", no es un día concreto).
+ */
+export function diaOperativoDe(now: Date = new Date()): "semana" | "fin_semana_festivo" {
   return esFinDeSemanaOFestivo(now) ? "fin_semana_festivo" : "semana";
+}
+
+/** ¿Un tipo con esta disponibilidad se ve hoy en taquilla? */
+export function disponibleHoy(disponibleDias: "todos" | "semana" | "fin_semana_festivo", now: Date = new Date()): boolean {
+  return disponibleDias === "todos" || disponibleDias === diaOperativoDe(now);
 }
