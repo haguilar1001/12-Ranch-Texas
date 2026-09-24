@@ -27,10 +27,11 @@ export async function obtenerSesion(): Promise<SesionUsuario | null> {
   return leerToken(c.value);
 }
 
-// `granja` va por DEBAJO de consulta a propósito: el operario de granja no debe ver
-// ventas, caja ni gastos. Su acceso al módulo de Animales se concede aparte, con
-// `puedeOperarGranja`, no por nivel jerárquico.
-const JERARQUIA = ["granja", "consulta", "control_acceso", "cajero", "supervisor", "administrador"];
+// `granja` y `chofer` van por DEBAJO de consulta a propósito: ni el operario de granja
+// ni el chofer deben ver ventas, caja ni gastos. Su acceso a su módulo (Animales /
+// Control Vehículo) se concede aparte, con `puedeOperarGranja` / `puedeConducir`, no
+// por nivel jerárquico.
+const JERARQUIA = ["granja", "chofer", "consulta", "control_acceso", "cajero", "supervisor", "administrador"];
 
 /** ¿El rol tiene al menos el nivel requerido? (administrador incluye todo). */
 export function tieneRol(rol: string, minimo: string): boolean {
@@ -46,4 +47,13 @@ export function tieneRol(rol: string, minimo: string): boolean {
  */
 export function puedeOperarGranja(rol: string): boolean {
   return rol === "granja" || tieneRol(rol, "supervisor");
+}
+
+/**
+ * ¿Puede ver y cerrar SUS PROPIOS viajes en Control Vehículo? El chofer sí; de los
+ * demás roles, solo supervisor hacia arriba (para poder revisar/ayudar si hace falta).
+ * Solicitar y aprobar una solicitud es otro permiso (`tieneRol(rol, "supervisor")`).
+ */
+export function puedeConducir(rol: string): boolean {
+  return rol === "chofer" || tieneRol(rol, "supervisor");
 }

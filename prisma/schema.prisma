@@ -25,6 +25,7 @@ enum Rol {
   control_acceso
   granja // operario de granja: solo el módulo de Animales
   consulta
+  chofer // solo Control Vehículo: sus viajes aprobados
 }
 
 enum EstadoManilla {
@@ -111,6 +112,9 @@ model Usuario {
 
   turnos TurnoCaja[]
   ventas Venta[]
+
+  vehiculos_a_cargo   Vehiculo[]          @relation("VehiculoChoferHabitual")
+  viajes_como_chofer  SolicitudVehiculo[] @relation("SolicitudChofer")
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1344,4 +1348,102 @@ model MantenimientoEquipo {
   @@index([equipo_id])
   @@index([estado])
   @@map("mantenimientos_equipo")
+}
+
+// ------------------------- CONTROL DE VEHÍCULOS -------------------------
+// Solicitud → aprobación (supervisor/administrador) → viaje → el chofer cierra con el
+// kilometraje. Sirve para saber quién más pide el vehículo, qué chofer lo usa más y
+// cuántos kilómetros se recorren.
+
+enum PrioridadVehiculo {
+  baja
+  media
+  alta
+  urgente
+}
+
+enum EstadoSolicitudVehiculo {
+  pendiente
+  aprobada
+  rechazada
+  completada
+  cancelada
+}
+
+model Vehiculo {
+  id     String  @id @default(uuid())
+  placa  String  @unique
+  marca  String?
+  modelo String?
+  activo Boolean @default(true)
+
+  /// Quién lo maneja normalmente; una solicitud puede asignar a otro chofer si toca.
+  chofer_habitual_id String?
+  chofer_habitual     Usuario? @relation("VehiculoChoferHabitual", fields: [chofer_habitual_id], references: [id])
+
+  solicitudes SolicitudVehiculo[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@map("vehiculos")
+}
+
+/// Los ~200 "jefes" que piden el vehículo. Catálogo simple, sin login — como
+/// `AutorizadorCortesia`: alguien de oficina registra la solicitud a su nombre.
+model SolicitanteVehiculo {
+  id     String  @id @default(uuid())
+  nombre String
+  cargo  String?
+  activo Boolean @default(true)
+
+  solicitudes SolicitudVehiculo[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@map("solicitantes_vehiculo")
+}
+
+model SolicitudVehiculo {
+  id               String                  @id @default(uuid())
+  solicitante_id   String
+  hora_inicio      DateTime
+  hora_fin         DateTime
+  prioridad        PrioridadVehiculo       @default(media)
+  descripcion      String
+  estado           EstadoSolicitudVehiculo @default(pendiente)
+
+  /// Se asignan al aprobar; una solicitud rechazada nunca los tiene.
+  vehiculo_id String?
+  chofer_id   String?
+
+  aprobado_por   String?
+  aprobado_en    DateTime?
+  motivo_rechazo String?
+
+  /// Los llena el chofer al devolver el vehículo — un solo paso, no dos.
+  km_inicial Int?
+  km_final   Int?
+  cerrado_en DateTime?
+
+  motivo_cancelacion String?
+
+  solicitante SolicitanteVehiculo @relation(fields: [solicitante_id], references: [id])
+  vehiculo    Vehiculo?            @relation(fields: [vehiculo_id], references: [id])
+  chofer      Usuario?             @relation("SolicitudChofer", fields: [chofer_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([estado])
+  @@index([chofer_id])
+  @@index([solicitante_id])
+  @@map("solicitudes_vehiculo")
 }

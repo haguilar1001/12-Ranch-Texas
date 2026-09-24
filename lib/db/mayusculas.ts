@@ -58,6 +58,9 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   CategoriaEquipo: ["nombre", "descripcion"],
   Equipo: ["nombre", "codigo", "ubicacion", "marca", "modelo", "serie", "observaciones"],
   MantenimientoEquipo: ["descripcion", "responsable"],
+  Vehiculo: ["placa", "marca", "modelo"],
+  SolicitanteVehiculo: ["nombre", "cargo"],
+  SolicitudVehiculo: ["descripcion", "motivo_rechazo", "motivo_cancelacion"],
 };
 
 /** "maría josé " → "MARÍA JOSÉ". Respeta tildes y la Ñ. */

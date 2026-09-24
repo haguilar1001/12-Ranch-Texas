@@ -13,6 +13,7 @@ const PERFILES: { value: string; label: string; desc: string }[] = [
   { value: "control_acceso", label: "Control de acceso", desc: "Solo escanea accesos" },
   { value: "granja", label: "Granja", desc: "Solo animales: alimentar y trasladar" },
   { value: "consulta", label: "Consulta", desc: "Solo reportes" },
+  { value: "chofer", label: "Chofer", desc: "Solo Control Vehículo: sus viajes aprobados" },
 ];
 const labelRol = (v: string) => PERFILES.find((p) => p.value === v)?.label ?? v;
 

@@ -18,7 +18,7 @@ interface Resultado {
   error?: string;
 }
 
-const ROLES = ["administrador", "supervisor", "cajero", "control_acceso", "granja", "consulta"];
+const ROLES = ["administrador", "supervisor", "cajero", "control_acceso", "granja", "consulta", "chofer"];
 
 async function admin() {
   const s = await obtenerSesion();
