@@ -254,26 +254,42 @@ y no los $20.866.480 que suman los dos cuadros.
   del histórico, tocaría un script aparte.
 
 ### Tarifas por día: semana vs. fin de semana y festivo (2026-09-24)
-- **Cada tipo de visitante tiene DOS tarifas vigentes a la vez**, no una: una para
-  `semana` y otra para `fin_semana_festivo`. Un festivo colombiano entre semana (con
-  traslado Emiliani ya aplicado) cuenta como `fin_semana_festivo`, aunque no caiga
-  sábado ni domingo.
-  - `Tarifa.dia_tipo` (`prisma/schema.prisma`); índice por `(tipo_visitante_id,
-    dia_tipo, vigente_desde)`. Cada franja mantiene su propio historial (nunca se
-    sobrescribe, igual que antes).
-  - Qué franja aplica "hoy" lo decide `diaTarifaDe()`
-    (`lib/tarifas/diaTarifa.ts`), reutilizando `festivosColombia()`
+- **Primer intento (revertido el mismo día):** cada tipo con DOS tarifas vigentes a la
+  vez (`Tarifa.dia_tipo`). Resultó ser el modelo equivocado — no era lo que se pedía.
+- **Modelo correcto:** un tipo = un precio. Lo que cambia con el día es **cuáles tipos
+  se ven en taquilla**, no cuánto cuesta cada uno. En producción ya existían catálogos
+  paralelos ("SEMANAL ADULTO/NIÑO/..." para eventos entre semana vs. "ADULTO"/"NIÑO"
+  para fin de semana/festivo) — el problema real era que taquilla los mostraba TODOS
+  a la vez y el cajero no sabía cuál usar.
+  - `TipoVisitante.disponible_dias` (`todos` | `semana` | `fin_semana_festivo`). Un
+    festivo colombiano entre semana (con traslado Emiliani) cuenta como
+    `fin_semana_festivo`, aunque no caiga sábado ni domingo.
+  - Qué día es "hoy" lo decide `diaOperativoDe()` / `disponibleHoy()`
+    (`lib/tarifas/disponibilidad.ts`), reutilizando `festivosColombia()`
     (`scripts/festivos-co.ts`).
-  - **Taquilla solo trae/muestra la tarifa de la franja de hoy** (una sola, no las
-    dos) — el cajero ni ve la del otro día. El cobro se recalcula en el SERVIDOR con
-    esa misma franja al registrar la venta (`lib/ventas/registrar.ts`), igual que ya
-    se hacía con la tarifa vigente: nunca se confía en lo que mandó el cliente.
-  - `/admin/tarifas` edita las dos franjas por separado (cada una con su botón
-    "Cambiar" e historial propio); un tipo nuevo nace con el mismo valor en las dos,
-    y el administrador ajusta la de fin de semana/festivo si debe ser distinta.
-  - Migración: todo tipo existente arrancó con la MISMA tarifa en ambas franjas
-    (`scripts/_tmp-crear-tarifas-finde.ts`, uso único) para no dejar ningún tipo sin
-    precio el día del despliegue.
+  - **Taquilla EXCLUYE de la consulta** los tipos que no aplican hoy (ni siquiera
+    llegan a la pantalla). El servidor valida lo mismo al registrar la venta
+    (`lib/ventas/registrar.ts` → `LineaVenta.disponible_hoy`, `lib/ventas/calculo.ts`):
+    no se confía en qué tenía abierto el cajero.
+  - `/admin/tarifas`: el formulario de edición (ventana modal) tiene un selector
+    "Disponible en taquilla" además de la tarifa única con su historial.
+  - `ADULTO`/`NIÑO` → solo fin de semana/festivo; `SEMANAL *` → solo entre semana; el
+    resto (bonos, adulto mayor, bebé, tarifa comercial…) queda en "todos los días" por
+    ser el valor por defecto seguro (`scripts/_tmp-set-disponibilidad.ts`, uso único) —
+    el administrador ajusta cualquier caso puntual desde la pantalla.
+
+### Tarifas restringidas a administrador (2026-09-24)
+- **"Eventos Varios" solo debe verse y venderse por un administrador** — el responsable
+  no quiere que un cajero pueda aplicarle descuentos por su cuenta. Como el cajero ni
+  siquiera ve el tipo, el problema queda resuelto de raíz (más fuerte que solo ocultar
+  el botón de descuento).
+  - `TipoVisitante.solo_administrador` (editable en `/admin/tarifas`, junto a las demás
+    banderas del tipo). Taquilla excluye estos tipos de la consulta salvo que quien
+    tenga la sesión sea administrador.
+  - Validado también en el SERVIDOR: `ContextoVenta` ahora lleva `usuarioRol`, y
+    `crearVenta` rechaza la línea si el rol no alcanza (`lib/ventas/calculo.ts` →
+    `LineaVenta.permitido_rol`) — mismo criterio que `disponible_hoy`/`permite_descuento`.
+  - Marcado en "EVENTOS VARIOS" con `scripts/_tmp-set-solo-admin.ts` (uso único).
 
 ### Tarifa Comercial Especial: descuento unitario solo en un tipo (2026-09-24)
 - **El descuento unitario en taquilla ("% Aplicar descuento", precio libre por unidad +
@@ -309,7 +325,26 @@ y no los $20.866.480 que suman los dos cuadros.
     escanear en un punto de control real, sí sumaría al aforo del día (el aforo se mide
     por escaneo, no por caja) — evitar escanear manillas de prueba en control de acceso.
 
-## Decisiones técnicas a resolver en su fase
+### Control Vehículo — nuevo módulo (2026-09-24)
+- Hay un vehículo (varios, en general) y un chofer que lo maneja, pero ~200 "jefes"
+  pueden pedirlo. El responsable quiere control de quién más lo pide, quién más maneja
+  y cuánto se rueda, con aprobación de por medio (no cualquier solicitud sale sola).
+  - **Nuevo rol `chofer`**: inicia sesión, ve SUS viajes aprobados y los cierra
+    registrando kilometraje inicial y final **en un solo paso** (no dos), al volver.
+    Va por debajo de `consulta` en la jerarquía (`lib/auth/sesion.ts`), como `granja`:
+    su acceso se concede aparte con `puedeConducir`, no por nivel.
+  - **Solicitantes sin login**: catálogo simple (nombre + cargo), igual que
+    `AutorizadorCortesia` — alguien de oficina (supervisor/administrador) registra la
+    solicitud a nombre del jefe que la pide.
+  - **Flujo**: solicitar (día, horas, prioridad, descripción) → pendiente → un
+    supervisor/administrador aprueba (asigna vehículo + chofer) o rechaza con motivo →
+    el chofer cierra con el kilometraje → completada. Se puede cancelar antes de cerrar.
+  - Modelos: `Vehiculo`, `SolicitanteVehiculo`, `SolicitudVehiculo` (con
+    `PrioridadVehiculo`, `EstadoSolicitudVehiculo`).
+  - Reporte (`/admin/reportes/vehiculos`): viajes y km por solicitante (quién pide
+    más), por chofer y por vehículo, del período — solo cuenta lo ya cerrado.
+  - Pendiente/a futuro: no hay pantalla para que el propio "jefe" vea el estado de su
+    solicitud (tendría que preguntarle a quien la registró); no se contempló todavía.
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).
 - Hora de corte del "día operativo" para cuadre diario y export CSV (no medianoche UTC).
