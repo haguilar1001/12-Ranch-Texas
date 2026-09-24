@@ -60,7 +60,7 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   MantenimientoEquipo: ["descripcion", "responsable"],
   Vehiculo: ["placa", "marca", "modelo"],
   SolicitanteVehiculo: ["nombre", "cargo"],
-  SolicitudVehiculo: ["descripcion", "motivo_rechazo", "motivo_cancelacion"],
+  SolicitudVehiculo: ["descripcion", "origen", "destino", "motivo_rechazo", "motivo_cancelacion"],
 };
 
 /** "maría josé " → "MARÍA JOSÉ". Respeta tildes y la Ñ. */

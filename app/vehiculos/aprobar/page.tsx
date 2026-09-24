@@ -34,11 +34,13 @@ export default async function AprobarVehiculoPage() {
         id: p.id, solicitante: p.solicitante.nombre, cargo: p.solicitante.cargo,
         horaInicio: formatearFechaHoraBogota(p.hora_inicio), horaFin: formatearFechaHoraBogota(p.hora_fin),
         prioridad: p.prioridad, descripcion: p.descripcion,
+        origen: p.origen, destino: p.destino, viajeRedondo: p.viaje_redondo,
       }))}
       aprobadas={aprobadasRaw.map((a) => ({
         id: a.id, solicitante: a.solicitante.nombre,
         horaInicio: formatearFechaHoraBogota(a.hora_inicio), horaFin: formatearFechaHoraBogota(a.hora_fin),
         vehiculo: a.vehiculo?.placa ?? "—", chofer: a.chofer?.nombre ?? "—",
+        origen: a.origen, destino: a.destino, viajeRedondo: a.viaje_redondo,
       }))}
       vehiculos={vehiculos.map((v) => ({ id: v.id, etiqueta: `${v.placa}${v.marca ? ` · ${v.marca}` : ""}${v.modelo ? ` ${v.modelo}` : ""}` }))}
       choferes={choferes}

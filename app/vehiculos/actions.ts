@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol, puedeConducir } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
-import { validarSolicitud, validarCierre, type Prioridad } from "@/lib/vehiculos/calculo";
+import { validarSolicitud, validarCierre, horaFinDe, type Prioridad } from "@/lib/vehiculos/calculo";
 
 interface Resultado {
   ok: boolean;
@@ -24,20 +24,23 @@ export interface EntradaCrearSolicitud {
   solicitante_id: string;
   fecha: string; // YYYY-MM-DD
   hora_inicio: string; // HH:MM
-  hora_fin: string; // HH:MM
+  duracion_minutos: number; // la hora de fin se calcula: hora_inicio + esto
   prioridad: Prioridad;
   descripcion: string;
+  origen: string;
+  destino: string;
+  viaje_redondo: boolean;
 }
 
 export async function crearSolicitud(input: EntradaCrearSolicitud): Promise<Resultado> {
   const s = await sesionSupervisor();
   if (!s) return { ok: false, error: "Solo un supervisor o administrador puede registrar una solicitud." };
 
-  if (!input.fecha || !input.hora_inicio || !input.hora_fin) {
-    return { ok: false, error: "Indica la fecha y las horas de inicio y fin." };
+  if (!input.fecha || !input.hora_inicio || !input.duracion_minutos) {
+    return { ok: false, error: "Indica la fecha, la hora de inicio y la duración aproximada." };
   }
   const horaInicio = new Date(`${input.fecha}T${input.hora_inicio}:00-05:00`);
-  const horaFin = new Date(`${input.fecha}T${input.hora_fin}:00-05:00`);
+  const horaFin = horaFinDe(horaInicio, input.duracion_minutos);
 
   const errores = validarSolicitud({
     solicitante_id: input.solicitante_id,
@@ -45,6 +48,8 @@ export async function crearSolicitud(input: EntradaCrearSolicitud): Promise<Resu
     hora_fin: horaFin,
     prioridad: input.prioridad,
     descripcion: input.descripcion,
+    origen: input.origen,
+    destino: input.destino,
   });
   if (errores.length) return { ok: false, error: errores.join(" ") };
 
@@ -58,6 +63,9 @@ export async function crearSolicitud(input: EntradaCrearSolicitud): Promise<Resu
       hora_fin: horaFin,
       prioridad: input.prioridad,
       descripcion: input.descripcion.trim(),
+      origen: input.origen.trim(),
+      destino: input.destino.trim(),
+      viaje_redondo: !!input.viaje_redondo,
       creado_por: s.id,
     },
   });

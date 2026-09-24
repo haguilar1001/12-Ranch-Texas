@@ -22,6 +22,7 @@ export default function UsuariosClient({ miId, usuarios }: { miId: string; usuar
   const [nuevo, setNuevo] = useState({ nombre: "", usuario: "", rol: "cajero", password: "" });
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [editNombre, setEditNombre] = useState<{ id: string; v: string } | null>(null);
+  const [editUsuario, setEditUsuario] = useState<{ id: string; v: string } | null>(null);
   const [reset, setReset] = useState<{ id: string; v: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -80,7 +81,17 @@ export default function UsuariosClient({ miId, usuarios }: { miId: string; usuar
                       <span>{u.nombre} <button onClick={() => setEditNombre({ id: u.id, v: u.nombre })} className="text-ranch-marron/40 hover:text-ranch-marron">✏️</button></span>
                     )}
                   </td>
-                  <td className="text-ranch-marron/70">{u.usuario}</td>
+                  <td className="text-ranch-marron/70">
+                    {editUsuario?.id === u.id ? (
+                      <span className="flex gap-1">
+                        <input value={editUsuario.v} onChange={(e) => setEditUsuario({ id: u.id, v: e.target.value })} className="sin-mayusculas w-36 rounded border px-1 py-0.5" />
+                        <button onClick={async () => { aviso(await editarUsuario(u.id, { usuario: editUsuario.v }), "Usuario/correo actualizado."); setEditUsuario(null); }} className="text-ranch-verde">✓</button>
+                        <button onClick={() => setEditUsuario(null)} className="text-red-500">✕</button>
+                      </span>
+                    ) : (
+                      <span>{u.usuario} <button onClick={() => setEditUsuario({ id: u.id, v: u.usuario })} className="text-ranch-marron/40 hover:text-ranch-marron">✏️</button></span>
+                    )}
+                  </td>
                   <td>
                     <select
                       defaultValue={u.rol}

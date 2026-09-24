@@ -3,18 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearSolicitud } from "../actions";
-import { PRIORIDADES, type Prioridad } from "@/lib/vehiculos/calculo";
+import { PRIORIDADES, DURACIONES, type Prioridad } from "@/lib/vehiculos/calculo";
 
 interface Solicitante { id: string; nombre: string; cargo: string | null }
 
 const ETIQUETA_PRIORIDAD: Record<Prioridad, string> = { baja: "Baja", media: "Media", alta: "Alta", urgente: "🔴 Urgente" };
 
+const FORM_VACIO = {
+  solicitante_id: "", fecha: "", hora_inicio: "", duracion_minutos: 60,
+  prioridad: "media" as Prioridad, descripcion: "", origen: "", destino: "", viaje_redondo: false,
+};
+
 export default function SolicitarClient({ solicitantes, hoy }: { solicitantes: Solicitante[]; hoy: string }) {
   const router = useRouter();
-  const [form, setForm] = useState({
-    solicitante_id: "", fecha: hoy, hora_inicio: "", hora_fin: "",
-    prioridad: "media" as Prioridad, descripcion: "",
-  });
+  const [form, setForm] = useState({ ...FORM_VACIO, fecha: hoy });
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
 
@@ -25,7 +27,7 @@ export default function SolicitarClient({ solicitantes, hoy }: { solicitantes: S
       const r = await crearSolicitud(form);
       if (r.ok) {
         setResultado({ ok: true, texto: "Solicitud registrada. Queda pendiente de aprobación." });
-        setForm({ solicitante_id: "", fecha: hoy, hora_inicio: "", hora_fin: "", prioridad: "media", descripcion: "" });
+        setForm({ ...FORM_VACIO, fecha: hoy });
         router.refresh();
       } else {
         setResultado({ ok: false, texto: r.error ?? "No se pudo registrar la solicitud." });
@@ -62,14 +64,36 @@ export default function SolicitarClient({ solicitantes, hoy }: { solicitantes: S
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-semibold text-ranch-marron">
-            Desde
+            Hora de inicio
             <input type="time" value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} className="mt-1 w-full rounded-lg border border-ranch-marron/30 px-3 py-2" />
           </label>
           <label className="block text-sm font-semibold text-ranch-marron">
-            Hasta
-            <input type="time" value={form.hora_fin} onChange={(e) => setForm({ ...form, hora_fin: e.target.value })} className="mt-1 w-full rounded-lg border border-ranch-marron/30 px-3 py-2" />
+            Duración aproximada
+            <select
+              value={form.duracion_minutos}
+              onChange={(e) => setForm({ ...form, duracion_minutos: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-ranch-marron/30 px-3 py-2"
+            >
+              {DURACIONES.map(([min, label]) => <option key={min} value={min}>{label}</option>)}
+            </select>
           </label>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-semibold text-ranch-marron">
+            Origen
+            <input value={form.origen} onChange={(e) => setForm({ ...form, origen: e.target.value })} placeholder="Ej: Parque" className="mt-1 w-full rounded-lg border border-ranch-marron/30 px-3 py-2" />
+          </label>
+          <label className="block text-sm font-semibold text-ranch-marron">
+            Destino
+            <input value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} placeholder="Ej: Makro Barranquilla" className="mt-1 w-full rounded-lg border border-ranch-marron/30 px-3 py-2" />
+          </label>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm font-semibold text-ranch-marron">
+          <input type="checkbox" checked={form.viaje_redondo} onChange={(e) => setForm({ ...form, viaje_redondo: e.target.checked })} className="h-4 w-4" />
+          Es un viaje redondo (ida y vuelta)
+        </label>
 
         <label className="block text-sm font-semibold text-ranch-marron">
           Prioridad

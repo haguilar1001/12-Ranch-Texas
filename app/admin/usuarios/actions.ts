@@ -48,16 +48,25 @@ export async function crearUsuario(e: EntradaUsuario): Promise<Resultado> {
   return { ok: true };
 }
 
-export async function editarUsuario(id: string, cambios: { nombre?: string; rol?: string }): Promise<Resultado> {
+export async function editarUsuario(id: string, cambios: { nombre?: string; usuario?: string; rol?: string }): Promise<Resultado> {
   const s = await admin();
   if (!s) return { ok: false, error: "Solo un administrador." };
   const u = await prisma.usuario.findUnique({ where: { id } });
   if (!u) return { ok: false, error: "Usuario no encontrado." };
 
-  const data: { nombre?: string; rol?: Rol; actualizado_por?: string } = { actualizado_por: s.id };
+  const data: { nombre?: string; usuario?: string; rol?: Rol; actualizado_por?: string } = { actualizado_por: s.id };
   if (cambios.nombre !== undefined) {
     if (!cambios.nombre.trim()) return { ok: false, error: "El nombre no puede quedar vacío." };
     data.nombre = cambios.nombre.trim();
+  }
+  if (cambios.usuario !== undefined) {
+    const nuevo = cambios.usuario.trim();
+    if (!nuevo) return { ok: false, error: "El usuario o correo no puede quedar vacío." };
+    if (nuevo !== u.usuario) {
+      const repetido = await prisma.usuario.findUnique({ where: { usuario: nuevo } });
+      if (repetido) return { ok: false, error: "Ya existe otro usuario con ese identificador." };
+    }
+    data.usuario = nuevo;
   }
   if (cambios.rol !== undefined) {
     if (!ROLES.includes(cambios.rol)) return { ok: false, error: "Perfil inválido." };
@@ -68,7 +77,7 @@ export async function editarUsuario(id: string, cambios: { nombre?: string; rol?
     data.rol = cambios.rol as Rol;
   }
   await prisma.usuario.update({ where: { id }, data });
-  await registrarAuditoria({ usuario_id: s.id, entidad: "usuario", entidad_id: id, accion: "editar", datos_antes: { nombre: u.nombre, rol: u.rol }, datos_despues: cambios });
+  await registrarAuditoria({ usuario_id: s.id, entidad: "usuario", entidad_id: id, accion: "editar", datos_antes: { nombre: u.nombre, usuario: u.usuario, rol: u.rol }, datos_despues: cambios });
   revalidatePath("/admin/usuarios");
   return { ok: true };
 }

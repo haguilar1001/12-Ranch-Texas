@@ -49,6 +49,7 @@ export default async function NavBar() {
       enlaces: [
         ["📝", "Solicitar vehículo", "/vehiculos/solicitar", "Registrar una solicitud a nombre de quien la pide", supervisor],
         ["✅", "Aprobar solicitudes", "/vehiculos/aprobar", "Asignar vehículo y chofer, o rechazar", supervisor],
+        ["📅", "Calendario", "/vehiculos/calendario", "Solicitudes pendientes y aprobadas del mes", supervisor],
         ["🚗", "Mis viajes", "/vehiculos/mis-viajes", "Cerrar un viaje con el kilometraje", chofer],
         ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
         ["📊", "Uso de vehículos", "/admin/reportes/vehiculos", "Quién pide más, quién maneja más", consulta],

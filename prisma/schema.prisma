@@ -1418,9 +1418,16 @@ model SolicitudVehiculo {
   id               String                  @id @default(uuid())
   solicitante_id   String
   hora_inicio      DateTime
+  /// Se calcula sola: hora_inicio + la duración aproximada que se pidió, nunca se
+  /// captura directamente (evita que quede una hora de fin menor que la de inicio).
   hora_fin         DateTime
   prioridad        PrioridadVehiculo       @default(media)
   descripcion      String
+  /// Filas de antes de este campo quedan en "" (sin especificar), no null.
+  origen           String                  @default("")
+  destino          String                  @default("")
+  /// Informativo: si el viaje es de ida y vuelta. No cambia cómo se calcula la duración.
+  viaje_redondo    Boolean                 @default(false)
   estado           EstadoSolicitudVehiculo @default(pendiente)
 
   /// Se asignan al aprobar; una solicitud rechazada nunca los tiene.

@@ -36,6 +36,13 @@ export function horaBogota(now: Date = new Date()): string {
   }).format(now);
 }
 
+/** Fecha corta con día de la semana ("jue, 24 sep"), sin hora — para resúmenes por día. */
+export function formatearFechaCortaBogota(d: Date): string {
+  return new Intl.DateTimeFormat("es-CO", { timeZone: TZ, weekday: "short", day: "numeric", month: "short" })
+    .format(d)
+    .replace(/\.$/, "");
+}
+
 /** Formatea fecha/hora en Bogotá para mostrar en la manilla. */
 export function formatearFechaHoraBogota(d: Date): string {
   return new Intl.DateTimeFormat("es-CO", {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validarSolicitud, validarCierre, kmRecorridos, type EntradaSolicitud } from "../lib/vehiculos/calculo";
+import { validarSolicitud, validarCierre, kmRecorridos, horaFinDe, type EntradaSolicitud } from "../lib/vehiculos/calculo";
 
 const base: EntradaSolicitud = {
   solicitante_id: "sol-1",
@@ -7,6 +7,8 @@ const base: EntradaSolicitud = {
   hora_fin: new Date("2026-09-25T12:00:00-05:00"),
   prioridad: "media",
   descripcion: "Recoger insumos en el centro",
+  origen: "Parque",
+  destino: "Centro de acopio",
 };
 
 describe("validarSolicitud", () => {
@@ -35,7 +37,23 @@ describe("validarSolicitud", () => {
   it("rechaza fechas inválidas", () => {
     const e = validarSolicitud({ ...base, hora_inicio: null, hora_fin: null });
     expect(e.some((x) => x.includes("hora de inicio no es válida"))).toBe(true);
-    expect(e.some((x) => x.includes("hora de fin no es válida"))).toBe(true);
+    expect(e.some((x) => x.includes("duración no es válida"))).toBe(true);
+  });
+
+  it("exige origen y destino", () => {
+    const sinOrigen = validarSolicitud({ ...base, origen: "  " });
+    expect(sinOrigen.some((x) => x.includes("el origen"))).toBe(true);
+
+    const sinDestino = validarSolicitud({ ...base, destino: "" });
+    expect(sinDestino.some((x) => x.includes("el destino"))).toBe(true);
+  });
+});
+
+describe("horaFinDe", () => {
+  it("suma la duración en minutos a la hora de inicio", () => {
+    const inicio = new Date("2026-09-25T08:00:00-05:00");
+    expect(horaFinDe(inicio, 90).toISOString()).toBe(new Date("2026-09-25T09:30:00-05:00").toISOString());
+    expect(horaFinDe(inicio, 480).toISOString()).toBe(new Date("2026-09-25T16:00:00-05:00").toISOString());
   });
 });
 

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, puedeConducir, tieneRol } from "@/lib/auth/sesion";
-import { formatearFechaHoraBogota } from "@/lib/tiempo";
+import { fechaBogota, formatearFechaCortaBogota, formatearFechaHoraBogota } from "@/lib/tiempo";
+import { kmRecorridos } from "@/lib/vehiculos/calculo";
 import MisViajesClient from "./MisViajesClient";
 
 export const dynamic = "force-dynamic";
@@ -31,17 +32,34 @@ export default async function MisViajesPage() {
     }),
   ]);
 
+  // Resumen por día (de los últimos cerrados de abajo): cuántos viajes y cuántos km,
+  // agrupados por el día en que se cerró cada uno.
+  const porDia = new Map<string, { viajes: number; km: number }>();
+  for (const v of completadosRaw) {
+    if (!v.cerrado_en) continue;
+    const fecha = fechaBogota(v.cerrado_en);
+    const a = porDia.get(fecha) ?? { viajes: 0, km: 0 };
+    a.viajes += 1;
+    a.km += kmRecorridos(v.km_inicial, v.km_final);
+    porDia.set(fecha, a);
+  }
+  const resumenPorDia = [...porDia.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([fecha, r]) => ({ fecha: formatearFechaCortaBogota(new Date(`${fecha}T12:00:00-05:00`)), viajes: r.viajes, km: r.km }));
+
   return (
     <MisViajesClient
       aprobados={aprobadosRaw.map((v) => ({
         id: v.id, solicitante: v.solicitante.nombre, vehiculo: v.vehiculo?.placa ?? "—", chofer: v.chofer?.nombre ?? "—",
         horaInicio: formatearFechaHoraBogota(v.hora_inicio), horaFin: formatearFechaHoraBogota(v.hora_fin), descripcion: v.descripcion,
+        origen: v.origen, destino: v.destino, viajeRedondo: v.viaje_redondo,
       }))}
       completados={completadosRaw.map((v) => ({
         id: v.id, solicitante: v.solicitante.nombre, vehiculo: v.vehiculo?.placa ?? "—",
         km: v.km_final !== null && v.km_inicial !== null ? v.km_final - v.km_inicial : null,
         cerrado: v.cerrado_en ? formatearFechaHoraBogota(v.cerrado_en) : "—",
       }))}
+      resumenPorDia={resumenPorDia}
     />
   );
 }

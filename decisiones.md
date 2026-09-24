@@ -345,6 +345,20 @@ y no los $20.866.480 que suman los dos cuadros.
     más), por chofer y por vehículo, del período — solo cuenta lo ya cerrado.
   - Pendiente/a futuro: no hay pantalla para que el propio "jefe" vea el estado de su
     solicitud (tendría que preguntarle a quien la registró); no se contempló todavía.
+  - **Ajustes del mismo día:**
+    - La hora de fin **no se captura**, se calcula: hora de inicio + una duración
+      aproximada de una lista (`DURACIONES`/`horaFinDe()` en
+      `lib/vehiculos/calculo.ts`) — evita que quede una hora de fin antes que la de
+      inicio y es más rápido de llenar.
+    - Cada solicitud lleva **origen, destino y si es viaje redondo**
+      (`SolicitudVehiculo.origen/destino/viaje_redondo`).
+    - En "Aprobar", si solo hay UN vehículo activo y UN chofer activo, se preseleccionan
+      solos — no tiene sentido elegir entre una sola opción.
+    - **Calendario** (`/vehiculos/calendario`, supervisor+): vista de mes con las
+      solicitudes pendientes y aprobadas del período (rechazadas/canceladas/completadas
+      no salen ahí), navegable por mes.
+    - **Resumen por día** en "Mis viajes": cuántos viajes y cuántos km cerró el chofer
+      cada día (de sus últimos cerrados).
 - `roles`: enum fijo (5 roles) vs. tabla configurable de permisos. Arranca como enum.
 - Consecutivo de venta/manilla: ¿por caja, por día, global? (afecta reimpresión y facturación futura).
 - Hora de corte del "día operativo" para cuadre diario y export CSV (no medianoche UTC).

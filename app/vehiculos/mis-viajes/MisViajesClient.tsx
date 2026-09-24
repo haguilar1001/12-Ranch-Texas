@@ -6,12 +6,18 @@ import { cerrarViaje } from "../actions";
 
 interface Aprobado {
   id: string; solicitante: string; vehiculo: string; chofer: string; horaInicio: string; horaFin: string; descripcion: string;
+  origen: string; destino: string; viajeRedondo: boolean;
 }
 interface Completado {
   id: string; solicitante: string; vehiculo: string; km: number | null; cerrado: string;
 }
+interface ResumenDia { fecha: string; viajes: number; km: number }
 
-export default function MisViajesClient({ aprobados, completados }: { aprobados: Aprobado[]; completados: Completado[] }) {
+export default function MisViajesClient({
+  aprobados, completados, resumenPorDia,
+}: {
+  aprobados: Aprobado[]; completados: Completado[]; resumenPorDia: ResumenDia[];
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -49,6 +55,11 @@ export default function MisViajesClient({ aprobados, completados }: { aprobados:
             <div key={v.id} className="rounded-xl border-2 border-ranch-marron/15 p-3">
               <p className="font-semibold text-ranch-marron">{v.solicitante} — {v.vehiculo}</p>
               <p className="text-xs text-ranch-marron/60">{v.horaInicio} → {v.horaFin} · {v.chofer}</p>
+              {(v.origen || v.destino) && (
+                <p className="text-xs text-ranch-marron/60">
+                  📍 {v.origen || "—"} → {v.destino || "—"}{v.viajeRedondo ? " (redondo)" : ""}
+                </p>
+              )}
               <p className="mt-1 text-sm text-ranch-marron/80">{v.descripcion}</p>
 
               {cerrar?.id === v.id ? (
@@ -80,6 +91,25 @@ export default function MisViajesClient({ aprobados, completados }: { aprobados:
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mb-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
+        <h2 className="mb-3 font-bold text-ranch-marron">Resumen por día</h2>
+        {resumenPorDia.length === 0 ? (
+          <p className="text-sm text-ranch-marron/50">Sin viajes cerrados todavía.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <tbody>
+              {resumenPorDia.map((r) => (
+                <tr key={r.fecha} className="border-t border-ranch-marron/10">
+                  <td className="py-1.5 capitalize text-ranch-marron">{r.fecha}</td>
+                  <td className="py-1.5 text-right text-ranch-marron/60">{r.viajes} {r.viajes === 1 ? "viaje" : "viajes"}</td>
+                  <td className="py-1.5 text-right font-semibold text-ranch-marron">{r.km} km</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
 
       <section className="rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">

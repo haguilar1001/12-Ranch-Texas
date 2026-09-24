@@ -7,10 +7,11 @@ import type { Prioridad } from "@/lib/vehiculos/calculo";
 
 interface Pendiente {
   id: string; solicitante: string; cargo: string | null; horaInicio: string; horaFin: string;
-  prioridad: Prioridad; descripcion: string;
+  prioridad: Prioridad; descripcion: string; origen: string; destino: string; viajeRedondo: boolean;
 }
 interface Aprobada {
   id: string; solicitante: string; horaInicio: string; horaFin: string; vehiculo: string; chofer: string;
+  origen: string; destino: string; viajeRedondo: boolean;
 }
 interface Opcion { id: string; etiqueta?: string; nombre?: string }
 
@@ -67,6 +68,11 @@ export default function AprobarClient({
                 <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ESTILO_PRIORIDAD[p.prioridad]}`}>{ETIQUETA_PRIORIDAD[p.prioridad]}</span>
               </div>
               <p className="text-xs text-ranch-marron/60">{p.horaInicio} → {p.horaFin}</p>
+              {(p.origen || p.destino) && (
+                <p className="text-xs text-ranch-marron/60">
+                  📍 {p.origen || "—"} → {p.destino || "—"}{p.viajeRedondo ? " (redondo)" : ""}
+                </p>
+              )}
               <p className="mt-1 text-sm text-ranch-marron/80">{p.descripcion}</p>
 
               {asignar?.id === p.id ? (
@@ -108,7 +114,15 @@ export default function AprobarClient({
                 </div>
               ) : (
                 <div className="mt-2 flex gap-1.5 border-t border-ranch-marron/10 pt-2">
-                  <button onClick={() => setAsignar({ id: p.id, vehiculo_id: "", chofer_id: "" })} className="rounded-lg bg-ranch-verde px-3 py-1 text-xs font-semibold text-white">✓ Aprobar</button>
+                  <button
+                    onClick={() => setAsignar({
+                      id: p.id,
+                      // Con un solo vehículo/chofer activo no hay nada que elegir: se precarga solo.
+                      vehiculo_id: vehiculos.length === 1 ? vehiculos[0].id : "",
+                      chofer_id: choferes.length === 1 ? choferes[0].id : "",
+                    })}
+                    className="rounded-lg bg-ranch-verde px-3 py-1 text-xs font-semibold text-white"
+                  >✓ Aprobar</button>
                   <button onClick={() => setRechazar({ id: p.id, motivo: "" })} className="rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700">✕ Rechazar</button>
                 </div>
               )}
@@ -125,6 +139,11 @@ export default function AprobarClient({
             <div key={a.id} className="rounded-lg border border-ranch-marron/15 p-2 text-sm">
               <p className="font-semibold text-ranch-marron">{a.solicitante} — {a.vehiculo} · {a.chofer}</p>
               <p className="text-xs text-ranch-marron/60">{a.horaInicio} → {a.horaFin}</p>
+              {(a.origen || a.destino) && (
+                <p className="text-xs text-ranch-marron/60">
+                  📍 {a.origen || "—"} → {a.destino || "—"}{a.viajeRedondo ? " (redondo)" : ""}
+                </p>
+              )}
               {cancelar?.id === a.id ? (
                 <div className="mt-2 space-y-1.5">
                   <input value={cancelar.motivo} onChange={(e) => setCancelar({ ...cancelar, motivo: e.target.value })} placeholder="Motivo de la cancelación" className="w-full rounded-lg border border-ranch-marron/25 px-2 py-1.5 text-sm" />
