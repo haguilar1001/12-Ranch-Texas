@@ -7,6 +7,18 @@ export interface MedioResumen {
   es_efectivo: boolean;
 }
 
+/** Nombre para mostrar en un selector: con su ícono adelante si tiene ("💵 EFECTIVO"). */
+export function etiquetaMedio(m: { nombre: string; icono?: string | null }): string {
+  return m.icono ? `${m.icono} ${m.nombre}` : m.nombre;
+}
+
+/** Un emoji o dos, nada de texto largo ni HTML: el ícono va pegado al nombre. */
+export function validarIcono(icono: string | null | undefined): { ok: true; icono: string | null } | { ok: false; error: string } {
+  const v = icono?.trim() || null;
+  if (v && (v.length > 8 || /[<>"'\\a-zA-Z0-9]/.test(v))) return { ok: false, error: "El ícono debe ser un emoji (por ejemplo 💵)." };
+  return { ok: true, icono: v };
+}
+
 /** Convierte un nombre en un código estable: minúsculas, sin tildes, con "_" ("Tarjeta Débito" → "tarjeta_debito"). */
 export function codigoDeMedio(nombre: string): string {
   return nombre

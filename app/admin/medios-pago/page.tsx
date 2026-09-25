@@ -23,6 +23,7 @@ export default async function MediosPagoPage() {
         id: m.id,
         nombre: m.nombre,
         codigo: m.codigo,
+        icono: m.icono,
         es_efectivo: m.es_efectivo,
         afecta_recaudo: m.afecta_recaudo,
         orden: m.orden,

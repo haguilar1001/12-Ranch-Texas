@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { codigoDeMedio, medioInicial, validarMediosActivos } from "../lib/caja/medios";
+import { codigoDeMedio, etiquetaMedio, medioInicial, validarIcono, validarMediosActivos } from "../lib/caja/medios";
 
 const efectivo = { id: "ef", activo: true, es_efectivo: true };
 const nequi = { id: "nq", activo: true, es_efectivo: false };
@@ -57,5 +57,24 @@ describe("codigoDeMedio", () => {
 
   it("nunca queda vacío", () => {
     expect(codigoDeMedio("¿?")).toBe("medio");
+  });
+});
+
+describe("íconos de medios de pago", () => {
+  it("el selector muestra el ícono delante del nombre", () => {
+    expect(etiquetaMedio({ nombre: "EFECTIVO", icono: "💵" })).toBe("💵 EFECTIVO");
+    expect(etiquetaMedio({ nombre: "NEQUI", icono: null })).toBe("NEQUI");
+  });
+
+  it("acepta emojis (también los de dos piezas) y vacío", () => {
+    expect(validarIcono("💵")).toEqual({ ok: true, icono: "💵" });
+    expect(validarIcono("🎟️")).toEqual({ ok: true, icono: "🎟️" });
+    expect(validarIcono("  ")).toEqual({ ok: true, icono: null });
+  });
+
+  it("rechaza texto y HTML", () => {
+    expect(validarIcono("efectivo").ok).toBe(false);
+    expect(validarIcono("<b>").ok).toBe(false);
+    expect(validarIcono("💵💵💵💵💵").ok).toBe(false);
   });
 });

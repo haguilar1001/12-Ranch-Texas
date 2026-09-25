@@ -8,6 +8,7 @@ import { construirZpl } from "@/lib/impresion";
 import { formatearFechaHoraBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
 import ImprimirAcciones from "./ImprimirAcciones";
 import FormaPago from "./FormaPago";
+import { etiquetaMedio } from "@/lib/caja/medios";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function ImprimirVentaPage({ params }: { params: Promise<{ 
   });
   if (!venta) notFound();
 
-  const medios = await prisma.medioPago.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { orden: "asc" } });
+  const medios = await prisma.medioPago.findMany({ where: { activo: true }, select: { id: true, nombre: true, icono: true }, orderBy: { orden: "asc" } });
 
   // Origen público para el enlace de consentimiento impreso.
   const h = await headers();
@@ -101,7 +102,7 @@ export default async function ImprimirVentaPage({ params }: { params: Promise<{ 
           <FormaPago
             ventaId={venta.id}
             totalCobrado={venta.total_cobrado}
-            medios={medios}
+            medios={medios.map((m) => ({ id: m.id, nombre: etiquetaMedio(m) }))}
             pagosActuales={venta.pagos.map((x) => ({ medio: x.medio_pago.nombre, medio_pago_id: x.medio_pago_id, monto: x.monto }))}
           />
         )}

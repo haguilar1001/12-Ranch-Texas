@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
-import { codigoDeMedio, validarMediosActivos } from "@/lib/caja/medios";
+import { codigoDeMedio, validarIcono, validarMediosActivos } from "@/lib/caja/medios";
 
 interface Resultado {
   ok: boolean;
@@ -18,6 +18,8 @@ export interface EntradaMedio {
   /** La plata entra HOY al parque. En false (bono, página web) suma a la venta pero no al recaudo. */
   afecta_recaudo: boolean;
   orden?: number;
+  /** Emoji que acompaña al nombre ("💵"); vacío = sin ícono. */
+  icono?: string | null;
 }
 
 async function admin() {
@@ -42,6 +44,8 @@ export async function crearMedio(e: EntradaMedio): Promise<Resultado> {
 
   const nombre = e.nombre?.trim();
   if (!nombre) return { ok: false, error: "El nombre es obligatorio." };
+  const ic = validarIcono(e.icono);
+  if (!ic.ok) return { ok: false, error: ic.error };
 
   const repetido = await prisma.medioPago.findFirst({ where: { nombre: { equals: nombre, mode: "insensitive" } } });
   if (repetido) {
@@ -61,11 +65,11 @@ export async function crearMedio(e: EntradaMedio): Promise<Resultado> {
   const orden = Number.isInteger(e.orden) && e.orden! >= 0 ? e.orden! : (max._max.orden ?? 0) + 1;
 
   const m = await prisma.medioPago.create({
-    data: { nombre, codigo, es_efectivo: !!e.es_efectivo, afecta_recaudo: !!e.afecta_recaudo, orden, creado_por: s.id },
+    data: { nombre, codigo, icono: ic.icono, es_efectivo: !!e.es_efectivo, afecta_recaudo: !!e.afecta_recaudo, orden, creado_por: s.id },
   });
   await registrarAuditoria({
     usuario_id: s.id, entidad: "medio_pago", entidad_id: m.id, accion: "crear",
-    datos_despues: { nombre, codigo, es_efectivo: m.es_efectivo, afecta_recaudo: m.afecta_recaudo, orden },
+    datos_despues: { nombre, codigo, icono: ic.icono, es_efectivo: m.es_efectivo, afecta_recaudo: m.afecta_recaudo, orden },
   });
   refrescar();
   return { ok: true };
@@ -80,6 +84,8 @@ export async function editarMedio(id: string, e: EntradaMedio): Promise<Resultad
 
   const nombre = e.nombre?.trim();
   if (!nombre) return { ok: false, error: "El nombre no puede quedar vacío." };
+  const ic = validarIcono(e.icono);
+  if (!ic.ok) return { ok: false, error: ic.error };
   const repetido = await prisma.medioPago.findFirst({
     where: { nombre: { equals: nombre, mode: "insensitive" }, id: { not: id } },
   });
@@ -96,6 +102,7 @@ export async function editarMedio(id: string, e: EntradaMedio): Promise<Resultad
     where: { id },
     data: {
       nombre,
+      icono: ic.icono,
       es_efectivo: !!e.es_efectivo,
       afecta_recaudo: !!e.afecta_recaudo,
       ...(e.orden !== undefined ? { orden: e.orden } : {}),
@@ -104,8 +111,8 @@ export async function editarMedio(id: string, e: EntradaMedio): Promise<Resultad
   });
   await registrarAuditoria({
     usuario_id: s.id, entidad: "medio_pago", entidad_id: id, accion: "editar",
-    datos_antes: { nombre: antes.nombre, es_efectivo: antes.es_efectivo, afecta_recaudo: antes.afecta_recaudo, orden: antes.orden },
-    datos_despues: { nombre, es_efectivo: !!e.es_efectivo, afecta_recaudo: !!e.afecta_recaudo, orden: e.orden ?? antes.orden },
+    datos_antes: { nombre: antes.nombre, icono: antes.icono, es_efectivo: antes.es_efectivo, afecta_recaudo: antes.afecta_recaudo, orden: antes.orden },
+    datos_despues: { nombre, icono: ic.icono, es_efectivo: !!e.es_efectivo, afecta_recaudo: !!e.afecta_recaudo, orden: e.orden ?? antes.orden },
   });
   refrescar();
   return { ok: true };

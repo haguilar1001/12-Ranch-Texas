@@ -8,6 +8,7 @@ interface Medio {
   id: string;
   nombre: string;
   codigo: string;
+  icono: string | null;
   es_efectivo: boolean;
   afecta_recaudo: boolean;
   orden: number;
@@ -18,12 +19,13 @@ interface Medio {
 
 interface Edicion {
   nombre: string;
+  icono: string;
   es_efectivo: boolean;
   afecta_recaudo: boolean;
   orden: string;
 }
 
-const VACIO: Edicion = { nombre: "", es_efectivo: false, afecta_recaudo: true, orden: "" };
+const VACIO: Edicion = { nombre: "", icono: "", es_efectivo: false, afecta_recaudo: true, orden: "" };
 
 export default function MediosPagoClient({ medios }: { medios: Medio[] }) {
   const router = useRouter();
@@ -66,6 +68,13 @@ export default function MediosPagoClient({ medios }: { medios: Medio[] }) {
       <section className="mb-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
         <h2 className="mb-3 font-bold text-ranch-marron">Nuevo medio de pago</h2>
         <div className="flex flex-wrap gap-2">
+          <input
+            value={nuevo.icono}
+            onChange={(e) => setNuevo({ ...nuevo, icono: e.target.value })}
+            placeholder="💳"
+            title="Ícono: un emoji"
+            className={`${input} sin-mayusculas w-16 text-center`}
+          />
           <input
             value={nuevo.nombre}
             onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
@@ -131,10 +140,13 @@ export default function MediosPagoClient({ medios }: { medios: Medio[] }) {
                     </td>
                     <td className="py-2">
                       {ed ? (
-                        <input value={ed.nombre} onChange={(e) => setEdicion({ ...ed, nombre: e.target.value })} className="w-full min-w-[12rem] rounded border border-ranch-marron/30 px-2 py-1" />
+                        <div className="flex gap-1">
+                          <input value={ed.icono} onChange={(e) => setEdicion({ ...ed, icono: e.target.value })} title="Ícono: un emoji" className="sin-mayusculas w-12 rounded border border-ranch-marron/30 px-1 py-1 text-center" />
+                          <input value={ed.nombre} onChange={(e) => setEdicion({ ...ed, nombre: e.target.value })} className="w-full min-w-[12rem] rounded border border-ranch-marron/30 px-2 py-1" />
+                        </div>
                       ) : (
                         <>
-                          <span className="font-semibold text-ranch-marron">{m.nombre}</span>
+                          <span className="font-semibold text-ranch-marron">{m.icono && <span className="mr-1">{m.icono}</span>}{m.nombre}</span>
                           <br /><span className="text-[10px] text-ranch-marron/40">{m.codigo}</span>
                         </>
                       )}
@@ -167,7 +179,7 @@ export default function MediosPagoClient({ medios }: { medios: Medio[] }) {
                         ) : (
                           <>
                             <button
-                              onClick={() => setEdicion({ id: m.id, nombre: m.nombre, es_efectivo: m.es_efectivo, afecta_recaudo: m.afecta_recaudo, orden: String(m.orden) })}
+                              onClick={() => setEdicion({ id: m.id, nombre: m.nombre, icono: m.icono ?? "", es_efectivo: m.es_efectivo, afecta_recaudo: m.afecta_recaudo, orden: String(m.orden) })}
                               className="rounded border border-ranch-marron/25 px-2 py-0.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60"
                             >✏️ Editar</button>
                             <button

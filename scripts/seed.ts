@@ -101,21 +101,21 @@ async function seedTiposYTarifas() {
 }
 
 async function seedMediosPago() {
-  const medios: Array<[string, string, boolean]> = [
-    ["efectivo", "Efectivo", true],
-    ["debito", "Tarjeta Débito", false],
-    ["credito", "Tarjeta Crédito", false],
-    ["nequi", "Nequi", false],
-    ["daviplata", "Daviplata", false],
-    ["transferencia", "Transferencia", false],
-    ["bono", "Bono / Convenio", false],
+  const medios: Array<[string, string, boolean, string]> = [
+    ["efectivo", "Efectivo", true, "💵"],
+    ["debito", "Tarjeta Débito", false, "💳"],
+    ["credito", "Tarjeta Crédito", false, "💳"],
+    ["nequi", "Nequi", false, "📱"],
+    ["daviplata", "Daviplata", false, "📱"],
+    ["transferencia", "Transferencia", false, "🏦"],
+    ["bono", "Bono / Convenio", false, "🎟️"],
   ];
   let orden = 1;
-  for (const [codigo, nombre, es_efectivo] of medios) {
+  for (const [codigo, nombre, es_efectivo, icono] of medios) {
     await prisma.medioPago.upsert({
       where: { codigo },
       update: {},
-      create: { codigo, nombre, es_efectivo, orden: orden++, creado_por: POR },
+      create: { codigo, nombre, es_efectivo, icono, orden: orden++, creado_por: POR },
     });
   }
   // La migración 20260912200000 crea PREPAGADO (BANCO) antes de este seed, con orden 1: quedaba de

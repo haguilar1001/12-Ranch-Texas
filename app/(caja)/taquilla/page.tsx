@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { turnoAbiertoDe } from "@/lib/caja/turno";
 import { diaOperativoDe } from "@/lib/tarifas/disponibilidad";
+import { etiquetaMedio } from "@/lib/caja/medios";
 import TaquillaClient, { type VentaACorregir } from "./TaquillaClient";
 
 export const dynamic = "force-dynamic";
@@ -155,7 +156,7 @@ export default async function TaquillaPage({
       cajero={s.nombre}
       caja={cajaNombre}
       tipos={tipos}
-      medios={medios.map((m) => ({ id: m.id, nombre: m.nombre, codigo: m.codigo, es_efectivo: m.es_efectivo }))}
+      medios={medios.map((m) => ({ id: m.id, nombre: etiquetaMedio(m), codigo: m.codigo, es_efectivo: m.es_efectivo }))}
       motivos={motivos.map((m) => ({ id: m.id, nombre: m.nombre }))}
       autorizadores={autorizadores}
       correccion={correccion}
