@@ -8,7 +8,10 @@ import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
 import type { ResumenTurno } from "@/lib/caja/resumen";
 
 interface Turno { id: string; caja: string; base_inicial: number; abierto: string; estado: string }
-interface Movimiento { id: string; tipo: "ingreso" | "egreso"; monto: number; concepto: string; medio: string | null; hora: string }
+interface Movimiento { id: string; tipo: "ingreso" | "egreso"; numero: number | null; tercero: string | null; monto: number; concepto: string; medio: string | null; hora: string }
+
+/** Comprobante imprimible de un movimiento de caja. */
+const urlComprobante = (id: string) => `/imprimir/movimiento/${id}`;
 
 export default function CajaAbierta({
   cajero, turno, resumen, movimientos, medios,
@@ -21,7 +24,9 @@ export default function CajaAbierta({
   const [tipo, setTipo] = useState<"ingreso" | "egreso">("egreso");
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
+  const [tercero, setTercero] = useState("");
   const [msgMov, setMsgMov] = useState<string | null>(null);
+  const [guardandoMov, setGuardandoMov] = useState(false);
 
   // Cierre
   const [cant, setCant] = useState<Record<number, number>>({});
@@ -39,9 +44,27 @@ export default function CajaAbierta({
   async function agregarMovimiento() {
     setMsgMov(null);
     const m = parseCOP(monto);
-    const r = await registrarMovimiento({ tipo, monto: m, concepto });
-    if (r.ok) { setMonto(""); setConcepto(""); router.refresh(); }
-    else setMsgMov(r.error ?? "Error");
+    // La ventana del comprobante se abre YA, dentro del clic: si se abre después de esperar al
+    // servidor, el navegador la trata como ventana emergente y la bloquea.
+    const ventana = window.open("about:blank", "_blank");
+    setGuardandoMov(true);
+    try {
+      const r = await registrarMovimiento({ tipo, monto: m, concepto, tercero });
+      if (r.ok && r.movimientoId) {
+        if (ventana) ventana.location.href = urlComprobante(r.movimientoId);
+        else setMsgMov("Movimiento guardado. Tu navegador bloqueó el comprobante: ábrelo con 🧾 en la lista.");
+        setMonto(""); setConcepto(""); setTercero("");
+        router.refresh();
+      } else {
+        ventana?.close();
+        setMsgMov(r.error ?? "Error");
+      }
+    } catch {
+      ventana?.close();
+      setMsgMov("No se pudo guardar. Revisa la conexión y vuelve a intentarlo.");
+    } finally {
+      setGuardandoMov(false);
+    }
   }
 
   async function cerrar() {
@@ -125,14 +148,22 @@ export default function CajaAbierta({
           </select>
           <input value={monto ? formatearMiles(parseCOP(monto)) : ""} onChange={(e) => setMonto(e.target.value)} inputMode="numeric" placeholder="Monto" className="w-28 rounded border px-2 py-1 text-right text-sm" />
           <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto" className="flex-1 rounded border px-2 py-1 text-sm" />
-          <button onClick={agregarMovimiento} className="rounded bg-ranch-marron px-3 py-1 text-sm font-semibold text-ranch-crema">Agregar</button>
+          <input value={tercero} onChange={(e) => setTercero(e.target.value)} placeholder={tipo === "egreso" ? "Pagado a (opcional)" : "Recibido de (opcional)"} className="w-full rounded border px-2 py-1 text-sm sm:w-auto sm:flex-1" />
+          <button onClick={agregarMovimiento} disabled={guardandoMov} className="rounded bg-ranch-marron px-3 py-1 text-sm font-semibold text-ranch-crema disabled:opacity-50">{guardandoMov ? "Guardando…" : "Agregar"}</button>
         </div>
+        <p className="mt-1 text-xs text-ranch-marron/50">Al agregarlo se abre su comprobante para imprimir y firmar.</p>
         {msgMov && <p className="mt-1 text-sm text-red-600">{msgMov}</p>}
         <ul className="mt-2 space-y-1 text-sm">
           {movimientos.map((m) => (
             <li key={m.id} className="flex justify-between border-t border-ranch-marron/10 py-1">
-              <span>{m.tipo === "egreso" ? "−" : "+"} {m.concepto} <span className="text-ranch-marron/40">{m.hora}</span></span>
-              <span className={m.tipo === "egreso" ? "text-red-600" : "text-ranch-verde"}>{formatearCOP(m.monto)}</span>
+              <span>
+                {m.tipo === "egreso" ? "−" : "+"} {m.numero != null && <span className="text-ranch-marron/50">N.° {m.numero} · </span>}{m.concepto}
+                {m.tercero && <span className="text-ranch-marron/60"> · {m.tercero}</span>} <span className="text-ranch-marron/40">{m.hora}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className={m.tipo === "egreso" ? "text-red-600" : "text-ranch-verde"}>{formatearCOP(m.monto)}</span>
+                <a href={urlComprobante(m.id)} target="_blank" rel="noopener" title="Ver e imprimir el comprobante" className="rounded px-1 hover:bg-ranch-crema">🧾</a>
+              </span>
             </li>
           ))}
           {movimientos.length === 0 && <li className="text-ranch-marron/40">Sin movimientos.</li>}

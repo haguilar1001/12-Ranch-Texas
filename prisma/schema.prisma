@@ -146,6 +146,9 @@ model Caja {
   @@map("cajas")
 }
 
+/// Una caja tiene a lo sumo UN turno activo (abierto/reabierto), y un usuario también. Lo
+/// garantizan lib/caja/turno.ts (candado) y dos índices únicos PARCIALES creados a mano en la
+/// migración 20260925170000_un_turno_activo_por_caja (Prisma no los puede declarar aquí).
 model TurnoCaja {
   id                 String      @id @default(uuid())
   caja_id            String
@@ -187,6 +190,12 @@ model MovimientoCaja {
   venta_id      String?
   referencia    String?
 
+  /// Consecutivo del comprobante impreso, uno por tipo: COMPROBANTE DE EGRESO N.° 1, 2, 3… y otro
+  /// igual para los ingresos. Solo lo llevan los movimientos manuales (ingreso/egreso).
+  numero  Int?
+  /// A quién se le pagó (egreso) o de quién se recibió (ingreso). Va en el comprobante.
+  tercero String?
+
   turno      TurnoCaja  @relation(fields: [turno_id], references: [id])
   medio_pago MedioPago? @relation(fields: [medio_pago_id], references: [id])
 
@@ -195,6 +204,7 @@ model MovimientoCaja {
   actualizado_en  DateTime @updatedAt
   actualizado_por String?
 
+  @@unique([tipo, numero])
   @@index([turno_id, tipo])
   @@map("movimientos_caja")
 }

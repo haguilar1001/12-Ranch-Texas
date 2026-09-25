@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
-import { turnoAbiertoDe } from "@/lib/caja/turno";
+import { turnoAbiertoDe, cajasConOcupacion } from "@/lib/caja/turno";
 import { resumenTurno } from "@/lib/caja/resumen";
 import { formatearFechaHoraBogota } from "@/lib/tiempo";
 import TurnoForm from "./TurnoForm";
@@ -16,7 +16,7 @@ export default async function TurnoPage() {
   const turno = await turnoAbiertoDe(s.id);
 
   if (!turno) {
-    const cajas = await prisma.caja.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } });
+    const cajas = await cajasConOcupacion();
     return (
       <main className="mx-auto max-w-md p-6">
         <h1 className="mb-1 text-2xl font-black text-ranch-marron">Turno de caja</h1>
@@ -49,7 +49,7 @@ export default async function TurnoPage() {
       }}
       resumen={resumen}
       movimientos={movimientos.map((m) => ({
-        id: m.id, tipo: m.tipo as "ingreso" | "egreso", monto: m.monto, concepto: m.concepto,
+        id: m.id, tipo: m.tipo as "ingreso" | "egreso", numero: m.numero, tercero: m.tercero, monto: m.monto, concepto: m.concepto,
         medio: m.medio_pago?.nombre ?? null, hora: formatearFechaHoraBogota(m.creado_en),
       }))}
       medios={medios.map((m) => ({ id: m.id, nombre: m.nombre }))}

@@ -8,6 +8,8 @@ import { useState } from "react";
 interface Caja {
   id: string;
   nombre: string;
+  /** Quién la tiene abierta ahora; null = libre. Una caja ocupada no se puede elegir. */
+  ocupadaPor: string | null;
 }
 
 export default function TurnoForm({ cajas }: { cajas: Caja[] }) {
@@ -28,8 +30,8 @@ export default function TurnoForm({ cajas }: { cajas: Caja[] }) {
             Selecciona una caja…
           </option>
           {cajas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
+            <option key={c.id} value={c.id} disabled={!!c.ocupadaPor}>
+              {c.ocupadaPor ? `${c.nombre} — abierta por ${c.ocupadaPor}` : c.nombre}
             </option>
           ))}
         </select>

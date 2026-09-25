@@ -20,7 +20,7 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   Usuario: ["nombre"],
   Caja: ["nombre", "ubicacion"],
   TurnoCaja: ["observacion_cierre"],
-  MovimientoCaja: ["concepto", "referencia"],
+  MovimientoCaja: ["concepto", "referencia", "tercero"],
   TipoVisitante: ["nombre"],
   Tarifa: ["motivo_cambio"],
   MotivoCortesia: ["nombre"],

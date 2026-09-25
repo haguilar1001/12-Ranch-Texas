@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
-import { turnoAbiertoDe } from "@/lib/caja/turno";
+import { turnoAbiertoDe, abrirTurnoEnCaja, reabrirTurnoCerrado } from "@/lib/caja/turno";
+import { crearMovimientoCaja } from "@/lib/caja/movimientos";
 import { resumenTurno } from "@/lib/caja/resumen";
 import { totalConteo } from "@/lib/caja/cierre";
 import { registrarAuditoria } from "@/lib/audit";
@@ -20,9 +21,21 @@ export async function abrirTurno(_prev: EstadoTurno | null, formData: FormData):
   const caja_id = String(formData.get("caja_id") ?? "");
   const base_inicial = parseInt(String(formData.get("base_inicial") ?? "0").replace(/\D/g, ""), 10) || 0;
   if (!caja_id) return { error: "Selecciona una caja." };
-  if (await turnoAbiertoDe(s.id)) return { error: "Ya tienes un turno abierto." };
 
-  await prisma.turnoCaja.create({ data: { caja_id, usuario_id: s.id, base_inicial, creado_por: s.id } });
+  // Una caja = un turno activo, y un usuario = un turno activo (con candado: ver lib/caja/turno).
+  let r: Awaited<ReturnType<typeof abrirTurnoEnCaja>>;
+  try {
+    r = await abrirTurnoEnCaja({ cajaId: caja_id, usuarioId: s.id, baseInicial: base_inicial });
+  } catch (e) {
+    // Segunda barrera: el índice único de la base rechazó un segundo turno activo.
+    if ((e as { code?: string })?.code === "P2002") return { error: "Esa caja (o tu usuario) ya tiene un turno abierto. Recarga la página." };
+    throw e;
+  }
+  if (!r.ok) return { error: r.error };
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "turno_caja", entidad_id: r.turnoId, accion: "abrir",
+    datos_despues: { caja_id, base_inicial },
+  });
   revalidatePath("/caja/turno");
   revalidatePath("/taquilla");
   return { ok: true };
@@ -31,6 +44,8 @@ export async function abrirTurno(_prev: EstadoTurno | null, formData: FormData):
 export interface ResultadoAccionCaja {
   ok: boolean;
   error?: string;
+  /** Movimiento recién creado: para abrir su comprobante. */
+  movimientoId?: string;
 }
 
 /** Movimiento de caja distinto a ventas (ingreso/egreso), con motivo. */
@@ -39,6 +54,8 @@ export async function registrarMovimiento(input: {
   monto: number;
   concepto: string;
   medio_pago_id?: string | null;
+  /** A quién se pagó (egreso) o de quién se recibió (ingreso). Opcional; sale en el comprobante. */
+  tercero?: string | null;
 }): Promise<ResultadoAccionCaja> {
   const s = await obtenerSesion();
   if (!s) return { ok: false, error: "Sesión expirada." };
@@ -47,18 +64,18 @@ export async function registrarMovimiento(input: {
   if (!Number.isInteger(input.monto) || input.monto <= 0) return { ok: false, error: "Monto inválido." };
   if (!input.concepto?.trim()) return { ok: false, error: "Indica el concepto." };
 
-  await prisma.movimientoCaja.create({
-    data: {
-      turno_id: turno.id,
-      tipo: input.tipo,
-      monto: input.monto,
-      concepto: input.concepto.trim(),
-      medio_pago_id: input.medio_pago_id ?? null,
-      creado_por: s.id,
-    },
+  if (input.tipo !== "ingreso" && input.tipo !== "egreso") return { ok: false, error: "Tipo de movimiento inválido." };
+
+  const m = await crearMovimientoCaja({
+    turnoId: turno.id, tipo: input.tipo, monto: input.monto, concepto: input.concepto,
+    tercero: input.tercero, medioPagoId: input.medio_pago_id, por: s.id,
+  });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "movimiento_caja", entidad_id: m.id, accion: "crear",
+    datos_despues: { tipo: m.tipo, numero: m.numero, monto: m.monto, concepto: m.concepto, tercero: m.tercero },
   });
   revalidatePath("/caja/turno");
-  return { ok: true };
+  return { ok: true, movimientoId: m.id };
 }
 
 export interface ResultadoCierre {
@@ -129,14 +146,10 @@ export async function reabrirTurno(turnoId: string, motivo: string): Promise<Res
   if (!tieneRol(s.rol, "administrador")) return { ok: false, error: "Solo un administrador puede reabrir." };
   if (!motivo?.trim()) return { ok: false, error: "Indica el motivo de la reapertura." };
 
-  const turno = await prisma.turnoCaja.findUnique({ where: { id: turnoId } });
-  if (!turno) return { ok: false, error: "Turno no encontrado." };
-  if (turno.estado !== "cerrado") return { ok: false, error: "El turno no está cerrado." };
-
-  await prisma.$transaction(async (tx) => {
-    await tx.turnoCaja.update({ where: { id: turnoId }, data: { estado: "reabierto", reabierto_por: s.id, reabierto_en: new Date(), actualizado_por: s.id } });
-    await registrarAuditoria({ usuario_id: s.id, entidad: "turno_caja", entidad_id: turnoId, accion: "reabrir", datos_despues: { motivo: motivo.trim() } });
-  });
+  // Mismas reglas que al abrir: no se reabre si la caja o el cajero ya tienen otro turno activo.
+  const r = await reabrirTurnoCerrado({ turnoId, por: s.id });
+  if (!r.ok) return { ok: false, error: r.error };
+  await registrarAuditoria({ usuario_id: s.id, entidad: "turno_caja", entidad_id: turnoId, accion: "reabrir", datos_despues: { motivo: motivo.trim() } });
   revalidatePath("/caja/turno");
   return { ok: true };
 }
