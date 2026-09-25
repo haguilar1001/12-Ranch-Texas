@@ -1,4 +1,4 @@
-import { prisma, type Tx } from "@/lib/db";
+import { prisma, type Tx } from "../db";
 
 /** Estados en los que un turno está vivo: se puede vender en él. */
 export const ESTADOS_ACTIVOS = ["abierto", "reabierto"] as const;

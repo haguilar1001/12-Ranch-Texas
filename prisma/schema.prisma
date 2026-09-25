@@ -192,12 +192,16 @@ model MovimientoCaja {
 
   /// Consecutivo del comprobante impreso, uno por tipo: COMPROBANTE DE EGRESO N.° 1, 2, 3… y otro
   /// igual para los ingresos. Solo lo llevan los movimientos manuales (ingreso/egreso).
-  numero  Int?
-  /// A quién se le pagó (egreso) o de quién se recibió (ingreso). Va en el comprobante.
-  tercero String?
+  numero          Int?
+  /// A quién se le pagó (egreso) o de quién se recibió (ingreso), tal como se imprimió en el
+  /// comprobante. En un egreso es copia del nombre del beneficiario (por si luego lo renombran).
+  tercero         String?
+  /// Egreso: a quién se le entregó la plata, de la lista de beneficiarios. Obligatorio en egresos.
+  beneficiario_id String?
 
-  turno      TurnoCaja  @relation(fields: [turno_id], references: [id])
-  medio_pago MedioPago? @relation(fields: [medio_pago_id], references: [id])
+  turno        TurnoCaja         @relation(fields: [turno_id], references: [id])
+  medio_pago   MedioPago?        @relation(fields: [medio_pago_id], references: [id])
+  beneficiario BeneficiarioCaja? @relation(fields: [beneficiario_id], references: [id])
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -207,6 +211,25 @@ model MovimientoCaja {
   @@unique([tipo, numero])
   @@index([turno_id, tipo])
   @@map("movimientos_caja")
+}
+
+/// A quién se le puede entregar plata de la caja (egresos): empleados, proveedores, domiciliarios…
+/// Lo mantienen supervisores y administradores en /admin/beneficiarios. Baja lógica con `activo`.
+model BeneficiarioCaja {
+  id        String  @id @default(uuid())
+  nombre    String
+  /// Cédula o NIT: sale bajo la firma de "Recibió" en el comprobante.
+  documento String?
+  activo    Boolean @default(true)
+
+  movimientos MovimientoCaja[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@map("beneficiarios_caja")
 }
 
 model ConteoDenominacion {

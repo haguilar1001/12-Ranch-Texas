@@ -78,6 +78,7 @@ export default async function NavBar() {
         ["🏷️", "Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
         ["🙋", "Clientes", "/admin/clientes", "Editar o desactivar un perfil", supervisor],
         ["🎫", "Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
+        ["🤝", "Beneficiarios de caja", "/admin/beneficiarios", "A quién se le entrega plata en un egreso", supervisor],
         ["🏛️", "Taquillas", "/admin/taquillas", "Nombre, ubicación y cuáles están activas", admin],
         ["💳", "Medios de pago", "/admin/medios-pago", "Efectivo, datáfono, Nequi… y en qué orden salen", admin],
         ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],

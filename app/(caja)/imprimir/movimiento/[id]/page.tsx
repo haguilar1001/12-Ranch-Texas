@@ -22,6 +22,7 @@ export default async function ComprobanteMovimientoPage({ params }: { params: Pr
     include: {
       turno: { include: { caja: true, usuario: { select: { id: true, nombre: true } } } },
       medio_pago: { select: { nombre: true } },
+      beneficiario: { select: { nombre: true, documento: true } },
     },
   });
   if (!m || (m.tipo !== "ingreso" && m.tipo !== "egreso")) notFound();
@@ -32,6 +33,10 @@ export default async function ComprobanteMovimientoPage({ params }: { params: Pr
   const titulo = egreso ? "COMPROBANTE DE EGRESO" : "COMPROBANTE DE INGRESO";
   const firmaIzq = egreso ? "Entregó (cajero)" : "Entregó";
   const firmaDer = egreso ? "Recibió" : "Recibió (cajero)";
+  // En un egreso quien recibe es el beneficiario: su nombre y cédula van bajo la firma de Recibió.
+  // El nombre sale de `tercero` (lo que se imprimió al registrarlo), aunque luego lo renombren.
+  const recibe = egreso ? m.tercero ?? m.beneficiario?.nombre ?? null : null;
+  const docRecibe = egreso ? m.beneficiario?.documento ?? null : null;
 
   return (
     <main className="mx-auto max-w-sm p-4">
@@ -72,7 +77,7 @@ export default async function ComprobanteMovimientoPage({ params }: { params: Pr
 
         <div className="mb-2 space-y-1">
           {m.tercero && (
-            <p><span className="font-bold">{egreso ? "Pagado a:" : "Recibido de:"}</span> {m.tercero}</p>
+            <p><span className="font-bold">{egreso ? "Entregado a:" : "Recibido de:"}</span> {m.tercero}{egreso && docRecibe ? ` · C.C./NIT ${docRecibe}` : ""}</p>
           )}
           <p><span className="font-bold">Concepto:</span> {m.concepto}</p>
           {m.medio_pago && <p><span className="font-bold">Medio:</span> {m.medio_pago.nombre}</p>}
@@ -94,8 +99,14 @@ export default async function ComprobanteMovimientoPage({ params }: { params: Pr
           </div>
           <div>
             <div className="border-t border-ranch-marron/60 pt-1">{firmaDer}</div>
-            {!egreso && <p className="mt-0.5">{m.turno.usuario.nombre}</p>}
-            <p className="mt-2 text-left">C.C.</p>
+            {egreso ? (
+              <>
+                {recibe && <p className="mt-0.5 font-bold">{recibe}</p>}
+                <p className="mt-1 text-left">C.C./NIT {docRecibe ?? ""}</p>
+              </>
+            ) : (
+              <p className="mt-0.5">{m.turno.usuario.nombre}</p>
+            )}
           </div>
         </div>
 

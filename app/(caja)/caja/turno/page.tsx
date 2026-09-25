@@ -36,6 +36,9 @@ export default async function TurnoPage() {
     include: { medio_pago: true },
   });
   const medios = await prisma.medioPago.findMany({ where: { activo: true }, orderBy: { orden: "asc" } });
+  const beneficiarios = await prisma.beneficiarioCaja.findMany({
+    where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true, documento: true },
+  });
 
   return (
     <CajaAbierta
@@ -53,6 +56,8 @@ export default async function TurnoPage() {
         medio: m.medio_pago?.nombre ?? null, hora: formatearFechaHoraBogota(m.creado_en),
       }))}
       medios={medios.map((m) => ({ id: m.id, nombre: m.nombre }))}
+      beneficiarios={beneficiarios}
+      puedeGestionarBeneficiarios={tieneRol(s.rol, "supervisor")}
     />
   );
 }

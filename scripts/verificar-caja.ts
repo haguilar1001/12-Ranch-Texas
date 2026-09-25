@@ -80,18 +80,25 @@ async function main() {
   console.log("\n4. Consecutivo de comprobantes");
   const turno = await prisma.turnoCaja.findFirstOrThrow({ where: { caja_id: caja1.id, estado: "abierto" } });
   const antes = (await prisma.movimientoCaja.aggregate({ where: { tipo: "egreso" }, _max: { numero: true } }))._max.numero ?? 0;
+  const benef = await prisma.beneficiarioCaja.create({ data: { nombre: `${MARCA} Proveedor`, documento: "900123", creado_por: MARCA } });
+  const sinBenef = await crearMovimientoCaja({ turnoId: turno.id, tipo: "egreso", monto: 1000, concepto: `${MARCA} sin beneficiario`, por: otro.id });
+  check("un egreso sin beneficiario se rechaza", !sinBenef.ok, sinBenef.ok ? "entró" : sinBenef.error);
   const movs = await Promise.all(
     Array.from({ length: 6 }, (_, i) =>
-      crearMovimientoCaja({ turnoId: turno.id, tipo: "egreso", monto: 1000 * (i + 1), concepto: `${MARCA} prueba ${i}`, tercero: "Proveedor QA", por: otro.id }),
+      crearMovimientoCaja({ turnoId: turno.id, tipo: "egreso", monto: 1000 * (i + 1), concepto: `${MARCA} prueba ${i}`, beneficiarioId: benef.id, por: otro.id }),
     ),
   );
-  const numeros = movs.map((m) => m.numero!).sort((x, y) => x - y);
+  const numeros = movs.map((m) => (m.ok ? m.numero : -1)).sort((x, y) => x - y);
   const esperados = Array.from({ length: 6 }, (_, i) => antes + i + 1);
-  check("6 egresos en paralelo, sin números repetidos", new Set(numeros).size === 6, numeros.join(", "));
+  check("6 egresos en paralelo, sin números repetidos", new Set(numeros).size === 6 && !numeros.includes(-1), numeros.join(", "));
   check("seguidos desde el último", JSON.stringify(numeros) === JSON.stringify(esperados), `esperado ${esperados.join(", ")}`);
   const ingreso = await crearMovimientoCaja({ turnoId: turno.id, tipo: "ingreso", monto: 5000, concepto: `${MARCA} ingreso`, por: otro.id });
-  check("el ingreso lleva su propio consecutivo", ingreso.numero != null, `N.° ${ingreso.numero}`);
-  check("guarda a quién se pagó", movs[0].tercero === "PROVEEDOR QA", movs[0].tercero ?? "null");
+  check("un ingreso no exige beneficiario y lleva su propio consecutivo", ingreso.ok, ingreso.ok ? `N.° ${ingreso.numero}` : ingreso.error);
+  const guardado = movs[0].ok ? await prisma.movimientoCaja.findUnique({ where: { id: movs[0].id } }) : null;
+  check("el egreso guarda el beneficiario y su nombre", guardado?.beneficiario_id === benef.id && guardado?.tercero === benef.nombre, guardado?.tercero ?? "null");
+  await prisma.beneficiarioCaja.update({ where: { id: benef.id }, data: { activo: false } });
+  const inactivo = await crearMovimientoCaja({ turnoId: turno.id, tipo: "egreso", monto: 1000, concepto: `${MARCA} inactivo`, beneficiarioId: benef.id, por: otro.id });
+  check("no deja usar un beneficiario inactivo", !inactivo.ok, inactivo.ok ? "entró" : inactivo.error);
 
   // Limpieza: turnos cerrados y cajas de prueba inactivas (nada se borra).
   await cerrarTurnosDe([a.id, b.id, c.id]);

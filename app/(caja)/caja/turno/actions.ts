@@ -54,28 +54,27 @@ export async function registrarMovimiento(input: {
   monto: number;
   concepto: string;
   medio_pago_id?: string | null;
-  /** A quién se pagó (egreso) o de quién se recibió (ingreso). Opcional; sale en el comprobante. */
+  /** Egreso: a quién se le entrega la plata, de la lista de beneficiarios. Obligatorio. */
+  beneficiario_id?: string | null;
+  /** Ingreso: de quién se recibió. Opcional. */
   tercero?: string | null;
 }): Promise<ResultadoAccionCaja> {
   const s = await obtenerSesion();
   if (!s) return { ok: false, error: "Sesión expirada." };
   const turno = await turnoAbiertoDe(s.id);
   if (!turno) return { ok: false, error: "No tienes un turno abierto." };
-  if (!Number.isInteger(input.monto) || input.monto <= 0) return { ok: false, error: "Monto inválido." };
-  if (!input.concepto?.trim()) return { ok: false, error: "Indica el concepto." };
 
-  if (input.tipo !== "ingreso" && input.tipo !== "egreso") return { ok: false, error: "Tipo de movimiento inválido." };
-
-  const m = await crearMovimientoCaja({
+  const r = await crearMovimientoCaja({
     turnoId: turno.id, tipo: input.tipo, monto: input.monto, concepto: input.concepto,
-    tercero: input.tercero, medioPagoId: input.medio_pago_id, por: s.id,
+    beneficiarioId: input.beneficiario_id, tercero: input.tercero, medioPagoId: input.medio_pago_id, por: s.id,
   });
+  if (!r.ok) return { ok: false, error: r.error };
   await registrarAuditoria({
-    usuario_id: s.id, entidad: "movimiento_caja", entidad_id: m.id, accion: "crear",
-    datos_despues: { tipo: m.tipo, numero: m.numero, monto: m.monto, concepto: m.concepto, tercero: m.tercero },
+    usuario_id: s.id, entidad: "movimiento_caja", entidad_id: r.id, accion: "crear",
+    datos_despues: { tipo: input.tipo, numero: r.numero, monto: input.monto, concepto: input.concepto, beneficiario_id: input.beneficiario_id ?? null, tercero: input.tercero ?? null },
   });
   revalidatePath("/caja/turno");
-  return { ok: true, movimientoId: m.id };
+  return { ok: true, movimientoId: r.id };
 }
 
 export interface ResultadoCierre {

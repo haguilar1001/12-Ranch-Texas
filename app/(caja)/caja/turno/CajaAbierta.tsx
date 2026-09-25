@@ -14,9 +14,12 @@ interface Movimiento { id: string; tipo: "ingreso" | "egreso"; numero: number | 
 const urlComprobante = (id: string) => `/imprimir/movimiento/${id}`;
 
 export default function CajaAbierta({
-  cajero, turno, resumen, movimientos, medios,
+  cajero, turno, resumen, movimientos, medios, beneficiarios, puedeGestionarBeneficiarios = false,
 }: {
   cajero: string; turno: Turno; resumen: ResumenTurno; movimientos: Movimiento[]; medios: { id: string; nombre: string }[];
+  /** A quién se le puede entregar plata en un egreso (lista de /admin/beneficiarios). */
+  beneficiarios: { id: string; nombre: string; documento: string | null }[];
+  puedeGestionarBeneficiarios?: boolean;
 }) {
   const router = useRouter();
 
@@ -25,6 +28,7 @@ export default function CajaAbierta({
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
   const [tercero, setTercero] = useState("");
+  const [beneficiarioId, setBeneficiarioId] = useState("");
   const [msgMov, setMsgMov] = useState<string | null>(null);
   const [guardandoMov, setGuardandoMov] = useState(false);
 
@@ -44,16 +48,22 @@ export default function CajaAbierta({
   async function agregarMovimiento() {
     setMsgMov(null);
     const m = parseCOP(monto);
+    // En un egreso "Entregado a" es obligatorio: se avisa antes de abrir la ventana del comprobante.
+    if (tipo === "egreso" && !beneficiarioId) { setMsgMov("Elige a quién se le entrega la plata."); return; }
     // La ventana del comprobante se abre YA, dentro del clic: si se abre después de esperar al
     // servidor, el navegador la trata como ventana emergente y la bloquea.
     const ventana = window.open("about:blank", "_blank");
     setGuardandoMov(true);
     try {
-      const r = await registrarMovimiento({ tipo, monto: m, concepto, tercero });
+      const r = await registrarMovimiento({
+        tipo, monto: m, concepto,
+        beneficiario_id: tipo === "egreso" ? beneficiarioId : null,
+        tercero: tipo === "ingreso" ? tercero : null,
+      });
       if (r.ok && r.movimientoId) {
         if (ventana) ventana.location.href = urlComprobante(r.movimientoId);
         else setMsgMov("Movimiento guardado. Tu navegador bloqueó el comprobante: ábrelo con 🧾 en la lista.");
-        setMonto(""); setConcepto(""); setTercero("");
+        setMonto(""); setConcepto(""); setTercero(""); setBeneficiarioId("");
         router.refresh();
       } else {
         ventana?.close();
@@ -148,10 +158,32 @@ export default function CajaAbierta({
           </select>
           <input value={monto ? formatearMiles(parseCOP(monto)) : ""} onChange={(e) => setMonto(e.target.value)} inputMode="numeric" placeholder="Monto" className="w-28 rounded border px-2 py-1 text-right text-sm" />
           <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto" className="flex-1 rounded border px-2 py-1 text-sm" />
-          <input value={tercero} onChange={(e) => setTercero(e.target.value)} placeholder={tipo === "egreso" ? "Pagado a (opcional)" : "Recibido de (opcional)"} className="w-full rounded border px-2 py-1 text-sm sm:w-auto sm:flex-1" />
+          {tipo === "egreso" ? (
+            <select
+              value={beneficiarioId}
+              onChange={(e) => setBeneficiarioId(e.target.value)}
+              required
+              className={`w-full rounded border px-2 py-1 text-sm sm:w-auto sm:flex-1 ${beneficiarioId ? "" : "text-ranch-marron/50"}`}
+            >
+              <option value="">Entregado a… (obligatorio)</option>
+              {beneficiarios.map((b) => (
+                <option key={b.id} value={b.id}>{b.nombre}{b.documento ? ` · ${b.documento}` : ""}</option>
+              ))}
+            </select>
+          ) : (
+            <input value={tercero} onChange={(e) => setTercero(e.target.value)} placeholder="Recibido de (opcional)" className="w-full rounded border px-2 py-1 text-sm sm:w-auto sm:flex-1" />
+          )}
           <button onClick={agregarMovimiento} disabled={guardandoMov} className="rounded bg-ranch-marron px-3 py-1 text-sm font-semibold text-ranch-crema disabled:opacity-50">{guardandoMov ? "Guardando…" : "Agregar"}</button>
         </div>
         <p className="mt-1 text-xs text-ranch-marron/50">Al agregarlo se abre su comprobante para imprimir y firmar.</p>
+        {tipo === "egreso" && beneficiarios.length === 0 && (
+          <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            No hay beneficiarios en la lista.{" "}
+            {puedeGestionarBeneficiarios
+              ? <a href="/admin/beneficiarios" className="font-semibold underline">Agrégalos aquí</a>
+              : "Pídele a un supervisor que los agregue en Administración → Beneficiarios de caja."}
+          </p>
+        )}
         {msgMov && <p className="mt-1 text-sm text-red-600">{msgMov}</p>}
         <ul className="mt-2 space-y-1 text-sm">
           {movimientos.map((m) => (
