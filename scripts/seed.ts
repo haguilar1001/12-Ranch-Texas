@@ -178,7 +178,7 @@ async function seedAtraccionesYControl() {
     console.log("  · atracciones ya existen, se omite");
   }
 
-  const entrada = await prisma.puntoControl.findFirst({ where: { nombre: "Entrada Principal" } });
+  const entrada = await prisma.puntoControl.findFirst({ where: { nombre: { equals: "Entrada Principal", mode: "insensitive" } } });
   if (!entrada) {
     await prisma.puntoControl.create({
       data: {

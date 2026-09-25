@@ -19,6 +19,28 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
 | F13 | Atracciones editables + fila virtual (el visitante separa turno con su QR) | ✅ Completada |
 
+
+## Traído de Family Party (2026-09-25)
+
+Family Party (repo 21-Family-Party) parte de este código. Estos arreglos se hicieron allá y se pasaron aquí
+con cherry-pick, más dos cambios hechos directamente aquí:
+
+- [x] **Una caja = un turno activo** (y un usuario = un turno activo): abrir o reabrir un turno valida que la
+      caja esté libre, dentro de una transacción con candado. Además hay índices únicos parciales (migración
+      `20260925170000_un_turno_activo_por_caja`, creados a mano: si `prisma migrate dev` propone borrarlos, no se
+      acepta). En producción no había turnos duplicados cuando se desplegó.
+- [x] **Comprobante de movimientos de caja**: consecutivo por tipo, valor en letras y firmas. Se abre al agregar
+      el movimiento y se reimprime con 🧾. Los 34 egresos y 2 ingresos que ya existían quedaron numerados.
+- [x] **Beneficiarios de caja** (`/admin/beneficiarios`): en un egreso, "Entregado a" es obligatorio y se elige
+      de la lista. Sale bajo la firma de "Recibió".
+- [x] **Medios de pago** (`/admin/medios-pago`), con ícono, y la taquilla arranca siempre en efectivo.
+- [x] **Taquillas** (`/admin/taquillas`): crear, renombrar y desactivar cajas.
+- [x] **Bug del aforo en 0** en la pantalla de inicio (hecho aquí): se buscaba "Entrada Principal", pero el
+      nombre está guardado en mayúsculas.
+- [x] **Migraciones al arrancar** (hecho aquí): `npm start` es `prisma migrate deploy && next start`.
+- [x] Las 4 migraciones se ensayaron en producción dentro de una transacción deshecha antes de desplegar.
+      **273 pruebas**, typecheck limpio y build OK.
+
 ## F13 — Fila virtual (completada, verificada)
 
 Responde a: *"atracciones donde la gente hoy se anota en una lista, le dan un turno, y tiene que

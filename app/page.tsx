@@ -58,7 +58,7 @@ export default async function Home() {
 
   const [ind, ep, comp] = await Promise.all([
     indicadoresVentas(inicioHoy, finHoy),
-    prisma.puntoControl.findFirst({ where: { nombre: "Entrada Principal" } }),
+    prisma.puntoControl.findFirst({ where: { nombre: { equals: "Entrada Principal", mode: "insensitive" } } }),
     comparativoAnual(anio),
   ]);
 
