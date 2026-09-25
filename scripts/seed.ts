@@ -118,7 +118,12 @@ async function seedMediosPago() {
       create: { codigo, nombre, es_efectivo, orden: orden++, creado_por: POR },
     });
   }
-  console.log("  ✓ medios de pago (provisional, ver decisiones P3)");
+  // La migración 20260912200000 crea PREPAGADO (BANCO) antes de este seed, con orden 1: quedaba de
+  // primero, empatado con EFECTIVO, y la taquilla arrancaba sin billetes. Va al final.
+  const otros = await prisma.medioPago.aggregate({ where: { codigo: { not: "prepagado" } }, _max: { orden: true } });
+  const ultimo = (otros._max.orden ?? 0) + 1;
+  await prisma.medioPago.updateMany({ where: { codigo: "prepagado", orden: { lt: ultimo } }, data: { orden: ultimo } });
+  console.log("  ✓ medios de pago (PREPAGADO al final; se administran en /admin/medios-pago)");
 }
 
 async function seedMotivosCortesia() {

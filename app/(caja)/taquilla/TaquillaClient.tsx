@@ -8,6 +8,7 @@ import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
 import { esCelularColombiano, esEmailValido } from "@/lib/contacto";
 import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
+import { medioInicial } from "@/lib/caja/medios";
 
 interface Tipo {
   id: string;
@@ -161,7 +162,8 @@ export default function TaquillaClient({
   const [pagos, setPagos] = useState<FilaPago[]>(() =>
     correccion?.pagos.length
       ? correccion.pagos.map((p, i) => ({ key: -(i + 1), medio_pago_id: p.medio_pago_id, monto: String(p.monto) }))
-      : [{ key: 1, medio_pago_id: medios[0]?.id ?? "", monto: "" }],
+      // Cada venta arranca en efectivo (ahí salen los billetes), aunque no sea el primero del orden.
+      : [{ key: 1, medio_pago_id: medioInicial(medios)?.id ?? "", monto: "" }],
   );
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -250,7 +252,7 @@ export default function TaquillaClient({
       if (montoPrepagoSugerido <= 0) return;
       prepagoAutoValorRef.current = montoPrepagoSugerido;
       const nueva = { key: nextKey(), medio_pago_id: medioPrepagoId, monto: String(montoPrepagoSugerido) };
-      const esInicialVacia = pagos.length === 1 && parseCOP(pagos[0].monto) === 0 && pagos[0].medio_pago_id === (medios[0]?.id ?? "");
+      const esInicialVacia = pagos.length === 1 && parseCOP(pagos[0].monto) === 0 && pagos[0].medio_pago_id === (medioInicial(medios)?.id ?? "");
       setPagos(esInicialVacia ? [nueva] : [...pagos, nueva]);
       return;
     }
@@ -264,7 +266,7 @@ export default function TaquillaClient({
     if (montoPrepagoSugerido <= 0) {
       prepagoAutoValorRef.current = null;
       const resto = pagos.filter((_, k) => k !== i);
-      setPagos(resto.length > 0 ? resto : [{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+      setPagos(resto.length > 0 ? resto : [{ key: nextKey(), medio_pago_id: medioInicial(medios)?.id ?? "", monto: "" }]);
       return;
     }
     if (actual === montoPrepagoSugerido) return;
@@ -378,7 +380,7 @@ export default function TaquillaClient({
   }
 
   function pagoExacto() {
-    const efectivo = medios.find((m) => m.es_efectivo) ?? medios[0];
+    const efectivo = medioInicial(medios);
     setPagos([{ key: nextKey(), medio_pago_id: efectivo?.id ?? "", monto: String(totales.total_cobrado) }]);
   }
   function agregarPago() {
@@ -396,7 +398,7 @@ export default function TaquillaClient({
     setComprador({ nombre: "", documento: "", celular: "", email: "" });
     setEsEmpresa(false); setEmpresa({ razon_social: "", nit: "" });
     setSugerenciaCliente(null); setCelularBuscado(null);
-    setPagos([{ key: nextKey(), medio_pago_id: medios[0]?.id ?? "", monto: "" }]);
+    setPagos([{ key: nextKey(), medio_pago_id: medioInicial(medios)?.id ?? "", monto: "" }]);
     // Nueva llave: lo que venga es una venta distinta, no un reintento de la anterior.
     claveRef.current = nuevaClave();
     setSinRespuesta(false);
