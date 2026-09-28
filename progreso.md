@@ -40,6 +40,10 @@ con cherry-pick, más dos cambios hechos directamente aquí:
 - [x] **Migraciones al arrancar** (hecho aquí): `npm start` es `prisma migrate deploy && next start`.
 - [x] Las 4 migraciones se ensayaron en producción dentro de una transacción deshecha antes de desplegar.
       **273 pruebas**, typecheck limpio y build OK.
+- [x] **Casilla "Es prepagada" en las tarifas** (2026-09-28): separada de "se escanea en la app de bonos". La
+      taquilla sugiere el medio PREPAGADO solo para esas tarifas. La migración marcó las que ya se escaneaban
+      (BONO COMFAMILIAR, BONO COOMEVA, PÁGINA WEB y REDENCIÓN BONO), así que nada cambió para el cajero.
+      **276 pruebas**.
 
 ## F13 — Fila virtual (completada, verificada)
 
