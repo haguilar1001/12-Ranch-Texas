@@ -493,13 +493,17 @@ function Ubicacion({ busy, correr, esSupervisor, recintos, animales }: Comun & {
 
 function Alimentos({ busy, correr, esSupervisor, alimentos }: Comun & { alimentos: AlimentoVista[] }) {
   const [nuevo, setNuevo] = useState({ nombre: "", tipo: "", unidad_medida: "bulto", costo_unitario: "", equivalencia_g: "" });
+  const [creando, setCreando] = useState(false);
   const [edicion, setEdicion] = useState<{ id: string; nombre: string; tipo: string; unidad_medida: string; costo_unitario: string; equivalencia_g: string } | null>(null);
   const [mov, setMov] = useState<{ id: string; tipo: string; cantidad: string; unidad: string; motivo: string; costo: string } | null>(null);
   const sinEquivalencia = alimentos.filter((a) => a.activo && !a.convertible);
 
   return (
     <>
-      {esSupervisor && (
+      {esSupervisor && !creando && (
+        <button className={`${boton} mb-4`} onClick={() => setCreando(true)}>+ Nuevo alimento</button>
+      )}
+      {esSupervisor && creando && (
       <section className={`mb-4 ${card} p-4`}>
         <h2 className="mb-1 font-bold text-ranch-marron">Nuevo alimento</h2>
         <p className="mb-3 text-xs text-ranch-marron/55">
@@ -513,13 +517,19 @@ function Alimentos({ busy, correr, esSupervisor, alimentos }: Comun & { alimento
           <input className={input} placeholder="Costo por unidad (COP)" inputMode="numeric" value={nuevo.costo_unitario} onChange={(e) => setNuevo({ ...nuevo, costo_unitario: e.target.value })} />
           <input className={input} placeholder="Equivalencia en gramos (40000)" inputMode="numeric" value={nuevo.equivalencia_g} onChange={(e) => setNuevo({ ...nuevo, equivalencia_g: e.target.value })} />
         </div>
-        <button
-          className={`${boton} mt-3`} disabled={busy}
-          onClick={async () => {
-            const ok = await correr(() => crearAlimento(nuevo), "Alimento creado.");
-            if (ok) setNuevo({ nombre: "", tipo: "", unidad_medida: "bulto", costo_unitario: "", equivalencia_g: "" });
-          }}
-        >Crear alimento</button>
+        <div className="mt-3 flex gap-2">
+          <button
+            className={boton} disabled={busy}
+            onClick={async () => {
+              const ok = await correr(() => crearAlimento(nuevo), "Alimento creado.");
+              if (ok) {
+                setNuevo({ nombre: "", tipo: "", unidad_medida: "bulto", costo_unitario: "", equivalencia_g: "" });
+                setCreando(false);
+              }
+            }}
+          >Crear alimento</button>
+          <button className={botonSec} onClick={() => setCreando(false)}>Cancelar</button>
+        </div>
       </section>
       )}
 

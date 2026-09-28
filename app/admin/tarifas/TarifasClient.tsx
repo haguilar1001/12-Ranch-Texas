@@ -92,6 +92,8 @@ export default function TarifasClient({
 }) {
   const router = useRouter();
   const [nuevo, setNuevo] = useState({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
+  // Crear es una opción, no un formulario siempre abierto.
+  const [creando, setCreando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [edicion, setEdicion] = useState<
@@ -181,7 +183,10 @@ export default function TarifasClient({
 
   async function crear() {
     const r = await ejecutar(() => crearTipo(nuevo), "Tipo de visitante creado.");
-    if (r?.ok) setNuevo({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
+    if (r?.ok) {
+      setNuevo({ nombre: "", requiere_pago: true, valor: "", edad_min: "", edad_max: "" });
+      setCreando(false);
+    }
   }
 
   return (
@@ -195,8 +200,14 @@ export default function TarifasClient({
       {msg && <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
 
       {/* Crear */}
+      {!creando && (
+        <button onClick={() => setCreando(true)} className="mb-4 rounded-lg bg-ranch-marron px-5 py-2 font-semibold text-ranch-crema">
+          + Nuevo tipo de visitante
+        </button>
+      )}
+      {creando && (
       <section className="mb-6 rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
-        <h2 className="mb-3 font-bold text-ranch-marron">Crear tipo de visitante</h2>
+        <h2 className="mb-3 font-bold text-ranch-marron">Nuevo tipo de visitante</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre (p. ej. Estudiante)" className="rounded-lg border border-ranch-marron/30 px-3 py-2" />
           <input
@@ -220,8 +231,12 @@ export default function TarifasClient({
           Este tipo cobra entrada
         </label>
         <p className="mt-1 text-xs text-ranch-marron/50">Si no cobra (bebé, cortesía, adulto mayor…), la tarifa queda en $ 0 pero igual genera manilla.</p>
-        <button onClick={crear} disabled={busy} className="mt-3 rounded-lg bg-ranch-marron px-5 py-2 font-semibold text-ranch-crema disabled:opacity-50">Crear tipo</button>
+        <div className="mt-3 flex gap-2">
+          <button onClick={crear} disabled={busy} className="rounded-lg bg-ranch-marron px-5 py-2 font-semibold text-ranch-crema disabled:opacity-50">Crear tipo</button>
+          <button onClick={() => setCreando(false)} className="rounded-lg border border-ranch-marron/30 px-5 py-2 font-semibold text-ranch-marron">Cancelar</button>
+        </div>
       </section>
+      )}
 
       {/* Lista — solo lectura; toda la edición vive en el formulario modal (✏️ Editar). */}
       <section className="rounded-2xl border-2 border-ranch-marron/20 bg-white p-4">
