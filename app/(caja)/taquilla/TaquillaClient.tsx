@@ -8,7 +8,7 @@ import type { EntradaVenta, ResultadoVenta } from "@/lib/ventas/tipos";
 import { calcularTotales, validarVenta, type LineaVenta } from "@/lib/ventas/calculo";
 import { esCelularColombiano, esEmailValido } from "@/lib/contacto";
 import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
-import { medioInicial } from "@/lib/caja/medios";
+import { medioInicial, montoPrepagado } from "@/lib/caja/medios";
 
 interface Tipo {
   id: string;
@@ -21,6 +21,8 @@ interface Tipo {
   requiere_carnet: boolean;
   /** Bono o compra web: hay que verificarlo en la aplicación de bonos antes de vender. */
   requiere_escaneo: boolean;
+  /** Ya se pagó por banco o página web: se sugiere cobrarlo con el medio PREPAGADO. */
+  es_prepagado: boolean;
   /** Solo estos tipos muestran el botón de descuento unitario (tarifas de evento/comercial). */
   permite_descuento: boolean;
 }
@@ -227,9 +229,7 @@ export default function TaquillaClient({
   const medioPrepagoId = useMemo(() => medios.find((m) => m.codigo === "prepagado")?.id ?? null, [medios]);
   const montoPrepagoSugerido = useMemo(() => {
     if (!medioPrepagoId) return 0;
-    return lineas
-      .filter((l) => l.tipo_linea === "pago" && tipoPorId.get(l.tipo_visitante_id)?.requiere_escaneo)
-      .reduce((a, l) => a + l.valor_cobrado * l.cantidad, 0);
+    return montoPrepagado(lineas, (id) => !!tipoPorId.get(id)?.es_prepagado);
   }, [lineas, tipoPorId, medioPrepagoId]);
   /** Último valor que ESTE efecto puso en la fila de prepago; sirve para notar si el cajero lo cambió. */
   const prepagoAutoValorRef = useRef<number | null>(null);

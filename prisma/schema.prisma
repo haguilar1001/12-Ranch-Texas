@@ -272,6 +272,11 @@ model TipoVisitante {
   /// de vender. En taquilla obliga a marcar "escaneado" para poder registrar.
   requiere_escaneo Boolean @default(false)
 
+  /// La entrada ya se pagó antes, por banco o página web (bonos de convenio, compras web): suma a la
+  /// venta del día pero no al efectivo del cajón. La taquilla sugiere cobrarla con el medio PREPAGADO.
+  /// Independiente de `requiere_escaneo`: un convenio por transferencia es prepagado y no se escanea.
+  es_prepagado Boolean @default(false)
+
   /// Solo los tipos con esto en true muestran el botón "Aplicar descuento" en taquilla
   /// (precio libre por unidad, con motivo y autorización) — pensado para tarifas de
   /// evento/comercial donde el valor negociado cambia cada vez. Se valida también en

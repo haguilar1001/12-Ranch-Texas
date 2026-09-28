@@ -49,6 +49,7 @@ export default async function TarifasPage() {
       icono: t.icono,
       requiere_carnet: t.requiere_carnet,
       requiere_escaneo: t.requiere_escaneo,
+      es_prepagado: t.es_prepagado,
       permite_descuento: t.permite_descuento,
       disponible_dias: t.disponible_dias,
       solo_administrador: t.solo_administrador,

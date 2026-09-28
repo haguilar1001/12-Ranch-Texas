@@ -121,6 +121,8 @@ interface CambiosTipo {
   requiere_carnet?: boolean;
   /** El bono/QR se verifica en la aplicación de bonos antes de vender. */
   requiere_escaneo?: boolean;
+  /** Ya se pagó por banco o página web: la taquilla sugiere el medio PREPAGADO. */
+  es_prepagado?: boolean;
   /** Solo con esto en true aparece el botón de descuento unitario en taquilla. */
   permite_descuento?: boolean;
   /** Qué días se ve este tipo en taquilla: "todos", "semana" o "fin_semana_festivo". */
@@ -181,6 +183,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
 
   if (cambios.requiere_carnet !== undefined) data.requiere_carnet = !!cambios.requiere_carnet;
   if (cambios.requiere_escaneo !== undefined) data.requiere_escaneo = !!cambios.requiere_escaneo;
+  if (cambios.es_prepagado !== undefined) data.es_prepagado = !!cambios.es_prepagado;
   if (cambios.permite_descuento !== undefined) data.permite_descuento = !!cambios.permite_descuento;
   if (cambios.disponible_dias !== undefined) data.disponible_dias = cambios.disponible_dias;
   if (cambios.solo_administrador !== undefined) data.solo_administrador = !!cambios.solo_administrador;
@@ -191,7 +194,7 @@ export async function editarTipo(id: string, cambios: CambiosTipo): Promise<Resu
     datos_antes: {
       nombre: tipo.nombre, requiere_pago: tipo.requiere_pago, edad_min: tipo.edad_min,
       edad_max: tipo.edad_max, orden: tipo.orden, icono: tipo.icono, requiere_carnet: tipo.requiere_carnet,
-      requiere_escaneo: tipo.requiere_escaneo, permite_descuento: tipo.permite_descuento, disponible_dias: tipo.disponible_dias,
+      requiere_escaneo: tipo.requiere_escaneo, es_prepagado: tipo.es_prepagado, permite_descuento: tipo.permite_descuento, disponible_dias: tipo.disponible_dias,
     },
     datos_despues: JSON.parse(JSON.stringify(cambios)),
   });

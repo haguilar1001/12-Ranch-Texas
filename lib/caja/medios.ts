@@ -53,3 +53,17 @@ export function validarMediosActivos(actuales: MedioResumen[], cambio: MedioResu
 export function medioInicial<T extends { es_efectivo: boolean }>(medios: T[]): T | undefined {
   return medios.find((m) => m.es_efectivo) ?? medios[0];
 }
+
+/**
+ * Cuánto de este tiquete ya se pagó antes (bonos de convenio, página web): la suma de las líneas
+ * PAGADAS de tipos prepagados. Es lo que la taquilla sugiere cobrar con el medio PREPAGADO; las
+ * cortesías no cuentan porque no se cobran.
+ */
+export function montoPrepagado(
+  lineas: { tipo_visitante_id: string; tipo_linea: string; valor_cobrado: number; cantidad: number }[],
+  esPrepagado: (tipoId: string) => boolean,
+): number {
+  return lineas
+    .filter((l) => l.tipo_linea === "pago" && esPrepagado(l.tipo_visitante_id))
+    .reduce((a, l) => a + l.valor_cobrado * l.cantidad, 0);
+}

@@ -24,6 +24,8 @@ interface Tipo {
   icono: string | null;
   requiere_carnet: boolean;
   requiere_escaneo: boolean;
+  /** Ya se pagó por banco o página web: la taquilla sugiere PREPAGADO. */
+  es_prepagado: boolean;
   /** Solo estos tipos muestran el botón de descuento unitario en taquilla. */
   permite_descuento: boolean;
   /** Qué días se ve este tipo en taquilla. */
@@ -95,7 +97,7 @@ export default function TarifasClient({
   const [edicion, setEdicion] = useState<
     {
       id: string; nombre: string; edad_min: string; edad_max: string; orden: string; icono: string;
-      requiere_carnet: boolean; requiere_escaneo: boolean; permite_descuento: boolean; disponible_dias: Disponibilidad;
+      requiere_carnet: boolean; requiere_escaneo: boolean; es_prepagado: boolean; permite_descuento: boolean; disponible_dias: Disponibilidad;
       solo_administrador: boolean;
     } | null
   >(null);
@@ -110,6 +112,7 @@ export default function TarifasClient({
       icono: t.icono ?? "",
       requiere_carnet: t.requiere_carnet,
       requiere_escaneo: t.requiere_escaneo,
+      es_prepagado: t.es_prepagado,
       permite_descuento: t.permite_descuento,
       disponible_dias: t.disponible_dias,
       solo_administrador: t.solo_administrador,
@@ -127,6 +130,7 @@ export default function TarifasClient({
         icono: edicion.icono,
         requiere_carnet: edicion.requiere_carnet,
         requiere_escaneo: edicion.requiere_escaneo,
+        es_prepagado: edicion.es_prepagado,
         permite_descuento: edicion.permite_descuento,
         disponible_dias: edicion.disponible_dias,
         solo_administrador: edicion.solo_administrador,
@@ -247,6 +251,11 @@ export default function TarifasClient({
                             ☑ escaneo
                           </span>
                         )}
+                        {t.es_prepagado && (
+                          <span title="Ya se pagó por banco o página web: la taquilla sugiere PREPAGADO" className="ml-1 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-700">
+                            🏦 prepagada
+                          </span>
+                        )}
                         {t.permite_descuento && (
                           <span title="Admite descuento unitario en taquilla" className="ml-1 rounded bg-ranch-dorado/15 px-1 text-[10px] font-bold text-ranch-dorado">
                             % descuento
@@ -365,6 +374,10 @@ export default function TarifasClient({
                   <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
                     <input type="checkbox" checked={edicion.requiere_escaneo} onChange={(e) => setEdicion({ ...edicion, requiere_escaneo: e.target.checked })} className="h-4 w-4" />
                     Se escanea en la app de bonos
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
+                    <input type="checkbox" checked={edicion.es_prepagado} onChange={(e) => setEdicion({ ...edicion, es_prepagado: e.target.checked })} className="h-4 w-4" />
+                    Es prepagada (ya se pagó por banco o página web)
                   </label>
                   <label className="flex items-center gap-2 text-sm text-ranch-marron/80">
                     <input type="checkbox" checked={edicion.permite_descuento} onChange={(e) => setEdicion({ ...edicion, permite_descuento: e.target.checked })} className="h-4 w-4" />

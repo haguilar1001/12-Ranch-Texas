@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { codigoDeMedio, etiquetaMedio, medioInicial, validarIcono, validarMediosActivos } from "../lib/caja/medios";
+import { codigoDeMedio, etiquetaMedio, medioInicial, montoPrepagado, validarIcono, validarMediosActivos } from "../lib/caja/medios";
 
 const efectivo = { id: "ef", activo: true, es_efectivo: true };
 const nequi = { id: "nq", activo: true, es_efectivo: false };
@@ -76,5 +76,27 @@ describe("íconos de medios de pago", () => {
     expect(validarIcono("efectivo").ok).toBe(false);
     expect(validarIcono("<b>").ok).toBe(false);
     expect(validarIcono("💵💵💵💵💵").ok).toBe(false);
+  });
+});
+
+describe("montoPrepagado", () => {
+  const prepagados = new Set(["bono", "web"]);
+  const es = (id: string) => prepagados.has(id);
+
+  it("suma solo las líneas pagadas de tarifas prepagadas", () => {
+    const lineas = [
+      { tipo_visitante_id: "bono", tipo_linea: "pago", valor_cobrado: 45000, cantidad: 2 },
+      { tipo_visitante_id: "nino", tipo_linea: "pago", valor_cobrado: 25000, cantidad: 1 },
+      { tipo_visitante_id: "web", tipo_linea: "pago", valor_cobrado: 30000, cantidad: 1 },
+    ];
+    expect(montoPrepagado(lineas, es)).toBe(120000);
+  });
+
+  it("las cortesías de una tarifa prepagada no cuentan", () => {
+    expect(montoPrepagado([{ tipo_visitante_id: "bono", tipo_linea: "invitacion", valor_cobrado: 0, cantidad: 3 }], es)).toBe(0);
+  });
+
+  it("sin tarifas prepagadas no se sugiere nada", () => {
+    expect(montoPrepagado([{ tipo_visitante_id: "nino", tipo_linea: "pago", valor_cobrado: 25000, cantidad: 4 }], es)).toBe(0);
   });
 });
