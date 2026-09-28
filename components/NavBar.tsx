@@ -51,7 +51,6 @@ export default async function NavBar() {
         ["✅", "Aprobar solicitudes", "/vehiculos/aprobar", "Asignar vehículo y chofer, o rechazar", supervisor],
         ["📅", "Calendario", "/vehiculos/calendario", "Solicitudes pendientes y aprobadas del mes", supervisor],
         ["🚗", "Mis viajes", "/vehiculos/mis-viajes", "Cerrar un viaje con el kilometraje", chofer],
-        ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
         ["📊", "Uso de vehículos", "/admin/reportes/vehiculos", "Quién pide más, quién maneja más", consulta],
       ],
     },
@@ -74,13 +73,21 @@ export default async function NavBar() {
       icono: "⚙️",
       label: "Administración",
       enlaces: [
-        ["💸", "Gastos", "/admin/gastos", "Registrar por rubro con soporte", supervisor],
+        ["💸", "Gastos", "/admin/gastos", "Registrar por rubro, área y quién lo pidió", supervisor],
         ["🏷️", "Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
         ["🙋", "Clientes", "/admin/clientes", "Editar o desactivar un perfil", supervisor],
+      ],
+    },
+    {
+      // Parámetros y catálogos: se definen una vez y se tocan poco. Lo del día a día va en Administración.
+      icono: "🛠️",
+      label: "Configuración",
+      enlaces: [
         ["🎫", "Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
-        ["🤝", "Beneficiarios de caja", "/admin/beneficiarios", "A quién se le entrega plata en un egreso", supervisor],
         ["🏛️", "Taquillas", "/admin/taquillas", "Nombre, ubicación y cuáles están activas", admin],
         ["💳", "Medios de pago", "/admin/medios-pago", "Efectivo, datáfono, Nequi… y en qué orden salen", admin],
+        ["🤝", "Beneficiarios de caja", "/admin/beneficiarios", "A quién se le entrega plata en un egreso", supervisor],
+        ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
         ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
         ["🖨️", "Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],
       ],
