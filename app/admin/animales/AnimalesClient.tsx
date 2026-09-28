@@ -9,7 +9,9 @@ import {
   crearAlimento, editarAlimento, cambiarEstadoAlimento, registrarMovimientoAlimento,
   crearRacion, editarRacion, cambiarEstadoRacion,
   registrarAlimentacion, anularAlimentacion,
+  registrarCompraAlimento, anularCompraAlimento,
 } from "./actions";
+import { subtotalLinea } from "@/lib/animales/compras";
 
 // ------------------------------------------------------------------ tipos
 
@@ -49,6 +51,12 @@ export interface BitacoraVista {
   automatico: boolean; franja: string | null;
 }
 
+export interface CompraVista {
+  id: string; fecha: string; proveedor: string; numero_factura: string | null; observaciones: string | null;
+  total: number; estado: string; motivo_anulacion: string | null; estadoGasto: string | null;
+  lineas: { alimento: string; cantidadTexto: string; precio_unitario: number; unidad: string; subtotal: number }[];
+}
+
 interface Props {
   esAdmin: boolean;
   esSupervisor: boolean;
@@ -64,14 +72,19 @@ interface Props {
   raciones: RacionVista[];
   bitacora: BitacoraVista[];
   empleados: { id: string; nombre: string }[];
+  compras: CompraVista[];
+  proveedores: { id: string; nombre: string }[];
+  /** Fecha de hoy en Bogotá (YYYY-MM-DD), para el formulario de compra. */
+  hoy: string;
 }
 
-type Pestana = "inventario" | "ubicacion" | "alimentos" | "dieta" | "bitacora";
+type Pestana = "inventario" | "ubicacion" | "alimentos" | "compras" | "dieta" | "bitacora";
 
 const PESTANAS: { id: Pestana; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "ubicacion", label: "Ubicación" },
   { id: "alimentos", label: "Alimentos" },
+  { id: "compras", label: "Compras" },
   { id: "dieta", label: "Dieta" },
   { id: "bitacora", label: "Bitácora" },
 ];
@@ -145,6 +158,7 @@ export default function AnimalesClient(p: Props) {
       {tab === "inventario" && <Inventario {...comun} animales={p.animales} categorias={p.categorias} recintos={p.recintos} />}
       {tab === "ubicacion" && <Ubicacion {...comun} recintos={p.recintos} animales={p.animales} />}
       {tab === "alimentos" && <Alimentos {...comun} alimentos={p.alimentos} />}
+      {tab === "compras" && <Compras {...comun} compras={p.compras} proveedores={p.proveedores} alimentos={p.alimentos} hoy={p.hoy} />}
       {tab === "dieta" && <Dieta {...comun} raciones={p.raciones} animales={p.animales} categorias={p.categorias} alimentos={p.alimentos} />}
       {tab === "bitacora" && (
         <Bitacora {...comun} bitacora={p.bitacora} raciones={p.raciones} animales={p.animales} alimentos={p.alimentos} empleados={p.empleados} kpis={p.kpis} />
@@ -638,6 +652,249 @@ function FilaAlimento({
             <p className="mt-2 text-xs text-ranch-marron/50">
               El <strong>ajuste</strong> fija el saldo al valor contado; la existencia siempre se recalcula desde estos movimientos.
             </p>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ------------------------------------------------------------------ COMPRAS
+
+/** "2,5" → 2.5 ; "1.500" → 1500 (igual que el servidor). NaN si no es número. */
+function numeroEscrito(texto: string): number {
+  const limpio = texto.trim().replace(/\s/g, "");
+  if (!limpio) return NaN;
+  return Number(limpio.includes(",") ? limpio.replace(/\./g, "").replace(",", ".") : limpio);
+}
+
+const pesos = (texto: string): number => parseInt(texto.replace(/[^\d]/g, ""), 10);
+
+interface LineaForm { alimento_id: string; cantidad: string; precio: string }
+const lineaVacia = (): LineaForm => ({ alimento_id: "", cantidad: "", precio: "" });
+
+function Compras({
+  busy, correr, esAdmin, compras, proveedores, alimentos, hoy,
+}: Comun & { compras: CompraVista[]; proveedores: { id: string; nombre: string }[]; alimentos: AlimentoVista[]; hoy: string }) {
+  const activos = alimentos.filter((a) => a.activo);
+  const [proveedorId, setProveedorId] = useState("");
+  const [proveedorNuevo, setProveedorNuevo] = useState("");
+  const [fecha, setFecha] = useState(hoy);
+  const [factura, setFactura] = useState("");
+  const [observaciones, setObservaciones] = useState("");
+  const [lineas, setLineas] = useState<LineaForm[]>([lineaVacia()]);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [anulando, setAnulando] = useState<{ id: string; motivo: string } | null>(null);
+
+  const alimentoDe = (id: string) => activos.find((a) => a.id === id);
+  const subtotal = (l: LineaForm) => {
+    const c = numeroEscrito(l.cantidad);
+    const p = pesos(l.precio);
+    return Number.isFinite(c) && Number.isFinite(p) ? subtotalLinea(c, p) : 0;
+  };
+  const total = lineas.reduce((t, l) => t + subtotal(l), 0);
+
+  const cambiarLinea = (i: number, cambio: Partial<LineaForm>) =>
+    setLineas(lineas.map((l, j) => (j === i ? { ...l, ...cambio } : l)));
+
+  function limpiar() {
+    setProveedorId(""); setProveedorNuevo(""); setFecha(hoy); setFactura(""); setObservaciones(""); setLineas([lineaVacia()]);
+  }
+
+  return (
+    <>
+      <section className={`mb-4 ${card} p-4`}>
+        <h2 className="mb-1 font-bold text-ranch-marron">Registrar compra</h2>
+        <p className="mb-3 text-xs text-ranch-marron/55">
+          Se registra al <strong>recibir</strong> el pedido: el alimento entra al inventario, la factura queda como
+          <strong> gasto pendiente</strong> en Gastos y el costo de cada alimento pasa a ser el precio de esta compra.
+          Precios <strong>con IVA</strong>, por unidad de compra.
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          <select className={input} value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
+            <option value="">Proveedor…</option>
+            {proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            <option value="nuevo">+ Proveedor nuevo</option>
+          </select>
+          {proveedorId === "nuevo" && (
+            <input className={input} placeholder="Nombre del proveedor" value={proveedorNuevo} onChange={(e) => setProveedorNuevo(e.target.value)} />
+          )}
+          <input className={input} type="date" max={hoy} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          <input className={input} placeholder="N.° de factura" value={factura} onChange={(e) => setFactura(e.target.value)} />
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr>
+                <th className={th}>Alimento</th>
+                <th className={`${th} text-right`}>Cantidad</th>
+                <th className={`${th} text-right`}>Precio c/u</th>
+                <th className={`${th} text-right`}>Subtotal</th>
+                <th className={th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineas.map((l, i) => {
+                const a = alimentoDe(l.alimento_id);
+                const precio = pesos(l.precio);
+                const cambio = a && a.costo_unitario !== null && precio > 0 && precio !== a.costo_unitario;
+                return (
+                  <tr key={i} className="border-t border-ranch-marron/10">
+                    <td className="py-2 pr-2">
+                      <select
+                        className={`${input} w-full min-w-44`} value={l.alimento_id}
+                        onChange={(e) => {
+                          const nuevo = alimentoDe(e.target.value);
+                          cambiarLinea(i, { alimento_id: e.target.value, precio: nuevo?.costo_unitario != null ? String(nuevo.costo_unitario) : "" });
+                        }}
+                      >
+                        <option value="">Selecciona…</option>
+                        {activos.map((x) => (
+                          <option key={x.id} value={x.id} disabled={lineas.some((o, j) => j !== i && o.alimento_id === x.id)}>{x.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 pr-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <input className={`${input} w-20 text-right`} inputMode="decimal" placeholder="0" value={l.cantidad} onChange={(e) => cambiarLinea(i, { cantidad: e.target.value })} />
+                        <span className="w-12 text-left text-xs text-ranch-marron/60">{a?.unidad_medida ?? ""}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-2 text-right">
+                      <input className={`${input} w-28 text-right`} inputMode="numeric" placeholder="$" value={l.precio} onChange={(e) => cambiarLinea(i, { precio: e.target.value })} />
+                      {cambio && <span className="block text-[11px] text-amber-700">antes {formatearCOP(a.costo_unitario!)}</span>}
+                    </td>
+                    <td className="py-2 pr-2 text-right font-semibold text-ranch-marron">{formatearCOP(subtotal(l))}</td>
+                    <td className="py-2 text-right">
+                      {lineas.length > 1 && (
+                        <button className={botonSec} onClick={() => setLineas(lineas.filter((_, j) => j !== i))}>Quitar</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-ranch-marron/20">
+                <td className="py-2">
+                  <button className={botonSec} onClick={() => setLineas([...lineas, lineaVacia()])}>+ Agregar alimento</button>
+                </td>
+                <td colSpan={2} className="py-2 pr-2 text-right text-xs uppercase text-ranch-marron/60">Total</td>
+                <td className="py-2 pr-2 text-right text-lg font-black text-ranch-marron">{formatearCOP(total)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <input className={`${input} mt-3 w-full`} placeholder="Observaciones (opcional)" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+        <button
+          className={`${boton} mt-3`} disabled={busy}
+          onClick={async () => {
+            const ok = await correr(() => registrarCompraAlimento({
+              proveedor_id: proveedorId && proveedorId !== "nuevo" ? proveedorId : null,
+              proveedor_nombre: proveedorId === "nuevo" ? proveedorNuevo : null,
+              fecha, numero_factura: factura, observaciones,
+              lineas: lineas.map((l) => ({ alimento_id: l.alimento_id, cantidad: l.cantidad, precio_unitario: l.precio })),
+            }), "Compra registrada: el inventario subió y el gasto quedó pendiente de pago.");
+            if (ok) limpiar();
+          }}
+        >Registrar compra</button>
+      </section>
+
+      <div className={`overflow-x-auto ${card}`}>
+        <table className="w-full text-left text-sm">
+          <thead className="bg-ranch-crema/60">
+            <tr>
+              <th className={th}>Fecha</th>
+              <th className={th}>Proveedor</th>
+              <th className={th}>Factura</th>
+              <th className={th}>Alimentos</th>
+              <th className={`${th} text-right`}>Total</th>
+              <th className={th}>Gasto</th>
+              <th className={th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {compras.map((c) => (
+              <FilaCompra
+                key={c.id} c={c} busy={busy} correr={correr} esAdmin={esAdmin}
+                abierta={abierta === c.id} alternar={() => setAbierta(abierta === c.id ? null : c.id)}
+                anulando={anulando?.id === c.id ? anulando : null} setAnulando={setAnulando}
+              />
+            ))}
+            {compras.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">Todavía no se ha registrado ninguna compra.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function FilaCompra({
+  c, busy, correr, esAdmin, abierta, alternar, anulando, setAnulando,
+}: {
+  c: CompraVista; busy: boolean; correr: Comun["correr"]; esAdmin: boolean; abierta: boolean; alternar: () => void;
+  anulando: { id: string; motivo: string } | null; setAnulando: (v: { id: string; motivo: string } | null) => void;
+}) {
+  const anulada = c.estado === "anulada";
+  return (
+    <>
+      <tr className={`border-t border-ranch-marron/10 ${anulada ? "opacity-50" : ""}`}>
+        <td className="whitespace-nowrap px-3 py-2 text-ranch-marron/70">{c.fecha}</td>
+        <td className="px-3 py-2 font-semibold text-ranch-marron">{c.proveedor}</td>
+        <td className="px-3 py-2 text-ranch-marron/70">{c.numero_factura ?? "—"}</td>
+        <td className="px-3 py-2 text-ranch-marron/70">
+          <button className="text-left underline decoration-dotted" onClick={alternar}>
+            {c.lineas.length === 1 ? c.lineas[0].alimento : `${c.lineas.length} alimentos`}
+          </button>
+        </td>
+        <td className="px-3 py-2 text-right font-semibold text-ranch-marron">{formatearCOP(c.total)}</td>
+        <td className="px-3 py-2">
+          {anulada ? (
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">anulada</span>
+          ) : (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.estadoGasto === "pagado" ? "bg-ranch-verde/15 text-ranch-verde" : "bg-amber-100 text-amber-700"}`}>
+              {c.estadoGasto ?? "—"}
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right">
+          {esAdmin && !anulada && (
+            <button className={botonSec} onClick={() => setAnulando(anulando ? null : { id: c.id, motivo: "" })}>Anular</button>
+          )}
+          {anulada && <span className="text-xs text-ranch-marron/45">{c.motivo_anulacion}</span>}
+        </td>
+      </tr>
+      {abierta && (
+        <tr className="border-t border-ranch-marron/5 bg-ranch-crema/30">
+          <td colSpan={7} className="px-3 py-3">
+            <ul className="space-y-1 text-sm text-ranch-marron/80">
+              {c.lineas.map((l, i) => (
+                <li key={i} className="flex flex-wrap justify-between gap-2">
+                  <span><strong>{l.alimento}</strong> · {l.cantidadTexto} · {formatearCOP(l.precio_unitario)} por {l.unidad}</span>
+                  <span className="font-semibold">{formatearCOP(l.subtotal)}</span>
+                </li>
+              ))}
+            </ul>
+            {c.observaciones && <p className="mt-2 text-xs text-ranch-marron/55">{c.observaciones}</p>}
+          </td>
+        </tr>
+      )}
+      {anulando && (
+        <tr className="border-t border-ranch-marron/5 bg-ranch-crema/30">
+          <td colSpan={7} className="px-3 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input className={`${input} flex-1`} placeholder="Motivo de la anulación (obligatorio)" value={anulando.motivo} onChange={(e) => setAnulando({ ...anulando, motivo: e.target.value })} />
+              <button
+                className={boton} disabled={busy}
+                onClick={async () => { if (await correr(() => anularCompraAlimento(c.id, anulando.motivo), "Compra anulada: el alimento salió del inventario y el gasto quedó anulado.")) setAnulando(null); }}
+              >Anular compra</button>
+            </div>
           </td>
         </tr>
       )}

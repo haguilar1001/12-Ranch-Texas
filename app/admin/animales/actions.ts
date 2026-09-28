@@ -7,6 +7,8 @@ import { registrarAuditoria } from "@/lib/audit";
 import { aBase, costoCOP, type AlimentoUnidad } from "@/lib/animales/unidades";
 import { cantidadPorEntrega, type FrecuenciaRacion, type ModoRacion } from "@/lib/animales/racion";
 import { recalcularExistencia, registrarEntregaConKardex } from "@/lib/animales/alimentacion";
+import { calcularLineasCompra, preciosQueCambian } from "@/lib/animales/compras";
+import type { Tx } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 
 interface Resultado {
@@ -449,6 +451,202 @@ export async function registrarMovimientoAlimento(e: {
   });
   revalidatePath(RUTA);
   return { ok: true, aviso: saldo < 0 ? "El inventario quedó en negativo. Revisa el conteo físico." : undefined };
+}
+
+// ============================================================ COMPRAS DE ALIMENTO
+
+/** Rubro de gasto de las compras de alimento. Se crea la primera vez, dentro de "Insumos y suministros" si existe. */
+async function rubroAlimentoAnimales(tx: Tx, usuarioId: string): Promise<string> {
+  const existente = await tx.rubroGasto.findFirst({
+    where: { nombre: { equals: "ALIMENTO DE ANIMALES", mode: "insensitive" } },
+  });
+  if (existente) return existente.id;
+
+  const insumos = await tx.rubroGasto.findFirst({
+    where: { nombre: { equals: "INSUMOS Y SUMINISTROS", mode: "insensitive" }, nivel: "grupo" },
+  });
+  const nuevo = await tx.rubroGasto.create({
+    data: insumos
+      ? { nombre: "ALIMENTO DE ANIMALES", nivel: "rubro", padre_id: insumos.id, orden: 99, creado_por: usuarioId }
+      : { nombre: "ALIMENTO DE ANIMALES", nivel: "grupo", orden: 99, creado_por: usuarioId },
+  });
+  return nuevo.id;
+}
+
+export async function registrarCompraAlimento(e: {
+  proveedor_id?: string | null;
+  /** Proveedor nuevo: se crea si no existe uno con ese nombre. */
+  proveedor_nombre?: string | null;
+  fecha: string; // YYYY-MM-DD (Bogotá)
+  numero_factura?: string | null;
+  observaciones?: string | null;
+  lineas: { alimento_id: string; cantidad: string | number; precio_unitario: string | number }[];
+}): Promise<Resultado> {
+  const s = await granja();
+  if (!s) return { ok: false, error: SIN_PERMISO_GRANJA };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.fecha ?? "")) return { ok: false, error: "Indica la fecha de la compra." };
+  const fecha = new Date(`${e.fecha}T12:00:00-05:00`);
+  if (Number.isNaN(fecha.getTime())) return { ok: false, error: "Fecha no válida." };
+  if (fecha.getTime() > Date.now() + 24 * 3600 * 1000) return { ok: false, error: "La fecha de la compra no puede ser futura." };
+
+  const nombreProveedor = texto(e.proveedor_nombre);
+  if (!e.proveedor_id && !nombreProveedor) return { ok: false, error: "Indica el proveedor." };
+
+  // Cantidades y precios como los escribe la persona ("2,5" bultos, "$ 132.300").
+  const entradas = [];
+  for (const l of e.lineas ?? []) {
+    const cantidad = parseCantidad(l.cantidad);
+    const precio = entero(l.precio_unitario);
+    if (cantidad === null) return { ok: false, error: "Hay una cantidad que no es un número." };
+    if (precio === null || precio === "error") return { ok: false, error: "Hay un precio vacío o que no es un entero en pesos." };
+    entradas.push({ alimento_id: l.alimento_id, cantidad, precio_unitario: precio });
+  }
+
+  const alimentos = await prisma.alimento.findMany({ where: { id: { in: entradas.map((x) => x.alimento_id) }, activo: true } });
+  const calc = calcularLineasCompra(entradas, alimentos);
+  if (!calc.ok) return { ok: false, error: calc.error };
+  const cambiosPrecio = preciosQueCambian(calc.lineas, alimentos);
+  const nombreDe = new Map(alimentos.map((a) => [a.id, a.nombre]));
+
+  const { compraId, saldos } = await prisma.$transaction(async (tx) => {
+    let proveedorId = e.proveedor_id || null;
+    if (proveedorId) {
+      if (!(await tx.proveedor.findUnique({ where: { id: proveedorId } }))) throw new Error("Proveedor no encontrado.");
+    } else {
+      const existente = await tx.proveedor.findFirst({ where: { nombre: { equals: nombreProveedor!, mode: "insensitive" } } });
+      proveedorId = existente ? existente.id : (await tx.proveedor.create({ data: { nombre: nombreProveedor!, creado_por: s.id } })).id;
+    }
+
+    const factura = texto(e.numero_factura);
+    const gasto = await tx.gasto.create({
+      data: {
+        rubro_gasto_id: await rubroAlimentoAnimales(tx, s.id),
+        proveedor_id: proveedorId,
+        descripcion: `Compra de alimento${factura ? ` · factura ${factura}` : ""} · ${calc.lineas.map((l) => nombreDe.get(l.alimento_id)).join(", ")}`,
+        fecha_gasto: fecha,
+        // El parque no es responsable de IVA: el IVA pagado es costo, va dentro de la base.
+        base_gravable: calc.total,
+        total: calc.total,
+        estado: "pendiente",
+        creado_por: s.id,
+      },
+    });
+
+    const compra = await tx.compraAlimento.create({
+      data: {
+        proveedor_id: proveedorId,
+        fecha_compra: fecha,
+        numero_factura: factura,
+        observaciones: texto(e.observaciones),
+        total: calc.total,
+        gasto_id: gasto.id,
+        creado_por: s.id,
+        detalle: { create: calc.lineas.map((l) => ({ ...l, creado_por: s.id })) },
+      },
+    });
+
+    const saldos: { alimento_id: string; saldo: number }[] = [];
+    for (const l of calc.lineas) {
+      await tx.movimientoAlimento.create({
+        data: {
+          alimento_id: l.alimento_id,
+          tipo: "entrada",
+          cantidad_base: l.cantidad_base,
+          fecha,
+          costo: l.subtotal,
+          motivo: `Compra${factura ? ` factura ${factura}` : ""}`,
+          compra_id: compra.id,
+          creado_por: s.id,
+        },
+      });
+      saldos.push({ alimento_id: l.alimento_id, saldo: await recalcularExistencia(tx, l.alimento_id, s.id) });
+    }
+
+    // Decisión del responsable: el costo del alimento pasa a ser el de la última compra.
+    for (const c of cambiosPrecio) {
+      await tx.alimento.update({ where: { id: c.alimento_id }, data: { costo_unitario: c.despues, actualizado_por: s.id } });
+    }
+
+    return { compraId: compra.id, saldos };
+  }).catch((err: Error) => ({ compraId: null, saldos: [], error: err.message }));
+
+  if (!compraId) return { ok: false, error: "No se pudo registrar la compra. Revisa el proveedor e intenta de nuevo." };
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "compra_alimento", entidad_id: compraId, accion: "crear",
+    datos_despues: { total: calc.total, lineas: calc.lineas.map((l) => ({ ...l })), cambios_precio: cambiosPrecio },
+  });
+  revalidatePath(RUTA);
+  revalidatePath("/admin/gastos");
+
+  const avisos: string[] = [];
+  if (cambiosPrecio.length > 0) {
+    avisos.push(`Costo actualizado: ${cambiosPrecio.map((c) => nombreDe.get(c.alimento_id)).join(", ")}.`);
+  }
+  const negativos = saldos.filter((x) => x.saldo < 0).map((x) => nombreDe.get(x.alimento_id));
+  if (negativos.length > 0) avisos.push(`Siguen en negativo: ${negativos.join(", ")}. Haz un ajuste por conteo físico.`);
+  return { ok: true, aviso: avisos.join(" ") || undefined };
+}
+
+/** Anula la compra: devuelve el inventario con una salida de compensación y anula su gasto. Solo administrador. */
+export async function anularCompraAlimento(id: string, motivo: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo el administrador puede anular compras." };
+
+  const motivoLimpio = texto(motivo);
+  if (!motivoLimpio) return { ok: false, error: "Indica el motivo de la anulación (queda en la auditoría)." };
+
+  const compra = await prisma.compraAlimento.findUnique({ where: { id }, include: { detalle: true, gasto: true } });
+  if (!compra) return { ok: false, error: "Compra no encontrada." };
+  if (compra.estado === "anulada") return { ok: false, error: "Esa compra ya está anulada." };
+  if (compra.gasto?.estado === "pagado") {
+    return { ok: false, error: "El gasto de esta compra ya está pagado. Resuelve primero el pago en Gastos y anúlalo allá." };
+  }
+
+  const saldos = await prisma.$transaction(async (tx) => {
+    await tx.compraAlimento.update({
+      where: { id },
+      data: { estado: "anulada", motivo_anulacion: motivoLimpio, actualizado_por: s.id },
+    });
+    if (compra.gasto && compra.gasto.estado !== "anulado") {
+      await tx.gasto.update({ where: { id: compra.gasto.id }, data: { estado: "anulado", actualizado_por: s.id } });
+    }
+    // Compensación en el kardex: nunca se borra la entrada original.
+    const saldos: number[] = [];
+    for (const l of compra.detalle) {
+      await tx.movimientoAlimento.create({
+        data: {
+          alimento_id: l.alimento_id,
+          tipo: "salida",
+          cantidad_base: l.cantidad_base,
+          motivo: `Anulación de compra · ${motivoLimpio}`,
+          compra_id: compra.id,
+          creado_por: s.id,
+        },
+      });
+      saldos.push(await recalcularExistencia(tx, l.alimento_id, s.id));
+    }
+    return saldos;
+  });
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "compra_alimento", entidad_id: id, accion: "anular",
+    datos_antes: { total: compra.total, estado: compra.estado },
+    datos_despues: { motivo: motivoLimpio },
+  });
+  if (compra.gasto) {
+    await registrarAuditoria({
+      usuario_id: s.id, entidad: "gasto", entidad_id: compra.gasto.id, accion: "anular",
+      datos_despues: { motivo: `Anulación de compra de alimento · ${motivoLimpio}` },
+    });
+  }
+  revalidatePath(RUTA);
+  revalidatePath("/admin/gastos");
+  return {
+    ok: true,
+    aviso: saldos.some((x) => x < 0) ? "Algún alimento quedó en negativo: ya se había consumido parte de la compra." : undefined,
+  };
 }
 
 // ============================================================ RACIONES (dieta)

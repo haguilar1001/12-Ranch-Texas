@@ -769,8 +769,9 @@ model Proveedor {
   email      String?
   activo     Boolean @default(true)
 
-  gastos      Gasto[]
-  recurrentes GastoRecurrente[]
+  gastos           Gasto[]
+  recurrentes      GastoRecurrente[]
+  compras_alimento CompraAlimento[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -827,6 +828,8 @@ model Gasto {
   rubro      RubroGasto       @relation(fields: [rubro_gasto_id], references: [id])
   plantilla  GastoRecurrente? @relation(fields: [plantilla_id], references: [id])
   medio_pago MedioPago?       @relation(fields: [medio_pago_id], references: [id])
+
+  compra_alimento CompraAlimento? // si el gasto nació de una compra de alimento
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1201,6 +1204,7 @@ model Alimento {
   raciones       Racion[]
   movimientos    MovimientoAlimento[]
   alimentaciones RegistroAlimentacion[]
+  compras        CompraAlimentoDetalle[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1292,9 +1296,11 @@ model MovimientoAlimento {
   motivo          String?
   costo           Int? // COP del movimiento (compras)
   alimentacion_id String?                @unique // salida generada por una entrega de la bitácora
+  compra_id       String? // entrada (o su compensación al anular) generada por una compra
 
   alimento     Alimento              @relation(fields: [alimento_id], references: [id])
   alimentacion RegistroAlimentacion? @relation(fields: [alimentacion_id], references: [id])
+  compra       CompraAlimento?       @relation(fields: [compra_id], references: [id])
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1303,7 +1309,63 @@ model MovimientoAlimento {
 
   @@index([alimento_id])
   @@index([fecha])
+  @@index([compra_id])
   @@map("movimientos_alimento")
+}
+
+enum EstadoCompraAlimento {
+  registrada
+  anulada
+}
+
+// Compra de alimento: la factura del proveedor. Se registra al RECIBIR el pedido (un solo
+// paso): cada línea genera su entrada en el kardex y el total nace como gasto pendiente.
+// El total se guarda en el encabezado pero se recalcula desde el detalle (como una venta).
+model CompraAlimento {
+  id               String               @id @default(uuid())
+  proveedor_id     String?
+  fecha_compra     DateTime
+  numero_factura   String?
+  observaciones    String?
+  total            Int // COP con IVA = suma de los subtotales del detalle
+  estado           EstadoCompraAlimento @default(registrada)
+  motivo_anulacion String?
+  gasto_id         String?              @unique
+
+  proveedor   Proveedor?              @relation(fields: [proveedor_id], references: [id])
+  gasto       Gasto?                  @relation(fields: [gasto_id], references: [id])
+  detalle     CompraAlimentoDetalle[]
+  movimientos MovimientoAlimento[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([fecha_compra])
+  @@map("compras_alimento")
+}
+
+model CompraAlimentoDetalle {
+  id              String @id @default(uuid())
+  compra_id       String
+  alimento_id     String
+  unidad          String // unidad de compra del alimento en ese momento (bulto, paca, kg...)
+  cantidad_base   Int // g/ml/unidad que entran al inventario (2,5 bultos de 40 kg = 100000)
+  precio_unitario Int // COP con IVA por unidad de compra
+  subtotal        Int
+
+  compra   CompraAlimento @relation(fields: [compra_id], references: [id])
+  alimento Alimento       @relation(fields: [alimento_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([compra_id])
+  @@index([alimento_id])
+  @@map("compras_alimento_detalle")
 }
 
 // ------------------------- EQUIPOS -------------------------

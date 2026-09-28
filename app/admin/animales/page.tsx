@@ -4,7 +4,7 @@ import { obtenerSesion, tieneRol, puedeOperarGranja } from "@/lib/auth/sesion";
 import { formatearBase, costoCOP, type AlimentoUnidad } from "@/lib/animales/unidades";
 import { consumoBaseDiario, costoDiario, costoMensual, describirRacion, sugerenciaDeEntrega } from "@/lib/animales/racion";
 import { diasDeAutonomia } from "@/lib/animales/existencia";
-import { inicioDelDiaOperativo, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
+import { inicioDelDiaOperativo, formatearFechaHoraCortaBogota, fechaBogota } from "@/lib/tiempo";
 import AnimalesClient from "./AnimalesClient";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function AnimalesPage() {
 
   const desdeHoy = inicioDelDiaOperativo();
 
-  const [animalesRaw, categoriasRaw, recintosRaw, alimentosRaw, racionesRaw, bitacoraRaw, empleadosRaw] = await Promise.all([
+  const [animalesRaw, categoriasRaw, recintosRaw, alimentosRaw, racionesRaw, bitacoraRaw, empleadosRaw, comprasRaw, proveedoresRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { activo: true },
       include: {
@@ -48,6 +48,16 @@ export default async function AnimalesPage() {
       },
     }),
     prisma.empleado.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.compraAlimento.findMany({
+      orderBy: [{ fecha_compra: "desc" }, { creado_en: "desc" }],
+      take: 50,
+      include: {
+        proveedor: { select: { nombre: true } },
+        gasto: { select: { estado: true } },
+        detalle: { include: { alimento: true } },
+      },
+    }),
+    prisma.proveedor.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
   ]);
 
   // Censo por categoría, para las raciones que se definen a nivel de categoría.
@@ -183,6 +193,26 @@ export default async function AnimalesPage() {
     };
   });
 
+  // ---- Compras de alimento (la factura con su detalle).
+  const compras = comprasRaw.map((c) => ({
+    id: c.id,
+    fecha: fechaBogota(c.fecha_compra),
+    proveedor: c.proveedor?.nombre ?? "—",
+    numero_factura: c.numero_factura,
+    observaciones: c.observaciones,
+    total: c.total,
+    estado: c.estado,
+    motivo_anulacion: c.motivo_anulacion,
+    estadoGasto: c.gasto?.estado ?? null,
+    lineas: c.detalle.map((d) => ({
+      alimento: d.alimento.nombre,
+      cantidadTexto: formatearBase(d.cantidad_base, { ...unidadDe(d.alimento), unidad_medida: d.unidad }),
+      precio_unitario: d.precio_unitario,
+      unidad: d.unidad,
+      subtotal: d.subtotal,
+    })),
+  }));
+
   const registrosHoy = bitacoraRaw.filter((b) => b.fecha >= desdeHoy && !b.anulado);
   const racionesDiariasActivas = racionesRaw.filter((r) => r.activo && r.frecuencia === "diaria").length;
 
@@ -210,6 +240,9 @@ export default async function AnimalesPage() {
       raciones={raciones}
       bitacora={bitacora}
       empleados={empleadosRaw}
+      compras={compras}
+      proveedores={proveedoresRaw}
+      hoy={fechaBogota()}
     />
   );
 }

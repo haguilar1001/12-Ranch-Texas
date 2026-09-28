@@ -234,6 +234,22 @@ y no los $20.866.480 que suman los dos cuadros.
     *(Se intentó primero un Cron Job de Railway; se creó y se revirtió — el responsable no maneja
     esa parte de Railway.)*
 
+### Compras de alimento (2026-09-28)
+Pestaña **Compras** en `/admin/animales` (`compras_alimento` + `compras_alimento_detalle`). Decisiones
+del responsable:
+- **Crea el gasto:** cada compra nace como **gasto pendiente** en el rubro `ALIMENTO DE ANIMALES`
+  (se crea solo la primera vez, dentro de "Insumos y suministros"). El pago se marca en Gastos.
+  Base = total con IVA, IVA = 0: el parque no es responsable de IVA (ver arriba).
+- **Un solo paso:** se registra al **recibir** el pedido; cada línea genera su `entrada` en el kardex
+  (`movimientos_alimento.compra_id`). No hay pedido/recepción parcial.
+- **Último precio:** el `costo_unitario` del alimento pasa a ser el de la compra. Una línea en $0
+  (donación) no toca el costo. Anular la compra **no** devuelve el costo anterior.
+- **Permisos:** granja y supervisor registran; **anular es de administrador**, y solo si el gasto
+  no está pagado (si ya se pagó, se resuelve primero en Gastos). Anular deja una `salida` de
+  compensación y anula el gasto; nada se borra.
+- Las líneas se escriben en la **unidad de compra** del alimento (bulto, paca, kg) y admiten fracción
+  (2,5 bultos); el total se recalcula desde el detalle.
+
 ### Cliente maestro por celular, para agilizar taquilla (2026-09-14)
 - **Llave = celular, NO cédula.** La cédula queda por fuera a propósito: niños no la
   tienen, extranjeros traen pasaporte, mucha gente no la trae encima, y hoy es un
