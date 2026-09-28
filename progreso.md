@@ -18,7 +18,7 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F11 | Animales: alimentación (dieta individual/grupal + bitácora + kardex) y ubicación con historial | ✅ Completada (faltan datos reales de recintos) |
 | F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
 | F13 | Atracciones editables + fila virtual (el visitante separa turno con su QR) | ✅ Completada |
-| F14 | Animales: compras de alimento (factura con detalle → inventario + gasto pendiente) | 🟡 Pruebas verdes, falta verificar en pantalla |
+| F14 | Compras de alimento (factura → inventario + gasto) y gastos por área y por quién pide | ✅ Completada (verificada en local) |
 
 
 ## Traído de Family Party (2026-09-25)

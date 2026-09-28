@@ -25,6 +25,10 @@ export interface EntradaGasto {
   medio_pago_id?: string | null;
   estado: "pendiente" | "pagado";
   soporte_archivo?: string; // URL/referencia del soporte
+  /** Dónde se consume (área de trabajo). */
+  area_id?: string | null;
+  /** Empleado que pidió la compra. */
+  solicitante_id?: string | null;
 }
 
 export async function crearGasto(e: EntradaGasto): Promise<ResultadoGasto> {
@@ -35,6 +39,15 @@ export async function crearGasto(e: EntradaGasto): Promise<ResultadoGasto> {
   if (!e.descripcion?.trim()) return { ok: false, error: "Ingresa la descripción." };
   if (!e.fecha_gasto) return { ok: false, error: "Ingresa la fecha." };
   if (!Number.isInteger(e.base_gravable) || e.base_gravable < 0) return { ok: false, error: "Base inválida." };
+
+  const area_id = e.area_id || null;
+  const solicitante_id = e.solicitante_id || null;
+  if (area_id && !(await prisma.areaTrabajo.findFirst({ where: { id: area_id, activo: true } }))) {
+    return { ok: false, error: "El área no existe o está inactiva." };
+  }
+  if (solicitante_id && !(await prisma.empleado.findFirst({ where: { id: solicitante_id, activo: true } }))) {
+    return { ok: false, error: "El empleado que pidió no existe o está inactivo." };
+  }
 
   let proveedor_id: string | null = null;
   if (e.proveedor_nombre?.trim()) {
@@ -62,6 +75,8 @@ export async function crearGasto(e: EntradaGasto): Promise<ResultadoGasto> {
       medio_pago_id: e.estado === "pagado" ? e.medio_pago_id ?? null : null,
       pagado_en: e.estado === "pagado" ? new Date() : null,
       soporte_archivo: e.soporte_archivo?.trim() || null,
+      area_id,
+      solicitante_id,
       creado_por: s.id,
     },
   });

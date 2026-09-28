@@ -823,11 +823,17 @@ model Gasto {
   soporte_archivo   String?
   pagado_en         DateTime?
   medio_pago_id     String?
+  /// Dónde se consume (centro de costo). Sin inventario: el control es por área y por quién pide.
+  area_id           String?
+  /// Empleado que pidió la compra.
+  solicitante_id    String?
 
-  proveedor  Proveedor?       @relation(fields: [proveedor_id], references: [id])
-  rubro      RubroGasto       @relation(fields: [rubro_gasto_id], references: [id])
-  plantilla  GastoRecurrente? @relation(fields: [plantilla_id], references: [id])
-  medio_pago MedioPago?       @relation(fields: [medio_pago_id], references: [id])
+  proveedor   Proveedor?       @relation(fields: [proveedor_id], references: [id])
+  rubro       RubroGasto       @relation(fields: [rubro_gasto_id], references: [id])
+  plantilla   GastoRecurrente? @relation(fields: [plantilla_id], references: [id])
+  medio_pago  MedioPago?       @relation(fields: [medio_pago_id], references: [id])
+  area        AreaTrabajo?     @relation(fields: [area_id], references: [id])
+  solicitante Empleado?        @relation(fields: [solicitante_id], references: [id])
 
   compra_alimento CompraAlimento? // si el gasto nació de una compra de alimento
 
@@ -839,6 +845,8 @@ model Gasto {
   @@index([rubro_gasto_id])
   @@index([fecha_gasto])
   @@index([estado])
+  @@index([area_id])
+  @@index([solicitante_id])
   @@map("gastos")
 }
 
@@ -991,6 +999,7 @@ model AreaTrabajo {
   cargos    Cargo[]
   empleados Empleado[]
   equipos   Equipo[]
+  gastos    Gasto[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1041,6 +1050,8 @@ model Empleado {
 
   cargo Cargo?       @relation(fields: [cargo_id], references: [id])
   area  AreaTrabajo? @relation(fields: [area_id], references: [id])
+
+  gastos_solicitados Gasto[]
 
   creado_en       DateTime @default(now())
   creado_por      String?

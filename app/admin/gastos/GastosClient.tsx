@@ -6,17 +6,22 @@ import { crearGasto, marcarPagado, type EntradaGasto } from "./actions";
 import { totalGasto } from "@/lib/gastos/calculo";
 import { formatearCOP, formatearMiles, parseCOP } from "@/lib/dinero/cop";
 
-interface GastoFila { id: string; fecha: string; rubro: string; proveedor: string; descripcion: string; total: number; estado: string }
+interface GastoFila {
+  id: string; fecha: string; rubro: string; proveedor: string; descripcion: string; total: number; estado: string;
+  area: string | null; solicitante: string | null;
+}
 
 export default function GastosClient({
-  fechaHoy, rubros, medios, gastos,
+  fechaHoy, rubros, medios, gastos, areas, empleados,
 }: {
   fechaHoy: string; rubros: { id: string; path: string }[]; medios: { id: string; nombre: string }[]; gastos: GastoFila[];
+  areas: { id: string; nombre: string }[]; empleados: { id: string; nombre: string; area_id: string | null }[];
 }) {
   const router = useRouter();
   const [f, setF] = useState({
     rubro_gasto_id: "", proveedor_nombre: "", proveedor_nit: "", descripcion: "", fecha_gasto: fechaHoy,
     base: "", iva: "", retefuente: "", reteica: "", otras: "", medio_pago_id: "", estado: "pendiente" as "pendiente" | "pagado", soporte: "",
+    area_id: "", solicitante_id: "",
   });
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -37,12 +42,13 @@ export default function GastosClient({
       descripcion: f.descripcion, fecha_gasto: f.fecha_gasto,
       base_gravable: parseCOP(f.base), iva: parseCOP(f.iva), retefuente: parseCOP(f.retefuente), reteica: parseCOP(f.reteica), otras_retenciones: parseCOP(f.otras),
       medio_pago_id: f.medio_pago_id || null, estado: f.estado, soporte_archivo: f.soporte,
+      area_id: f.area_id || null, solicitante_id: f.solicitante_id || null,
     };
     const r = await crearGasto(entrada);
     setEnviando(false);
     if (r.ok) {
       setMsg({ ok: true, t: "Gasto registrado." });
-      setF((p) => ({ ...p, descripcion: "", base: "", iva: "", retefuente: "", reteica: "", otras: "", proveedor_nombre: "", proveedor_nit: "", soporte: "" }));
+      setF((p) => ({ ...p, descripcion: "", base: "", iva: "", retefuente: "", reteica: "", otras: "", proveedor_nombre: "", proveedor_nit: "", soporte: "", area_id: "", solicitante_id: "" }));
       router.refresh();
     } else setMsg({ ok: false, t: r.error ?? "Error" });
   }
@@ -80,6 +86,26 @@ export default function GastosClient({
           </label>
           <label className="text-sm"><span className="block text-ranch-marron/70">Descripción</span>
             <input value={f.descripcion} onChange={(e) => set("descripcion", e.target.value)} className="w-full rounded border px-2 py-1" />
+          </label>
+          <label className="text-sm"><span className="block text-ranch-marron/70">¿Quién lo pidió?</span>
+            <select
+              value={f.solicitante_id}
+              onChange={(e) => {
+                const emp = empleados.find((x) => x.id === e.target.value);
+                // El área se llena sola con la del empleado; se puede cambiar si el gasto es de otra área.
+                setF((p) => ({ ...p, solicitante_id: e.target.value, area_id: emp?.area_id ?? p.area_id }));
+              }}
+              className="w-full rounded border px-2 py-1"
+            >
+              <option value="">Selecciona…</option>
+              {empleados.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
+          </label>
+          <label className="text-sm"><span className="block text-ranch-marron/70">¿Dónde se consume? (área)</span>
+            <select value={f.area_id} onChange={(e) => set("area_id", e.target.value)} className="w-full rounded border px-2 py-1">
+              <option value="">Selecciona…</option>
+              {areas.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
           </label>
           <label className="text-sm"><span className="block text-ranch-marron/70">Proveedor</span>
             <input value={f.proveedor_nombre} onChange={(e) => set("proveedor_nombre", e.target.value)} placeholder="Nombre" className="w-full rounded border px-2 py-1" />
@@ -125,7 +151,7 @@ export default function GastosClient({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-ranch-marron/60">
-              <th className="py-1">Fecha</th><th>Rubro</th><th>Proveedor</th><th className="text-right">Total</th><th>Estado</th><th></th>
+              <th className="py-1">Fecha</th><th>Rubro</th><th>Proveedor</th><th>Área · pidió</th><th className="text-right">Total</th><th>Estado</th><th></th>
             </tr></thead>
             <tbody>
               {gastos.map((g) => (
@@ -133,6 +159,10 @@ export default function GastosClient({
                   <td className="py-1">{g.fecha}</td>
                   <td>{g.rubro}</td>
                   <td>{g.proveedor}</td>
+                  <td className="text-ranch-marron/70">
+                    {g.area ?? "—"}
+                    {g.solicitante && <span className="block text-xs text-ranch-marron/50">{g.solicitante}</span>}
+                  </td>
                   <td className="text-right">{formatearCOP(g.total)}</td>
                   <td><span className={g.estado === "pagado" ? "text-ranch-verde" : g.estado === "anulado" ? "text-red-600" : "text-ranch-dorado"}>{g.estado}</span></td>
                   <td className="text-right">
@@ -148,7 +178,7 @@ export default function GastosClient({
                   </td>
                 </tr>
               ))}
-              {gastos.length === 0 && <tr><td colSpan={6} className="py-2 text-ranch-marron/40">Sin gastos aún.</td></tr>}
+              {gastos.length === 0 && <tr><td colSpan={7}className="py-2 text-ranch-marron/40">Sin gastos aún.</td></tr>}
             </tbody>
           </table>
         </div>
