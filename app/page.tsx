@@ -118,13 +118,15 @@ export default async function Home() {
           </video>
           {/* Velo claro: mantiene el logo (oscuro) y el texto legibles, con o sin video. */}
           <div className="absolute inset-0 bg-gradient-to-t from-ranch-crema/85 via-ranch-crema/55 to-white/70" />
-          <div className="relative flex flex-col items-center gap-2 px-6 py-10 text-center">
+          <div className="relative flex items-center justify-between gap-4 px-5 py-4 sm:px-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Ranch Texas" className="mb-1 h-24 w-auto drop-shadow-md sm:h-28" />
-            <h1 className="text-2xl font-black text-ranch-marron sm:text-3xl">Hola, {s.nombre.split(" ")[0]} 👋</h1>
-            <p className="text-sm text-ranch-marron/60">
-              Resumen del día — {new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
-            </p>
+            <img src="/logo.png" alt="Ranch Texas" className="h-14 w-auto shrink-0 drop-shadow-md sm:h-20" />
+            <div className="text-right">
+              <h1 className="text-xl font-black text-ranch-marron sm:text-3xl">Hola, {s.nombre.split(" ")[0]} 👋</h1>
+              <p className="text-xs text-ranch-marron/60 sm:text-sm">
+                Resumen del día — {new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
+              </p>
+            </div>
           </div>
         </section>
 
