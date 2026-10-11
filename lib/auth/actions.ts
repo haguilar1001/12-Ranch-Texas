@@ -39,7 +39,11 @@ export async function login(_prev: EstadoLogin | null, formData: FormData): Prom
   const password = String(formData.get("password") ?? "");
   if (!usuario || !password) return { error: "Ingresa usuario y contraseña." };
 
-  const u = await prisma.usuario.findUnique({ where: { usuario } });
+  // El usuario (o correo) no distingue mayúsculas: el teclado del celular pone la primera
+  // letra en mayúscula y "Hector@..." debe entrar igual que "hector@...". Si por datos viejos
+  // hubiera dos que solo difieren en mayúsculas, manda el que coincide exacto.
+  const candidatos = await prisma.usuario.findMany({ where: { usuario: { equals: usuario, mode: "insensitive" } } });
+  const u = candidatos.find((c) => c.usuario === usuario) ?? (candidatos.length === 1 ? candidatos[0] : null);
   if (!u || !u.activo || !(await verificarPassword(password, u.hash_password))) {
     return { error: "Usuario o contraseña incorrectos." };
   }

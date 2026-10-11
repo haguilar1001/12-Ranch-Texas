@@ -23,6 +23,9 @@ export default function LoginPage() {
           name="usuario"
           autoFocus
           autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           className="sin-mayusculas mt-1 mb-4 w-full rounded-lg border border-ranch-marron/30 px-3 py-2 outline-none focus:border-ranch-dorado"
         />
 

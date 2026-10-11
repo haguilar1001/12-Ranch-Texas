@@ -38,7 +38,10 @@ export async function crearUsuario(e: EntradaUsuario): Promise<Resultado> {
   if (!nombre || !usuario) return { ok: false, error: "Nombre y usuario/correo son obligatorios." };
   if (!ROLES.includes(e.rol)) return { ok: false, error: "Perfil inválido." };
   if (!e.password || e.password.length < 6) return { ok: false, error: "La contraseña inicial debe tener al menos 6 caracteres." };
-  if (await prisma.usuario.findUnique({ where: { usuario } })) return { ok: false, error: "Ya existe un usuario con ese identificador." };
+  // Sin distinguir mayúsculas: el ingreso tampoco las distingue.
+  if (await prisma.usuario.findFirst({ where: { usuario: { equals: usuario, mode: "insensitive" } } })) {
+    return { ok: false, error: "Ya existe un usuario con ese identificador." };
+  }
 
   const u = await prisma.usuario.create({
     data: { nombre, usuario, rol: e.rol as Rol, hash_password: await hashPassword(e.password), creado_por: s.id },
@@ -63,7 +66,7 @@ export async function editarUsuario(id: string, cambios: { nombre?: string; usua
     const nuevo = cambios.usuario.trim();
     if (!nuevo) return { ok: false, error: "El usuario o correo no puede quedar vacío." };
     if (nuevo !== u.usuario) {
-      const repetido = await prisma.usuario.findUnique({ where: { usuario: nuevo } });
+      const repetido = await prisma.usuario.findFirst({ where: { usuario: { equals: nuevo, mode: "insensitive" }, id: { not: id } } });
       if (repetido) return { ok: false, error: "Ya existe otro usuario con ese identificador." };
     }
     data.usuario = nuevo;
