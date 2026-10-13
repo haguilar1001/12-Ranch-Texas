@@ -32,6 +32,14 @@ describe("dinero COP", () => {
     expect(formatearMiles(1234567)).toBe("1.234.567");
   });
 
+  // Safari en español no agrupaba 4 cifras ("1432"): la cifra no depende del navegador.
+  it("separa miles también en números de 4 cifras", () => {
+    expect(formatearMiles(1432)).toBe("1.432");
+    expect(formatearMiles(332)).toBe("332");
+    expect(formatearMiles(-5340)).toBe("-5.340");
+    expect(formatearCOP(3000)).toBe(`$${NBSP}3.000`);
+  });
+
   it("parsea texto con puntos y símbolo", () => {
     expect(parseCOP("$ 1.234.567")).toBe(1234567);
     expect(parseCOP("60.000")).toBe(60000);

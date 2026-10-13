@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -53,9 +53,9 @@ export default async function EquiposPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-3 gap-3">
-        <Kpi label="Equipos" valor={String(equipos.length)} />
-        <Kpi label="Operativos" valor={String(operativos)} />
-        <Kpi label="Categorías" valor={String(categorias)} />
+        <Kpi label="Equipos" valor={formatearMiles(equipos.length)} />
+        <Kpi label="Operativos" valor={formatearMiles(operativos)} />
+        <Kpi label="Categorías" valor={formatearMiles(categorias)} />
       </div>
 
       {/* Inventario */}

@@ -6,7 +6,7 @@ import { relacionCortesias, type TipoCortesia } from "@/lib/reportes/cortesias";
 import { queryDe, rangoDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -147,11 +147,11 @@ export default async function ReporteCortesiasPage({
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{rango.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Valor no cobrado" valor={formatearCOP(r.totalNoCobrado)} />
-        <Kpi label="Personas" valor={String(r.totalPersonas)} />
-        <Kpi label="Registros" valor={String(r.lineas.length)} />
+        <Kpi label="Personas" valor={formatearMiles(r.totalPersonas)} />
+        <Kpi label="Registros" valor={formatearMiles(r.lineas.length)} />
         <Kpi
           label="Atenciones"
-          valor={String(r.porTipo.find((t) => t.tipo === "atencion")?.personas ?? 0)}
+          valor={formatearMiles(r.porTipo.find((t) => t.tipo === "atencion")?.personas ?? 0)}
           sub={formatearCOP(r.porTipo.find((t) => t.tipo === "atencion")?.noCobrado ?? 0)}
         />
       </div>

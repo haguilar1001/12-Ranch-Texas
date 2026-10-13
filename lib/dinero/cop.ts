@@ -1,11 +1,14 @@
 // Utilidades de dinero en pesos colombianos (COP).
 // Regla dura del proyecto: el dinero SIEMPRE se maneja como entero (sin decimales).
 
-const formateador = new Intl.NumberFormat("es-CO", {
-  style: "decimal",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
+/**
+ * Miles con punto, siempre: "1.432", "81.293.000". No se usa Intl.NumberFormat("es-CO")
+ * porque en español algunos navegadores (Safari del iPhone) NO separan los números de
+ * 4 cifras y mostraban "1432"; el servidor sí lo hacía. Así se ve igual en todo equipo.
+ */
+function conPuntos(entero: number): string {
+  return String(Math.abs(entero)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 
 /**
  * Espacio DURO entre el símbolo y la cifra.
@@ -22,12 +25,13 @@ const ESPACIO_DURO = " ";
 export function formatearCOP(valor: number): string {
   const entero = Math.round(valor);
   const signo = entero < 0 ? "-" : "";
-  return `${signo}$${ESPACIO_DURO}${formateador.format(Math.abs(entero))}`;
+  return `${signo}$${ESPACIO_DURO}${conPuntos(entero)}`;
 }
 
 /** Formatea sin el símbolo: "1.234.567". */
 export function formatearMiles(valor: number): string {
-  return formateador.format(Math.round(valor));
+  const entero = Math.round(valor);
+  return `${entero < 0 ? "-" : ""}${conPuntos(entero)}`;
 }
 
 /**

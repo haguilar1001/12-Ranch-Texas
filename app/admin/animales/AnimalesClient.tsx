@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import {
   crearRecinto, editarRecinto, cambiarEstadoRecinto,
   crearAnimal, editarAnimal, trasladarAnimal, cambiarEstadoAnimal,
@@ -132,9 +132,9 @@ export default function AnimalesClient(p: Props) {
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi label="Cabezas" valor={p.kpis.cabezas.toLocaleString("es-CO")} />
-        <Kpi label="Grupos" valor={String(p.kpis.grupos)} />
-        <Kpi label="Recintos" valor={String(p.kpis.recintos)} />
-        <Kpi label="Sin ubicar" valor={String(p.kpis.sinUbicacion)} alerta={p.kpis.sinUbicacion > 0} />
+        <Kpi label="Grupos" valor={formatearMiles(p.kpis.grupos)} />
+        <Kpi label="Recintos" valor={formatearMiles(p.kpis.recintos)} />
+        <Kpi label="Sin ubicar" valor={formatearMiles(p.kpis.sinUbicacion)} alerta={p.kpis.sinUbicacion > 0} />
         <Kpi label="Alimento / día" valor={formatearCOP(p.kpis.costoDiario)} />
         <Kpi label="Alimento / mes" valor={formatearCOP(p.kpis.costoMensual)} />
       </div>
@@ -1096,8 +1096,8 @@ function Bitacora({
   return (
     <>
       <div className="mb-4 grid grid-cols-3 gap-3">
-        <Kpi label="Entregas hoy" valor={String(kpis.entregasHoy)} />
-        <Kpi label="Raciones diarias" valor={String(kpis.racionesDiariasActivas)} />
+        <Kpi label="Entregas hoy" valor={formatearMiles(kpis.entregasHoy)} />
+        <Kpi label="Raciones diarias" valor={formatearMiles(kpis.racionesDiariasActivas)} />
         <Kpi label="Costo de hoy" valor={formatearCOP(kpis.costoHoy)} />
       </div>
 

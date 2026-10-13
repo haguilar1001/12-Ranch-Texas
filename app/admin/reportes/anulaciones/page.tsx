@@ -6,7 +6,7 @@ import { relacionAnulaciones } from "@/lib/reportes/anulaciones";
 import { rangoDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
 import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -113,8 +113,8 @@ export default async function ReporteAnulacionesPage({
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{rango.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Valor anulado" valor={formatearCOP(r.totalAnulado)} />
-        <Kpi label="Ventas anuladas" valor={String(r.totalVentas)} />
-        <Kpi label="Asistentes" valor={String(r.totalAsistentes)} />
+        <Kpi label="Ventas anuladas" valor={formatearMiles(r.totalVentas)} />
+        <Kpi label="Asistentes" valor={formatearMiles(r.totalAsistentes)} />
         <Kpi label="Quién más anuló" valor={r.porUsuario[0]?.usuario ?? "—"} sub={r.porUsuario[0] ? formatearCOP(r.porUsuario[0].valor) : undefined} />
       </div>
 

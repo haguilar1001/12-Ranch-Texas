@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { llamar, atendido, noSePresento, anotarPorManilla } from "./actions";
+import { formatearMiles } from "@/lib/dinero/cop";
 
 interface TurnoVista {
   id: string;
@@ -87,10 +88,10 @@ export default function OperarFilaClient({ atracciones, actual, resumen, esperaA
       {msg && <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Esperando" valor={String(resumen.esperando)} sub={`${resumen.personasEsperando} personas`} />
+        <Kpi label="Esperando" valor={formatearMiles(resumen.esperando)} sub={`${formatearMiles(resumen.personasEsperando)} personas`} />
         <Kpi label="Espera actual" valor={esperaActual} />
-        <Kpi label="Atendidos hoy" valor={String(resumen.atendidosHoy)} />
-        <Kpi label="No se presentaron" valor={String(resumen.noSePresentaron)} />
+        <Kpi label="Atendidos hoy" valor={formatearMiles(resumen.atendidosHoy)} />
+        <Kpi label="No se presentaron" valor={formatearMiles(resumen.noSePresentaron)} />
       </div>
 
       <button

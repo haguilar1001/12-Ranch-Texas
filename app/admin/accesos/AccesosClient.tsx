@@ -7,6 +7,7 @@ import {
   crearAtraccion, editarAtraccion, cambiarEstadoAtraccion,
   crearPunto, editarPunto, cambiarEstadoPunto,
 } from "./actions";
+import { formatearMiles } from "@/lib/dinero/cop";
 
 export interface AtraccionVista {
   id: string;
@@ -113,10 +114,10 @@ export default function AccesosClient({ puedeEditar, kpis, atracciones, puntos }
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Entradas parque hoy" valor={String(kpis.entradasParque)} />
-        <Kpi label="Aforo actual" valor={String(kpis.aforoParque)} sub={kpis.aforoMaximo ? `de ${kpis.aforoMaximo}` : undefined} />
-        <Kpi label="Atracciones activas" valor={String(kpis.atracciones)} />
-        <Kpi label="Con consentimiento" valor={String(kpis.conConsentimiento)} />
+        <Kpi label="Entradas parque hoy" valor={formatearMiles(kpis.entradasParque)} />
+        <Kpi label="Aforo actual" valor={formatearMiles(kpis.aforoParque)} sub={kpis.aforoMaximo ? `de ${formatearMiles(kpis.aforoMaximo)}` : undefined} />
+        <Kpi label="Atracciones activas" valor={formatearMiles(kpis.atracciones)} />
+        <Kpi label="Con consentimiento" valor={formatearMiles(kpis.conConsentimiento)} />
       </div>
 
       <nav className="mb-4 flex flex-wrap gap-2">

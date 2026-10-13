@@ -5,7 +5,7 @@ import { indicadoresVentas } from "@/lib/reportes/ventas";
 import { comparativoAnual } from "@/lib/reportes/comparativo";
 import { variacionPct, formatearVariacion } from "@/lib/reportes/util";
 import { inicioDelDiaOperativo, fechaBogota } from "@/lib/tiempo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import NavBar from "@/components/NavBar";
 
 export const dynamic = "force-dynamic";
@@ -134,9 +134,9 @@ export default async function Home() {
         {verCifras && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Kpi label="Ingreso hoy" valor={formatearCOP(ind.ingreso)} />
-          <Kpi label="Entradas hoy" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
+          <Kpi label="Entradas hoy" valor={formatearMiles(ind.asistentes)} sub={`${formatearMiles(ind.numVentas)} ventas`} />
           <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
-          <Kpi label="Aforo actual" valor={String(aforo)} sub={ep?.aforo_maximo ? `de ${ep.aforo_maximo}` : undefined} />
+          <Kpi label="Aforo actual" valor={formatearMiles(aforo)} sub={ep?.aforo_maximo ? `de ${formatearMiles(ep.aforo_maximo)}` : undefined} />
         </div>
         )}
 

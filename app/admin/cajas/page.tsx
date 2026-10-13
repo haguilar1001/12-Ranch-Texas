@@ -3,7 +3,7 @@ import Link from "next/link";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { estadoDeCajas, tiempoAbierto, type CajaEnEstado } from "@/lib/caja/estado";
 import { fechaBogota, formatearFechaHoraBogota } from "@/lib/tiempo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,7 @@ export default async function EstadoCajasPage() {
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           label="Cajas abiertas"
-          valor={String(e.abiertas.length)}
+          valor={formatearMiles(e.abiertas.length)}
           sub={e.cerradas.length > 0 ? `${e.cerradas.length} ya cerró` : undefined}
         />
         <Kpi label="Vendido hoy" valor={formatearCOP(e.totalVentas)} sub={`${e.totalVentasCount} ventas · ${e.totalAsistentes} personas`} />

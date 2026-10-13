@@ -7,7 +7,7 @@ import { fechaBogota } from "@/lib/tiempo";
 import { formatearPct } from "@/lib/reportes/util";
 import { queryDe, rangoDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +59,11 @@ export default async function ReporteVentasPage({ searchParams }: { searchParams
 
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{periodo.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Kpi label="Entradas (asistentes)" valor={String(ind.asistentes)} />
-        <Kpi label="Ventas" valor={String(ind.numVentas)} />
+        <Kpi label="Entradas (asistentes)" valor={formatearMiles(ind.asistentes)} />
+        <Kpi label="Ventas" valor={formatearMiles(ind.numVentas)} />
         <Kpi label="Ingreso total" valor={formatearCOP(ind.ingreso)} />
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
-        <Kpi label="Entradas de cortesía" valor={String(ind.personasCortesia)} />
+        <Kpi label="Entradas de cortesía" valor={formatearMiles(ind.personasCortesia)} />
         <Kpi label="Valor no cobrado" valor={formatearCOP(ind.valorNoCobrado)} />
         <Kpi label="% cortesías/desc." valor={formatearPct(ind.pctCortesias)} />
       </div>

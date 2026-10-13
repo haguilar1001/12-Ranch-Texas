@@ -9,7 +9,7 @@ import { variacionPct, formatearVariacion, formatearPct } from "@/lib/reportes/u
 import { fechaBogota } from "@/lib/tiempo";
 import { rangoDe } from "../reportes/periodo";
 import FiltroPeriodo from "../reportes/FiltroPeriodo";
-import { formatearCOP } from "@/lib/dinero/cop";
+import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import Barras from "@/components/Barras";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +68,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {/* El rótulo sigue al período: decir "del mes" mirando un día es mentir. */}
         <Kpi label={periodo.fecha ? "Ingreso del día" : "Ingreso del mes"} valor={formatearCOP(ind.ingreso)} />
-        <Kpi label="Entradas" valor={String(ind.asistentes)} sub={`${ind.numVentas} ventas`} />
+        <Kpi label="Entradas" valor={formatearMiles(ind.asistentes)} sub={`${formatearMiles(ind.numVentas)} ventas`} />
         <Kpi label="Ticket promedio" valor={formatearCOP(ind.ticketPromedio)} sub="por entrada" />
         <Kpi label="% cortesías" valor={formatearPct(ind.pctCortesias)} sub={formatearCOP(ind.valorNoCobrado)} />
       </div>

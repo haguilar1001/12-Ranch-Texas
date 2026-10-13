@@ -8,6 +8,7 @@ import { kmRecorridos } from "@/lib/vehiculos/calculo";
 import { rangoDe, queryDe } from "../periodo";
 import FiltroPeriodo from "../FiltroPeriodo";
 import { fechaBogota, formatearFechaHoraBogota } from "@/lib/tiempo";
+import { formatearMiles } from "@/lib/dinero/cop";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,7 @@ export default async function ReporteVehiculosPage({
 
       <p className="mb-2 text-sm capitalize text-ranch-marron/60">{rango.etiqueta}</p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Viajes cerrados" valor={String(ind.totalViajes)} />
+        <Kpi label="Viajes cerrados" valor={formatearMiles(ind.totalViajes)} />
         <Kpi label="Kilómetros recorridos" valor={`${ind.kmTotales} km`} />
         <Kpi label="Quién más pide" valor={ind.porSolicitante[0]?.nombre ?? "—"} sub={ind.porSolicitante[0] ? `${ind.porSolicitante[0].viajes} viajes` : undefined} />
         <Kpi label="Quién más maneja" valor={ind.porChofer[0]?.nombre ?? "—"} sub={ind.porChofer[0] ? `${ind.porChofer[0].km} km` : undefined} />
