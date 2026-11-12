@@ -5,6 +5,7 @@ import { formatearBase, costoCOP, type AlimentoUnidad } from "@/lib/animales/uni
 import { consumoBaseDiario, costoDiario, costoMensual, describirRacion, sugerenciaDeEntrega } from "@/lib/animales/racion";
 import { diasDeAutonomia } from "@/lib/animales/existencia";
 import { inicioDelDiaOperativo, formatearFechaHoraCortaBogota, fechaBogota } from "@/lib/tiempo";
+import { resumirPorTipo, ETIQUETA_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
 import AnimalesClient from "./AnimalesClient";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,9 @@ export default async function AnimalesPage() {
 
   const desdeHoy = inicioDelDiaOperativo();
 
-  const [animalesRaw, categoriasRaw, recintosRaw, alimentosRaw, racionesRaw, bitacoraRaw, empleadosRaw, comprasRaw, proveedoresRaw] = await Promise.all([
+  const inicioMes = new Date(`${fechaBogota().slice(0, 7)}-01T00:00:00-05:00`);
+
+  const [animalesRaw, categoriasRaw, recintosRaw, alimentosRaw, racionesRaw, bitacoraRaw, empleadosRaw, comprasRaw, proveedoresRaw, novedadesRaw, novedadesMesRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { activo: true },
       include: {
@@ -58,6 +61,15 @@ export default async function AnimalesPage() {
       },
     }),
     prisma.proveedor.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.movimientoAnimal.findMany({
+      orderBy: [{ fecha: "desc" }, { creado_en: "desc" }],
+      take: 200,
+      include: { animal: { select: { nombre: true, categoria: { select: { nombre: true } } } } },
+    }),
+    prisma.movimientoAnimal.findMany({
+      where: { fecha: { gte: inicioMes }, tipo: { notIn: ["saldo_inicial", "traslado_entrada", "traslado_salida"] } },
+      select: { tipo: true, cantidad: true, valor: true, anulado: true },
+    }),
   ]);
 
   // Censo por categoría, para las raciones que se definen a nivel de categoría.
@@ -213,6 +225,24 @@ export default async function AnimalesPage() {
     })),
   }));
 
+  // ---- Novedades del censo (kardex de animales).
+  const novedades = novedadesRaw.map((m) => ({
+    id: m.id,
+    fecha: formatearFechaHoraCortaBogota(m.fecha),
+    grupo: m.animal.nombre,
+    categoria: m.animal.categoria.nombre,
+    tipo: m.tipo,
+    etiqueta: ETIQUETA_ANIMAL[m.tipo as TipoMovAnimal] ?? m.tipo,
+    cantidad: m.cantidad,
+    motivo: m.motivo,
+    valor: m.valor,
+    tercero: m.tercero,
+    anulado: m.anulado,
+    motivo_anulacion: m.motivo_anulacion,
+    anulable: !m.anulado && !(m.tipo === "saldo_inicial" && m.creado_por === "migracion"),
+  }));
+  const resumenMes = resumirPorTipo(novedadesMesRaw).map((r) => ({ ...r, etiqueta: ETIQUETA_ANIMAL[r.tipo as TipoMovAnimal] ?? r.tipo }));
+
   const registrosHoy = bitacoraRaw.filter((b) => b.fecha >= desdeHoy && !b.anulado);
   const racionesDiariasActivas = racionesRaw.filter((r) => r.activo && r.frecuencia === "diaria").length;
 
@@ -243,6 +273,8 @@ export default async function AnimalesPage() {
       compras={compras}
       proveedores={proveedoresRaw}
       hoy={fechaBogota()}
+      novedades={novedades}
+      resumenMes={resumenMes}
     />
   );
 }

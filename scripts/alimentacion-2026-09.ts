@@ -139,6 +139,12 @@ const TOTAL_CUADRO_EQUINOS = 15_893_451; // sin el heno: el cuadro no lo incluye
 const dest = (r: { animal: string | null; categoria: string | null }) => r.animal ?? `cat:${r.categoria}`;
 
 async function main() {
+  // Desde el kardex de animales (2026-11-12) las cabezas solo cambian por novedades.
+  // Este importador escribía la cantidad a mano: correrlo de nuevo descuadraría el kardex.
+  if ((await prisma.movimientoAnimal.count({ where: { creado_por: { not: "migracion" } } })) > 0) {
+    console.error("⛔ Ya hay novedades registradas en el kardex de animales. Este importador ya no se puede correr.");
+    process.exit(1);
+  }
   const url = process.env.DATABASE_URL ?? "";
   const destino = url.includes("localhost") || url.includes("127.0.0.1") ? "LOCAL" : "PRODUCCIÓN";
   console.log(`\n🌾 Alimentación · septiembre 2026 · base ${destino}`);

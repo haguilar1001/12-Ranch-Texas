@@ -250,6 +250,26 @@ del responsable:
 - Las líneas se escriben en la **unidad de compra** del alimento (bulto, paca, kg) y admiten fracción
   (2,5 bultos); el total se recalcula desde el detalle.
 
+### Novedades del inventario: animales y equipos (2026-11-12)
+- **La cantidad nunca se escribe a mano.** `animales.cantidad` y `equipos.cantidad` se recalculan desde
+  `movimientos_animal` / `movimientos_equipo`, igual que la existencia del alimento. Editar las cabezas en
+  el inventario quedó bloqueado: hay que registrar la novedad.
+- **Fecha del hecho ≠ fecha de registro.** Se puede registrar hoy una muerte del lunes; el kardex se ordena
+  por la fecha en que ocurrió. Si es hoy, se usa la hora actual; si es otro día, el mediodía de ese día.
+  No se aceptan fechas futuras.
+- **Nunca negativo.** Se rechaza cualquier novedad (o anulación) que deje el saldo por debajo de cero en
+  algún momento de la historia, no solo al final.
+- **Ajuste = conteo físico** y fija el saldo. Motivo obligatorio.
+- **Motivo obligatorio** en muerte (causa), sacrificio, pérdida, entrega, baja, robo y ajuste.
+- **Traslado parcial** (animales y equipos): las unidades pasan a un registro hermano en el destino
+  (mismo nombre y grupo; en equipos además misma marca y referencia). Se crea si no existe. Dos
+  movimientos enlazados (`contraparte_id`); anular uno anula los dos.
+- **Equipo en 0 unidades = "dado de baja"** automáticamente; ese estado no se elige a mano.
+- **Mantenimiento en proceso** pone el equipo "en mantenimiento"; al cerrarlo como realizado vuelve a
+  "operativo".
+- **Por decidir:** si la compra/venta de animales o equipos debe crear el gasto/ingreso automáticamente.
+  Por ahora solo se guarda el valor y el tercero en la novedad.
+
 ### Cliente maestro por celular, para agilizar taquilla (2026-09-14)
 - **Llave = celular, NO cédula.** La cédula queda por fuera a propósito: niños no la
   tienen, extranjeros traen pasaporte, mucha gente no la trae encima, y hoy es un

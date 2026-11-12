@@ -10,7 +10,9 @@ import {
   crearRacion, editarRacion, cambiarEstadoRacion,
   registrarAlimentacion, anularAlimentacion,
   registrarCompraAlimento, anularCompraAlimento,
+  registrarNovedadAnimal, anularNovedadAnimal,
 } from "./actions";
+import { NOVEDADES_ANIMAL, ETIQUETA_ANIMAL, EFECTO_ANIMAL, MOTIVO_OBLIGATORIO_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
 import { subtotalLinea } from "@/lib/animales/compras";
 
 // ------------------------------------------------------------------ tipos
@@ -57,6 +59,14 @@ export interface CompraVista {
   lineas: { alimento: string; cantidadTexto: string; precio_unitario: number; unidad: string; subtotal: number }[];
 }
 
+export interface NovedadVista {
+  id: string; fecha: string; grupo: string; categoria: string; tipo: string; etiqueta: string;
+  cantidad: number; motivo: string | null; valor: number | null; tercero: string | null;
+  anulado: boolean; motivo_anulacion: string | null; anulable: boolean;
+}
+
+export interface ResumenNovedadVista { tipo: string; etiqueta: string; movimientos: number; cantidad: number; valor: number }
+
 interface Props {
   esAdmin: boolean;
   esSupervisor: boolean;
@@ -76,12 +86,15 @@ interface Props {
   proveedores: { id: string; nombre: string }[];
   /** Fecha de hoy en Bogotá (YYYY-MM-DD), para el formulario de compra. */
   hoy: string;
+  novedades: NovedadVista[];
+  resumenMes: ResumenNovedadVista[];
 }
 
-type Pestana = "inventario" | "ubicacion" | "alimentos" | "compras" | "dieta" | "bitacora";
+type Pestana = "inventario" | "novedades" | "ubicacion" | "alimentos" | "compras" | "dieta" | "bitacora";
 
 const PESTANAS: { id: Pestana; label: string }[] = [
   { id: "inventario", label: "Inventario" },
+  { id: "novedades", label: "Novedades" },
   { id: "ubicacion", label: "Ubicación" },
   { id: "alimentos", label: "Alimentos" },
   { id: "compras", label: "Compras" },
@@ -111,6 +124,7 @@ export default function AnimalesClient(p: Props) {
   const [tab, setTab] = useState<Pestana>("inventario");
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [novedadPara, setNovedadPara] = useState("");
 
   async function correr(fn: () => Promise<{ ok: boolean; error?: string; aviso?: string }>, exito: string) {
     setBusy(true);
@@ -155,7 +169,15 @@ export default function AnimalesClient(p: Props) {
         <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.t}</p>
       )}
 
-      {tab === "inventario" && <Inventario {...comun} animales={p.animales} categorias={p.categorias} recintos={p.recintos} />}
+      {tab === "inventario" && (
+        <Inventario
+          {...comun} animales={p.animales} categorias={p.categorias} recintos={p.recintos}
+          irANovedad={(id) => { setNovedadPara(id); setMsg(null); setTab("novedades"); }}
+        />
+      )}
+      {tab === "novedades" && (
+        <Novedades {...comun} animales={p.animales} novedades={p.novedades} resumenMes={p.resumenMes} hoy={p.hoy} inicial={novedadPara} />
+      )}
       {tab === "ubicacion" && <Ubicacion {...comun} recintos={p.recintos} animales={p.animales} />}
       {tab === "alimentos" && <Alimentos {...comun} alimentos={p.alimentos} />}
       {tab === "compras" && <Compras {...comun} compras={p.compras} proveedores={p.proveedores} alimentos={p.alimentos} hoy={p.hoy} />}
@@ -177,11 +199,12 @@ interface Comun {
 
 // ------------------------------------------------------------------ INVENTARIO
 
-function Inventario({ busy, correr, animales, categorias, recintos }: Comun & { animales: AnimalVista[]; categorias: { id: string; nombre: string }[]; recintos: RecintoVista[] }) {
-  const [nuevo, setNuevo] = useState({ nombre: "", categoria_id: "", recinto_id: "", cantidad: "1", especie: "", observaciones: "" });
+function Inventario({ busy, correr, animales, categorias, recintos, irANovedad }: Comun & { animales: AnimalVista[]; categorias: { id: string; nombre: string }[]; recintos: RecintoVista[]; irANovedad: (id: string) => void }) {
+  const vacio = { nombre: "", categoria_id: "", recinto_id: "", cantidad: "1", origen: "saldo_inicial", especie: "", observaciones: "" };
+  const [nuevo, setNuevo] = useState(vacio);
   const [abierto, setAbierto] = useState(false);
-  const [traslado, setTraslado] = useState<{ id: string; recinto_id: string; motivo: string } | null>(null);
-  const [edicion, setEdicion] = useState<{ id: string; nombre: string; cantidad: string; estado: string } | null>(null);
+  const [traslado, setTraslado] = useState<{ id: string; recinto_id: string; motivo: string; cantidad: string } | null>(null);
+  const [edicion, setEdicion] = useState<{ id: string; nombre: string; estado: string } | null>(null);
   const [historial, setHistorial] = useState<string | null>(null);
   const activos = recintos.filter((r) => r.activo);
 
@@ -201,6 +224,12 @@ function Inventario({ busy, correr, animales, categorias, recintos }: Comun & { 
               {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
             <input className={input} placeholder="Cabezas" inputMode="numeric" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} />
+            <select className={input} value={nuevo.origen} onChange={(e) => setNuevo({ ...nuevo, origen: e.target.value })} title="De dónde salen esas cabezas">
+              <option value="saldo_inicial">Ya estaban en el parque (censo)</option>
+              <option value="compra">Compra</option>
+              <option value="nacimiento">Nacimiento</option>
+              <option value="donacion_recibida">Donación recibida</option>
+            </select>
             <select className={input} value={nuevo.recinto_id} onChange={(e) => setNuevo({ ...nuevo, recinto_id: e.target.value })}>
               <option value="">Sin ubicación…</option>
               {activos.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
@@ -213,7 +242,7 @@ function Inventario({ busy, correr, animales, categorias, recintos }: Comun & { 
             disabled={busy}
             onClick={async () => {
               const ok = await correr(() => crearAnimal(nuevo), "Grupo creado.");
-              if (ok) setNuevo({ nombre: "", categoria_id: "", recinto_id: "", cantidad: "1", especie: "", observaciones: "" });
+              if (ok) setNuevo(vacio);
             }}
           >
             Crear grupo
@@ -237,7 +266,7 @@ function Inventario({ busy, correr, animales, categorias, recintos }: Comun & { 
           <tbody>
             {animales.map((a) => (
               <FilaAnimal
-                key={a.id} a={a} busy={busy} correr={correr} recintos={activos}
+                key={a.id} a={a} busy={busy} correr={correr} recintos={activos} irANovedad={irANovedad}
                 traslado={traslado} setTraslado={setTraslado}
                 edicion={edicion} setEdicion={setEdicion}
                 historial={historial} setHistorial={setHistorial}
@@ -254,14 +283,15 @@ function Inventario({ busy, correr, animales, categorias, recintos }: Comun & { 
 }
 
 function FilaAnimal({
-  a, busy, correr, recintos, traslado, setTraslado, edicion, setEdicion, historial, setHistorial,
+  a, busy, correr, recintos, traslado, setTraslado, edicion, setEdicion, historial, setHistorial, irANovedad,
 }: {
   a: AnimalVista; busy: boolean; recintos: RecintoVista[];
   correr: Comun["correr"];
-  traslado: { id: string; recinto_id: string; motivo: string } | null;
-  setTraslado: (v: { id: string; recinto_id: string; motivo: string } | null) => void;
-  edicion: { id: string; nombre: string; cantidad: string; estado: string } | null;
-  setEdicion: (v: { id: string; nombre: string; cantidad: string; estado: string } | null) => void;
+  irANovedad: (id: string) => void;
+  traslado: { id: string; recinto_id: string; motivo: string; cantidad: string } | null;
+  setTraslado: (v: { id: string; recinto_id: string; motivo: string; cantidad: string } | null) => void;
+  edicion: { id: string; nombre: string; estado: string } | null;
+  setEdicion: (v: { id: string; nombre: string; estado: string } | null) => void;
   historial: string | null;
   setHistorial: (v: string | null) => void;
 }) {
@@ -282,11 +312,7 @@ function FilaAnimal({
           )}
         </td>
         <td className="px-3 py-2 text-right font-bold text-ranch-marron">
-          {editando ? (
-            <input className={`${input} w-20 text-right`} inputMode="numeric" value={edicion.cantidad} onChange={(e) => setEdicion({ ...edicion, cantidad: e.target.value })} />
-          ) : (
-            a.cantidad.toLocaleString("es-CO")
-          )}
+          {a.cantidad.toLocaleString("es-CO")}
         </td>
         <td className="px-3 py-2 text-ranch-marron/70">{a.categoria}</td>
         <td className="px-3 py-2 text-ranch-marron/70">
@@ -316,7 +342,7 @@ function FilaAnimal({
                 <button
                   className={botonSec} disabled={busy}
                   onClick={async () => {
-                    const ok = await correr(() => editarAnimal(a.id, { nombre: edicion.nombre, cantidad: edicion.cantidad, estado: edicion.estado }), "Grupo actualizado.");
+                    const ok = await correr(() => editarAnimal(a.id, { nombre: edicion.nombre, estado: edicion.estado }), "Grupo actualizado.");
                     if (ok) setEdicion(null);
                   }}
                 >Guardar</button>
@@ -324,8 +350,9 @@ function FilaAnimal({
               </>
             ) : (
               <>
-                <button className={botonSec} onClick={() => setEdicion({ id: a.id, nombre: a.nombre, cantidad: String(a.cantidad), estado: a.estado })}>Editar</button>
-                <button className={botonSec} onClick={() => setTraslado(trasladando ? null : { id: a.id, recinto_id: "", motivo: "" })}>Trasladar</button>
+                <button className={botonSec} onClick={() => irANovedad(a.id)} title="Nacimiento, muerte, venta, compra, ajuste…">Novedad</button>
+                <button className={botonSec} onClick={() => setEdicion({ id: a.id, nombre: a.nombre, estado: a.estado })}>Editar</button>
+                <button className={botonSec} onClick={() => setTraslado(trasladando ? null : { id: a.id, recinto_id: "", motivo: "", cantidad: String(a.cantidad) })}>Trasladar</button>
                 <button className={botonSec} onClick={() => setHistorial(historial === a.id ? null : a.id)}>Historial</button>
                 <button className={botonSec} disabled={busy} onClick={() => correr(() => cambiarEstadoAnimal(a.id, false), "Grupo dado de baja.")}>Baja</button>
               </>
@@ -338,7 +365,9 @@ function FilaAnimal({
         <tr className="border-t border-ranch-marron/5 bg-ranch-crema/30">
           <td colSpan={7} className="px-3 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-ranch-marron">Trasladar {a.nombre} ({a.cantidad} cabezas) a:</span>
+              <span className="text-sm font-semibold text-ranch-marron">Trasladar</span>
+              <input className={`${input} w-20 text-right`} inputMode="numeric" value={traslado.cantidad} onChange={(e) => setTraslado({ ...traslado, cantidad: e.target.value })} title="Cabezas que se mueven" />
+              <span className="text-sm font-semibold text-ranch-marron">de {a.cantidad} de {a.nombre} a:</span>
               <select className={input} value={traslado.recinto_id} onChange={(e) => setTraslado({ ...traslado, recinto_id: e.target.value })}>
                 <option value="">Recinto destino…</option>
                 {recintos.filter((r) => r.id !== a.recinto_id).map((r) => <option key={r.id} value={r.id}>{r.nombre}{r.capacidad ? ` (${r.ocupacion}/${r.capacidad})` : ""}</option>)}
@@ -347,11 +376,14 @@ function FilaAnimal({
               <button
                 className={boton} disabled={busy}
                 onClick={async () => {
-                  const ok = await correr(() => trasladarAnimal(a.id, traslado.recinto_id, { motivo: traslado.motivo }), "Traslado registrado.");
+                  const ok = await correr(() => trasladarAnimal(a.id, traslado.recinto_id, { motivo: traslado.motivo, cantidad: traslado.cantidad }), "Traslado registrado.");
                   if (ok) setTraslado(null);
                 }}
               >Trasladar</button>
             </div>
+            {Number(traslado.cantidad) > 0 && Number(traslado.cantidad) < a.cantidad && (
+              <p className="mt-2 text-xs text-ranch-marron/60">Traslado parcial: esas cabezas pasan a un grupo &quot;{a.nombre}&quot; en el recinto destino (si no existe, se crea). El censo total no cambia.</p>
+            )}
             {recintos.length === 0 && <p className="mt-2 text-xs text-amber-700">No hay recintos creados. Créalos en la pestaña Ubicación.</p>}
           </td>
         </tr>
@@ -376,6 +408,179 @@ function FilaAnimal({
           </td>
         </tr>
       )}
+    </>
+  );
+}
+
+// ------------------------------------------------------------------ NOVEDADES (kardex del censo)
+
+const PIDE_VALOR: TipoMovAnimal[] = ["compra", "venta"];
+const PIDE_TERCERO: TipoMovAnimal[] = ["compra", "venta", "donacion_recibida", "entrega"];
+const AYUDA_MOTIVO: Partial<Record<TipoMovAnimal, string>> = {
+  muerte: "Causa de la muerte (obligatoria)",
+  sacrificio: "Motivo del sacrificio (obligatorio)",
+  perdida: "Qué pasó: robo, fuga, extravío (obligatorio)",
+  entrega: "A quién y por qué (obligatorio)",
+  ajuste: "Por qué no cuadraba el conteo (obligatorio)",
+  nacimiento: "Madre, sexo de las crías (opcional)",
+};
+
+function Novedades({
+  busy, correr, esAdmin, animales, novedades, resumenMes, hoy, inicial,
+}: Comun & { animales: AnimalVista[]; novedades: NovedadVista[]; resumenMes: ResumenNovedadVista[]; hoy: string; inicial: string }) {
+  const vacio = { animal_id: inicial, tipo: "", cantidad: "1", fecha: hoy, motivo: "", valor: "", tercero: "" };
+  const [f, setF] = useState(vacio);
+  const [filtro, setFiltro] = useState("");
+  const [anulando, setAnulando] = useState<{ id: string; motivo: string } | null>(null);
+  const tipo = f.tipo as TipoMovAnimal;
+  const grupo = animales.find((a) => a.id === f.animal_id);
+  const efecto = f.tipo ? EFECTO_ANIMAL[tipo] : null;
+  const n = parseInt(f.cantidad.replace(/[^\d]/g, ""), 10);
+  const quedan = grupo && Number.isInteger(n)
+    ? efecto === "ajuste" ? n : efecto === "entrada" ? grupo.cantidad + n : efecto === "salida" ? grupo.cantidad - n : null
+    : null;
+
+  const visibles = filtro ? novedades.filter((x) => x.tipo === filtro) : novedades;
+  const tiposEnLista = Array.from(new Set(novedades.map((x) => x.tipo)));
+
+  return (
+    <>
+      <section className={`mb-4 ${card} p-4`}>
+        <h2 className="mb-1 font-bold text-ranch-marron">Registrar novedad</h2>
+        <p className="mb-3 text-xs text-ranch-marron/60">
+          Todo lo que cambia el número de animales entra por aquí: las cabezas del grupo se recalculan solas.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <select className={input} value={f.animal_id} onChange={(e) => setF({ ...f, animal_id: e.target.value })}>
+            <option value="">Grupo…</option>
+            {animales.map((a) => <option key={a.id} value={a.id}>{a.nombre} · {a.cantidad.toLocaleString("es-CO")}{a.recinto ? ` · ${a.recinto}` : ""}</option>)}
+          </select>
+          <select className={input} value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>
+            <option value="">Tipo de novedad…</option>
+            <optgroup label="Entran (+)">
+              {NOVEDADES_ANIMAL.filter((t) => EFECTO_ANIMAL[t] === "entrada").map((t) => <option key={t} value={t}>{ETIQUETA_ANIMAL[t]}</option>)}
+            </optgroup>
+            <optgroup label="Salen (−)">
+              {NOVEDADES_ANIMAL.filter((t) => EFECTO_ANIMAL[t] === "salida").map((t) => <option key={t} value={t}>{ETIQUETA_ANIMAL[t]}</option>)}
+            </optgroup>
+            <optgroup label="Conteo">
+              <option value="ajuste">{ETIQUETA_ANIMAL.ajuste}</option>
+            </optgroup>
+          </select>
+          <input className={input} type="date" max={hoy} value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} title="Fecha en que ocurrió" />
+          <label className="flex items-center gap-2 text-sm text-ranch-marron/70">
+            {tipo === "ajuste" ? "Cabezas contadas" : "Cabezas"}
+            <input className={`${input} w-24 text-right`} inputMode="numeric" value={f.cantidad} onChange={(e) => setF({ ...f, cantidad: e.target.value })} />
+          </label>
+          {PIDE_VALOR.includes(tipo) && (
+            <input className={input} inputMode="numeric" placeholder={tipo === "compra" ? "Valor total de la compra ($)" : "Valor total de la venta ($)"} value={f.valor} onChange={(e) => setF({ ...f, valor: e.target.value })} />
+          )}
+          {PIDE_TERCERO.includes(tipo) && (
+            <input className={input} placeholder={tipo === "venta" || tipo === "entrega" ? "Quién lo recibe" : "Quién lo vende o entrega"} value={f.tercero} onChange={(e) => setF({ ...f, tercero: e.target.value })} />
+          )}
+          <input
+            className={`${input} sm:col-span-3`}
+            placeholder={AYUDA_MOTIVO[tipo] ?? "Observación (opcional)"}
+            value={f.motivo}
+            onChange={(e) => setF({ ...f, motivo: e.target.value })}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            className={boton} disabled={busy}
+            onClick={async () => {
+              const ok = await correr(() => registrarNovedadAnimal({ ...f, valor: f.valor || null }), "Novedad registrada.");
+              if (ok) setF({ ...vacio, animal_id: f.animal_id });
+            }}
+          >Registrar</button>
+          {grupo && quedan !== null && (
+            <span className={`text-sm ${quedan < 0 ? "font-semibold text-red-600" : "text-ranch-marron/70"}`}>
+              {grupo.nombre}: {grupo.cantidad.toLocaleString("es-CO")} → <strong>{quedan.toLocaleString("es-CO")}</strong> cabezas
+            </span>
+          )}
+          {MOTIVO_OBLIGATORIO_ANIMAL.includes(tipo) && !f.motivo.trim() && (
+            <span className="text-xs text-amber-700">Falta el motivo.</span>
+          )}
+        </div>
+      </section>
+
+      <h2 className="mb-2 font-bold text-ranch-marron">Este mes</h2>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {resumenMes.length === 0 && <p className="col-span-full text-sm text-ranch-marron/50">Sin novedades este mes.</p>}
+        {resumenMes.map((r) => (
+          <div key={r.tipo} className={`${card} p-3`}>
+            <p className="text-xs uppercase text-ranch-marron/50">{r.etiqueta}</p>
+            <p className="text-xl font-black text-ranch-marron">{formatearMiles(r.cantidad)}</p>
+            <p className="text-xs text-ranch-marron/60">{formatearMiles(r.movimientos)} registro(s){r.valor > 0 ? ` · ${formatearCOP(r.valor)}` : ""}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold text-ranch-marron">Kardex del censo</h2>
+        <select className={input} value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+          <option value="">Todas las novedades</option>
+          {tiposEnLista.map((t) => <option key={t} value={t}>{ETIQUETA_ANIMAL[t as TipoMovAnimal] ?? t}</option>)}
+        </select>
+      </div>
+      <div className={`overflow-x-auto ${card}`}>
+        <table className="w-full text-left text-sm">
+          <thead className="bg-ranch-crema/60">
+            <tr>
+              <th className={th}>Fecha</th>
+              <th className={th}>Grupo</th>
+              <th className={th}>Novedad</th>
+              <th className={`${th} text-right`}>Cabezas</th>
+              <th className={th}>Detalle</th>
+              <th className={th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.map((x) => {
+              const ef = EFECTO_ANIMAL[x.tipo as TipoMovAnimal];
+              const signo = ef === "entrada" ? "+" : ef === "salida" ? "−" : "=";
+              return (
+                <tr key={x.id} className={`border-t border-ranch-marron/10 align-top ${x.anulado ? "opacity-50" : ""}`}>
+                  <td className="whitespace-nowrap px-3 py-2 text-ranch-marron/70">{x.fecha}</td>
+                  <td className="px-3 py-2 font-semibold text-ranch-marron">
+                    {x.grupo}<span className="block text-xs font-normal text-ranch-marron/50">{x.categoria}</span>
+                  </td>
+                  <td className="px-3 py-2 text-ranch-marron/80">
+                    {x.etiqueta}
+                    {x.anulado && <span className="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">anulada</span>}
+                  </td>
+                  <td className={`px-3 py-2 text-right font-bold ${ef === "salida" ? "text-red-600" : ef === "entrada" ? "text-ranch-verde" : "text-ranch-marron"}`}>
+                    {signo}{formatearMiles(x.cantidad)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-ranch-marron/70">
+                    {[x.motivo, x.tercero, x.valor ? formatearCOP(x.valor) : null].filter(Boolean).join(" · ") || "—"}
+                    {x.anulado && x.motivo_anulacion && <span className="block text-red-700">Anulada: {x.motivo_anulacion}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {esAdmin && x.anulable && (
+                      anulando?.id === x.id ? (
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <input className={`${input} w-40`} placeholder="Motivo" value={anulando.motivo} onChange={(e) => setAnulando({ ...anulando, motivo: e.target.value })} />
+                          <button
+                            className={botonSec} disabled={busy}
+                            onClick={async () => { if (await correr(() => anularNovedadAnimal(x.id, anulando.motivo), "Novedad anulada; el censo se recalculó.")) setAnulando(null); }}
+                          >Confirmar</button>
+                          <button className={botonSec} onClick={() => setAnulando(null)}>No</button>
+                        </div>
+                      ) : (
+                        <button className={botonSec} onClick={() => setAnulando({ id: x.id, motivo: "" })}>Anular</button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {visibles.length === 0 && (
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-ranch-marron/50">Sin novedades registradas.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

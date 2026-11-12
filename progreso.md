@@ -19,7 +19,56 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
 | F13 | Atracciones editables + fila virtual (el visitante separa turno con su QR) | ✅ Completada |
 | F14 | Compras de alimento (factura → inventario + gasto) y gastos por área y por quién pide | ✅ Completada (verificada en local) |
+| F15 | Kardex de animales (partos, muertes, ventas, compras, traslados parciales) y de equipos (compra, baja, robo, traslado) + Equipos con CRUD y mantenimientos | 🟡 Código listo; falta probar contra la base |
 
+
+## F15 — Novedades del inventario: animales y equipos (2026-11-12)
+
+Responde a: *"las novedades de los animales: compras, partos, muertes, ventas, traslados, sacrificio… todos
+los movimientos que alteren el inventario"* y *"lo mismo para equipos: compra, baja, traslado, robo, con
+marca, nombre, referencia, grupo…"*.
+
+- [x] **Kardex de unidades** (`lib/inventario/kardex.ts`, puro y probado): entrada suma, salida resta,
+      ajuste FIJA el saldo (conteo físico), traslado completo de equipo no mueve la cantidad. Ordena por
+      la **fecha del hecho**, ignora anulados y rechaza cualquier novedad que deje el saldo negativo en
+      algún punto de la historia (`saldoMinimo`). 11 pruebas nuevas.
+- [x] **Animales** (`movimientos_animal`): nacimiento, compra, donación recibida, muerte (causa
+      obligatoria), venta (valor y comprador), sacrificio, entrega/donación, pérdida/robo/fuga, ajuste.
+      `animales.cantidad` ya **no se edita a mano**: se recalcula desde el kardex. Pestaña **Novedades** en
+      `/admin/animales` con formulario, vista previa "X → Y cabezas", resumen del mes y kardex con filtro.
+      Botón **Novedad** en cada grupo del inventario. Un grupo que llega a 0 por muerte queda "fallecido".
+- [x] **Bug corregido — traslado parcial:** antes, trasladar 3 de 10 movía el grupo completo. Ahora las
+      cabezas pasan a un grupo del mismo nombre y categoría en el recinto destino (se crea si no existe),
+      con `traslado_salida` / `traslado_entrada` enlazados; el censo total no cambia.
+- [x] **Equipos** pasó de boceto de solo lectura a módulo completo (`/admin/equipos`, 4 pestañas):
+      - **Inventario**: hoja de vida con nombre, grupo, código/placa, marca, referencia, modelo, serie, área,
+        ubicación, unidades, proveedor (o uno nuevo), valor unitario de compra, fechas de compra e
+        instalación, garantía, vida útil, responsable (empleado) y observaciones. Buscador y filtro por grupo.
+      - **Novedades** (`movimientos_equipo`): compra, donación recibida, baja (daño/obsoleto), robo, pérdida,
+        venta, entrega, ajuste. Llegar a 0 unidades lo deja "dado de baja"; anular lo devuelve a operativo.
+      - **Trasladar** cambia área/ubicación y deja historia (origen → destino); parcial igual que animales
+        (5 de 20 sillas).
+      - **Mantenimientos**: programar (preventivo/correctivo), iniciar (el equipo queda "en mantenimiento"),
+        realizado con costo real (vuelve a "operativo"), cancelar. Vencidos en rojo.
+      - **Grupos**: crear, renombrar, desactivar (no si tiene equipos con unidades).
+      - KPIs: equipos, unidades, operativas, en taller/fuera, valor de compra, mantenimientos vencidos,
+        aviso de garantías que vencen en 30 días.
+- [x] **Permisos:** novedades de animales las registra granja/supervisor; las de equipos, supervisor.
+      **Anular es solo de administrador**, con motivo; nada se borra (el movimiento se marca anulado y se
+      recalcula). El saldo inicial que puso la migración no se anula: se corrige con un ajuste.
+- [x] Migración `20261112120000_kardex_animales_equipos`: crea las dos tablas, los campos nuevos de
+      `equipos` y un **saldo inicial** por cada grupo/equipo con su cantidad actual (no se pierde nada).
+- [x] Los importadores viejos (`import:animales`, `alimentacion:2026`) se **niegan a correr** si ya hay
+      novedades: escribían la cantidad a mano y descuadrarían el kardex.
+- [x] Verificado: **299 pruebas verdes**, typecheck limpio, `npm run build` OK.
+
+Pendiente:
+- [ ] **Probar contra la base** (local y luego producción): Docker Desktop no arrancó en esta sesión, así que
+      la migración y las pantallas no se han ejecutado contra Postgres todavía.
+- [ ] Decidir con la administradora: ¿la compra/venta de animales y equipos crea el gasto/ingreso solo
+      (como las compras de alimento)? Hoy solo guarda el valor.
+- [ ] Cargar el inventario real de equipos (Excel) y dar de baja los equipos de ejemplo del boceto si
+      llegaron a producción.
 
 ## Traído de Family Party (2026-09-25)
 

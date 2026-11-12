@@ -128,6 +128,12 @@ async function upsertAnimal(nombre: string, cantidad: number, categoria_id: stri
 }
 
 async function main() {
+  // Desde el kardex de animales (2026-11-12) las cabezas solo cambian por novedades.
+  // Este importador escribía la cantidad a mano: correrlo de nuevo descuadraría el kardex.
+  if ((await prisma.movimientoAnimal.count({ where: { creado_por: { not: "migracion" } } })) > 0) {
+    console.error("⛔ Ya hay novedades registradas en el kardex de animales. Este importador ya no se puede correr.");
+    process.exit(1);
+  }
   console.log("\n🐄 Importando inventario REAL de animales · Ranch Texas\n");
 
   // Categorías

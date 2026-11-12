@@ -113,8 +113,8 @@ model Usuario {
   turnos TurnoCaja[]
   ventas Venta[]
 
-  vehiculos_a_cargo   Vehiculo[]          @relation("VehiculoChoferHabitual")
-  viajes_como_chofer  SolicitudVehiculo[] @relation("SolicitudChofer")
+  vehiculos_a_cargo  Vehiculo[]          @relation("VehiculoChoferHabitual")
+  viajes_como_chofer SolicitudVehiculo[] @relation("SolicitudChofer")
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -384,8 +384,8 @@ model MedioPago {
   /// ya se pagó antes y está en el banco: la entrada suma a la VENTA del día, pero no
   /// al recaudo ni al arqueo del cajón.
   afecta_recaudo Boolean @default(true)
-  orden       Int     @default(0)
-  activo      Boolean @default(true)
+  orden          Int     @default(0)
+  activo         Boolean @default(true)
 
   pagos       VentaPago[]
   movimientos MovimientoCaja[]
@@ -417,13 +417,13 @@ model Venta {
 
   // Datos opcionales del comprador (configurable). Es una FOTO de lo que se
   // capturó EN ESTA venta — no se edita si el cliente maestro cambia después.
-  comprador_nombre    String?
-  comprador_documento String?
-  comprador_celular   String?
-  comprador_email     String?
+  comprador_nombre       String?
+  comprador_documento    String?
+  comprador_celular      String?
+  comprador_email        String?
   /// Cuando la venta queda a nombre de una empresa (para el recibo de caja).
   comprador_razon_social String?
-  comprador_nit           String?
+  comprador_nit          String?
 
   /// A qué cliente maestro quedó asociada esta venta (por celular). null si no
   /// se capturó celular o si la venta es de antes de que existiera `Cliente`.
@@ -488,15 +488,15 @@ model Cliente {
 }
 
 model VentaDetalle {
-  id                 String         @id @default(uuid())
-  venta_id           String
-  tipo_visitante_id  String
-  tarifa_id          String?
-  tipo_linea         TipoLineaVenta @default(pago)
-  cantidad           Int
-  valor_lista        Int // por unidad
-  valor_cobrado      Int // por unidad (valor_lista - descuento)
-  motivo_descuento   String?
+  id                String         @id @default(uuid())
+  venta_id          String
+  tipo_visitante_id String
+  tarifa_id         String?
+  tipo_linea        TipoLineaVenta @default(pago)
+  cantidad          Int
+  valor_lista       Int // por unidad
+  valor_cobrado     Int // por unidad (valor_lista - descuento)
+  motivo_descuento  String?
 
   /// A nombre de QUIÉN entró esta cortesía. El motivo dice por qué se dio (convenio,
   /// cumpleaños, empleado); el beneficiario dice a quién. Antes se metían los dos en el
@@ -772,6 +772,7 @@ model Proveedor {
   gastos           Gasto[]
   recurrentes      GastoRecurrente[]
   compras_alimento CompraAlimento[]
+  equipos          Equipo[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1052,6 +1053,7 @@ model Empleado {
   area  AreaTrabajo? @relation(fields: [area_id], references: [id])
 
   gastos_solicitados Gasto[]
+  equipos_a_cargo    Equipo[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1105,6 +1107,52 @@ enum TipoMovimientoAlimento {
   ajuste // corrección de inventario por conteo físico
 }
 
+// Novedades del censo (kardex de animales). La cantidad del grupo NUNCA se escribe a mano:
+// se recalcula desde estos movimientos, igual que la existencia del alimento.
+enum TipoMovimientoAnimal {
+  saldo_inicial // censo con el que arranca el kardex (o el grupo nuevo sin otro origen)
+  nacimiento
+  compra
+  donacion_recibida
+  traslado_entrada // llegan cabezas desde otro grupo (traslado parcial)
+  muerte
+  venta
+  sacrificio
+  entrega // donación o entrega a otra entidad (p. ej. Amigos de la Fauna)
+  perdida // robo, fuga, extravío
+  traslado_salida // salen cabezas hacia otro grupo (traslado parcial)
+  ajuste // conteo físico: FIJA el saldo
+}
+
+model MovimientoAnimal {
+  id               String               @id @default(uuid())
+  animal_id        String
+  tipo             TipoMovimientoAnimal
+  cantidad         Int // cabezas, siempre >= 0 (en ajuste = saldo contado)
+  fecha            DateTime // cuándo ocurrió el hecho (no cuándo se registró)
+  motivo           String? // causa de la muerte, razón de la venta, etc.
+  valor            Int? // COP: precio de compra o de venta
+  tercero          String? // comprador, vendedor, entidad que recibe/entrega
+  /// Par de un traslado parcial: el movimiento del otro grupo.
+  contraparte_id   String?
+  anulado          Boolean              @default(false)
+  motivo_anulacion String?
+  anulado_por      String?
+  anulado_en       DateTime?
+
+  animal Animal @relation(fields: [animal_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([animal_id])
+  @@index([fecha])
+  @@index([tipo])
+  @@map("movimientos_animal")
+}
+
 model CategoriaAnimal {
   id          String  @id @default(uuid())
   nombre      String // Aves, Equinos, Bovinos, Reptiles...
@@ -1151,7 +1199,7 @@ model Animal {
   codigo           String? // chapeta / identificador físico
   categoria_id     String
   recinto_id       String? // ubicación ACTUAL (el historial está en traslados_animal)
-  cantidad         Int          @default(1) // headcount del grupo/lote (1 = individuo)
+  cantidad         Int          @default(1) // headcount del grupo/lote (1 = individuo). Se RECALCULA desde movimientos_animal
   especie          String?
   raza             String?
   sexo             SexoAnimal   @default(desconocido)
@@ -1166,6 +1214,7 @@ model Animal {
   raciones       Racion[]
   traslados      TrasladoAnimal[]
   alimentaciones RegistroAlimentacion[]
+  movimientos    MovimientoAnimal[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1420,21 +1469,31 @@ model Equipo {
   id                String       @id @default(uuid())
   nombre            String
   codigo            String? // placa / consecutivo interno
-  categoria_id      String
+  categoria_id      String // en pantalla se llama "Grupo"
   area_id           String?
   ubicacion         String?
   marca             String?
   modelo            String?
+  referencia        String?
   serie             String?
+  cantidad          Int          @default(1) // unidades (1 = equipo individual). Se RECALCULA desde movimientos_equipo
+  proveedor_id      String?
+  responsable_id    String? // empleado que lo tiene a cargo
+  valor_compra      Int? // COP, valor unitario de compra
   fecha_compra      DateTime?
   fecha_instalacion DateTime?
+  garantia_hasta    DateTime?
+  vida_util_meses   Int?
   estado            EstadoEquipo @default(operativo)
   observaciones     String?
   activo            Boolean      @default(true)
 
   categoria      CategoriaEquipo       @relation(fields: [categoria_id], references: [id])
   area           AreaTrabajo?          @relation(fields: [area_id], references: [id])
+  proveedor      Proveedor?            @relation(fields: [proveedor_id], references: [id])
+  responsable    Empleado?             @relation(fields: [responsable_id], references: [id])
   mantenimientos MantenimientoEquipo[]
+  movimientos    MovimientoEquipo[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1444,6 +1503,53 @@ model Equipo {
   @@index([categoria_id])
   @@index([area_id])
   @@map("equipos")
+}
+
+// Novedades del inventario de equipos. Igual que en animales: la cantidad se recalcula
+// desde aquí. El traslado (cambio de área/ubicación) no cambia la cantidad, pero deja historia.
+enum TipoMovimientoEquipo {
+  saldo_inicial
+  compra
+  donacion_recibida
+  traslado_entrada // llegan unidades desde otro registro (traslado parcial)
+  baja // daño irreparable, obsolescencia
+  robo
+  perdida
+  venta
+  entrega // donación o entrega a un tercero
+  traslado_salida // salen unidades hacia otro registro (traslado parcial)
+  traslado // cambio de área/ubicación del registro completo (no mueve la cantidad)
+  ajuste // conteo físico: FIJA el saldo
+}
+
+model MovimientoEquipo {
+  id               String               @id @default(uuid())
+  equipo_id        String
+  tipo             TipoMovimientoEquipo
+  cantidad         Int
+  fecha            DateTime
+  motivo           String?
+  valor            Int? // COP
+  tercero          String?
+  origen           String? // traslado: área / ubicación de donde sale
+  destino          String? // traslado: área / ubicación a donde llega
+  contraparte_id   String?
+  anulado          Boolean              @default(false)
+  motivo_anulacion String?
+  anulado_por      String?
+  anulado_en       DateTime?
+
+  equipo Equipo @relation(fields: [equipo_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([equipo_id])
+  @@index([fecha])
+  @@index([tipo])
+  @@map("movimientos_equipo")
 }
 
 model MantenimientoEquipo {
@@ -1498,7 +1604,7 @@ model Vehiculo {
 
   /// Quién lo maneja normalmente; una solicitud puede asignar a otro chofer si toca.
   chofer_habitual_id String?
-  chofer_habitual     Usuario? @relation("VehiculoChoferHabitual", fields: [chofer_habitual_id], references: [id])
+  chofer_habitual    Usuario? @relation("VehiculoChoferHabitual", fields: [chofer_habitual_id], references: [id])
 
   solicitudes SolicitudVehiculo[]
 
@@ -1529,20 +1635,20 @@ model SolicitanteVehiculo {
 }
 
 model SolicitudVehiculo {
-  id               String                  @id @default(uuid())
-  solicitante_id   String
-  hora_inicio      DateTime
+  id             String                  @id @default(uuid())
+  solicitante_id String
+  hora_inicio    DateTime
   /// Se calcula sola: hora_inicio + la duración aproximada que se pidió, nunca se
   /// captura directamente (evita que quede una hora de fin menor que la de inicio).
-  hora_fin         DateTime
-  prioridad        PrioridadVehiculo       @default(media)
-  descripcion      String
+  hora_fin       DateTime
+  prioridad      PrioridadVehiculo       @default(media)
+  descripcion    String
   /// Filas de antes de este campo quedan en "" (sin especificar), no null.
-  origen           String                  @default("")
-  destino          String                  @default("")
+  origen         String                  @default("")
+  destino        String                  @default("")
   /// Informativo: si el viaje es de ida y vuelta. No cambia cómo se calcula la duración.
-  viaje_redondo    Boolean                 @default(false)
-  estado           EstadoSolicitudVehiculo @default(pendiente)
+  viaje_redondo  Boolean                 @default(false)
+  estado         EstadoSolicitudVehiculo @default(pendiente)
 
   /// Se asignan al aprobar; una solicitud rechazada nunca los tiene.
   vehiculo_id String?
@@ -1564,8 +1670,8 @@ model SolicitudVehiculo {
   motivo_cancelacion String?
 
   solicitante SolicitanteVehiculo @relation(fields: [solicitante_id], references: [id])
-  vehiculo    Vehiculo?            @relation(fields: [vehiculo_id], references: [id])
-  chofer      Usuario?             @relation("SolicitudChofer", fields: [chofer_id], references: [id])
+  vehiculo    Vehiculo?           @relation(fields: [vehiculo_id], references: [id])
+  chofer      Usuario?            @relation("SolicitudChofer", fields: [chofer_id], references: [id])
 
   creado_en       DateTime @default(now())
   creado_por      String?

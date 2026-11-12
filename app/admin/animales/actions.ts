@@ -9,6 +9,9 @@ import { cantidadPorEntrega, type FrecuenciaRacion, type ModoRacion } from "@/li
 import { recalcularExistencia, registrarEntregaConKardex } from "@/lib/animales/alimentacion";
 import { calcularLineasCompra, preciosQueCambian } from "@/lib/animales/compras";
 import type { Tx } from "@/lib/db";
+import { fechaBogota } from "@/lib/tiempo";
+import { fechaDelHecho, NOVEDADES_ANIMAL, MOTIVO_OBLIGATORIO_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
+import { recalcularCenso, SaldoNegativoError } from "@/lib/inventario/recalcular";
 import type { Prisma } from "@prisma/client";
 
 interface Resultado {
@@ -159,6 +162,8 @@ interface EntradaAnimal {
   categoria_id: string;
   recinto_id?: string | null;
   cantidad?: string | number;
+  /** Cómo llegan las cabezas del grupo nuevo: saldo inicial, compra, nacimiento o donación. */
+  origen?: string;
   codigo?: string | null;
   especie?: string | null;
   raza?: string | null;
@@ -168,6 +173,7 @@ interface EntradaAnimal {
 
 const SEXOS = ["macho", "hembra", "desconocido"] as const;
 const ESTADOS_ANIMAL = ["activo", "enfermo", "cuarentena", "fallecido", "trasladado"] as const;
+const ORIGENES_GRUPO: TipoMovAnimal[] = ["saldo_inicial", "compra", "nacimiento", "donacion_recibida"];
 
 export async function crearAnimal(e: EntradaAnimal): Promise<Resultado> {
   const s = await granja();
@@ -180,6 +186,7 @@ export async function crearAnimal(e: EntradaAnimal): Promise<Resultado> {
   const cantidad = entero(e.cantidad ?? 1);
   if (cantidad === "error" || cantidad === null || cantidad < 0) return { ok: false, error: "La cantidad de cabezas debe ser un entero mayor o igual a 0." };
 
+  const origen = ORIGENES_GRUPO.includes(e.origen as TipoMovAnimal) ? (e.origen as TipoMovAnimal) : "saldo_inicial";
   const sexo = SEXOS.includes(e.sexo as (typeof SEXOS)[number]) ? (e.sexo as (typeof SEXOS)[number]) : "desconocido";
   const recinto_id = texto(e.recinto_id);
 
@@ -191,7 +198,7 @@ export async function crearAnimal(e: EntradaAnimal): Promise<Resultado> {
         nombre,
         categoria_id: e.categoria_id,
         recinto_id,
-        cantidad,
+        cantidad: 0,
         codigo: texto(e.codigo),
         especie: texto(e.especie),
         raza: texto(e.raza),
@@ -200,6 +207,13 @@ export async function crearAnimal(e: EntradaAnimal): Promise<Resultado> {
         creado_por: s.id,
       },
     });
+    // Las cabezas entran por el kardex, nunca escritas a mano.
+    if (cantidad > 0) {
+      await tx.movimientoAnimal.create({
+        data: { animal_id: creado.id, tipo: origen, cantidad, fecha: new Date(), motivo: "Grupo creado", creado_por: s.id },
+      });
+      await recalcularCenso(tx, creado.id, s.id, nombre);
+    }
     // La primera ubicación también queda en el historial.
     if (recinto_id) {
       await tx.trasladoAnimal.create({
@@ -209,7 +223,7 @@ export async function crearAnimal(e: EntradaAnimal): Promise<Resultado> {
     return creado;
   });
 
-  await registrarAuditoria({ usuario_id: s.id, entidad: "animal", entidad_id: a.id, accion: "crear", datos_despues: { nombre, cantidad, recinto_id } });
+  await registrarAuditoria({ usuario_id: s.id, entidad: "animal", entidad_id: a.id, accion: "crear", datos_despues: { nombre, cantidad, origen, recinto_id } });
   revalidatePath(RUTA);
   return { ok: true, aviso };
 }
@@ -221,16 +235,15 @@ export async function editarAnimal(id: string, cambios: Partial<EntradaAnimal> &
   const antes = await prisma.animal.findUnique({ where: { id } });
   if (!antes) return { ok: false, error: "Grupo no encontrado." };
 
+  if (cambios.cantidad !== undefined && entero(cambios.cantidad) !== antes.cantidad) {
+    return { ok: false, error: "Las cabezas ya no se editan a mano: registra la novedad (nacimiento, muerte, venta, ajuste por conteo…)." };
+  }
+
   const data: Prisma.AnimalUpdateInput = { actualizado_por: s.id };
 
   if (cambios.nombre !== undefined) {
     if (!cambios.nombre.trim()) return { ok: false, error: "El nombre no puede quedar vacío." };
     data.nombre = cambios.nombre.trim();
-  }
-  if (cambios.cantidad !== undefined) {
-    const c = entero(cambios.cantidad);
-    if (c === "error" || c === null || c < 0) return { ok: false, error: "La cantidad de cabezas debe ser un entero mayor o igual a 0." };
-    data.cantidad = c;
   }
   if (cambios.categoria_id) data.categoria = { connect: { id: cambios.categoria_id } };
   if (cambios.codigo !== undefined) data.codigo = texto(cambios.codigo);
@@ -246,10 +259,12 @@ export async function editarAnimal(id: string, cambios: Partial<EntradaAnimal> &
   }
 
   await prisma.animal.update({ where: { id }, data });
+  const { cantidad: _ignorada, ...sinCantidad } = cambios;
+  void _ignorada;
   await registrarAuditoria({
     usuario_id: s.id, entidad: "animal", entidad_id: id, accion: "editar",
-    datos_antes: { nombre: antes.nombre, cantidad: antes.cantidad, estado: antes.estado },
-    datos_despues: JSON.parse(JSON.stringify(cambios)),
+    datos_antes: { nombre: antes.nombre, estado: antes.estado },
+    datos_despues: JSON.parse(JSON.stringify(sinCantidad)),
   });
   revalidatePath(RUTA);
   return { ok: true };
@@ -270,7 +285,12 @@ async function avisoDeCapacidad(recintoId: string, entran: number, excluirAnimal
   return undefined;
 }
 
-/** Mueve un grupo a otro recinto y deja el movimiento en el historial. */
+/**
+ * Mueve un grupo a otro recinto y deja el movimiento en el historial.
+ * Traslado PARCIAL (menos cabezas que el grupo): las cabezas pasan a un grupo del mismo nombre y
+ * categoría en el recinto destino (si no existe, se crea). El censo total del parque no cambia:
+ * queda un traslado_salida en el origen y un traslado_entrada en el destino, enlazados.
+ */
 export async function trasladarAnimal(
   animalId: string,
   recintoDestinoId: string,
@@ -287,30 +307,62 @@ export async function trasladarAnimal(
   const destino = await prisma.recinto.findUnique({ where: { id: recintoDestinoId } });
   if (!destino || !destino.activo) return { ok: false, error: "El recinto de destino no existe o está inactivo." };
 
-  const cant = entero(opciones.cantidad ?? animal.cantidad);
-  if (cant === "error" || cant === null || cant < 0) return { ok: false, error: "La cantidad trasladada debe ser un entero mayor o igual a 0." };
+  const cantTexto = opciones.cantidad === undefined || opciones.cantidad === "" ? animal.cantidad : opciones.cantidad;
+  const cant = entero(cantTexto);
+  if (cant === "error" || cant === null || cant < 0) return { ok: false, error: "La cantidad trasladada debe ser un entero." };
   if (cant > animal.cantidad) return { ok: false, error: `El grupo tiene ${animal.cantidad} cabezas; no puedes trasladar ${cant}.` };
+  if (cant === 0 && animal.cantidad > 0) return { ok: false, error: "La cantidad trasladada debe ser mayor a 0." };
+  const parcial = cant < animal.cantidad;
+  const motivo = texto(opciones.motivo);
 
-  const aviso = await avisoDeCapacidad(recintoDestinoId, cant, animalId);
+  const aviso = await avisoDeCapacidad(recintoDestinoId, cant, parcial ? undefined : animalId);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.trasladoAnimal.create({
-      data: {
-        animal_id: animalId,
-        recinto_origen_id: animal.recinto_id,
-        recinto_destino_id: recintoDestinoId,
-        cantidad: cant,
-        motivo: texto(opciones.motivo),
-        creado_por: s.id,
-      },
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (!parcial) {
+        await tx.trasladoAnimal.create({
+          data: { animal_id: animalId, recinto_origen_id: animal.recinto_id, recinto_destino_id: recintoDestinoId, cantidad: cant, motivo, creado_por: s.id },
+        });
+        await tx.animal.update({ where: { id: animalId }, data: { recinto_id: recintoDestinoId, actualizado_por: s.id } });
+        return;
+      }
+
+      // Grupo que recibe: el mismo nombre y categoría en el recinto destino, o uno nuevo.
+      let receptor = await tx.animal.findFirst({
+        where: { recinto_id: recintoDestinoId, nombre: animal.nombre, categoria_id: animal.categoria_id, activo: true },
+      });
+      if (!receptor) {
+        receptor = await tx.animal.create({
+          data: {
+            nombre: animal.nombre, categoria_id: animal.categoria_id, recinto_id: recintoDestinoId, cantidad: 0,
+            especie: animal.especie, raza: animal.raza, sexo: animal.sexo, estado: animal.estado,
+            observaciones: `Separado de ${animal.nombre}`, creado_por: s.id,
+          },
+        });
+      }
+      const ahora = new Date();
+      const salida = await tx.movimientoAnimal.create({
+        data: { animal_id: animalId, tipo: "traslado_salida", cantidad: cant, fecha: ahora, motivo: motivo ?? `A ${destino.nombre}`, creado_por: s.id },
+      });
+      const entrada = await tx.movimientoAnimal.create({
+        data: { animal_id: receptor.id, tipo: "traslado_entrada", cantidad: cant, fecha: ahora, motivo: motivo ?? "Traslado parcial", contraparte_id: salida.id, creado_por: s.id },
+      });
+      await tx.movimientoAnimal.update({ where: { id: salida.id }, data: { contraparte_id: entrada.id } });
+      await tx.trasladoAnimal.create({
+        data: { animal_id: receptor.id, recinto_origen_id: animal.recinto_id, recinto_destino_id: recintoDestinoId, cantidad: cant, motivo, creado_por: s.id },
+      });
+      await recalcularCenso(tx, animalId, s.id, animal.nombre);
+      await recalcularCenso(tx, receptor.id, s.id, receptor.nombre);
     });
-    await tx.animal.update({ where: { id: animalId }, data: { recinto_id: recintoDestinoId, actualizado_por: s.id } });
-  });
+  } catch (err) {
+    if (err instanceof SaldoNegativoError) return { ok: false, error: err.message };
+    throw err;
+  }
 
   await registrarAuditoria({
-    usuario_id: s.id, entidad: "animal", entidad_id: animalId, accion: "trasladar",
-    datos_antes: { recinto_id: animal.recinto_id },
-    datos_despues: { recinto_id: recintoDestinoId, cantidad: cant, motivo: texto(opciones.motivo) },
+    usuario_id: s.id, entidad: "animal", entidad_id: animalId, accion: parcial ? "trasladar_parcial" : "trasladar",
+    datos_antes: { recinto_id: animal.recinto_id, cantidad: animal.cantidad },
+    datos_despues: { recinto_id: recintoDestinoId, cantidad: cant, motivo },
   });
   revalidatePath(RUTA);
   return { ok: true, aviso };
@@ -321,6 +373,107 @@ export async function cambiarEstadoAnimal(id: string, activo: boolean): Promise<
   if (!s) return { ok: false, error: "Necesitas rol de supervisor." };
   await prisma.animal.update({ where: { id }, data: { activo, actualizado_por: s.id } });
   await registrarAuditoria({ usuario_id: s.id, entidad: "animal", entidad_id: id, accion: activo ? "activar" : "desactivar" });
+  revalidatePath(RUTA);
+  return { ok: true };
+}
+
+// ============================================================ NOVEDADES DEL CENSO (kardex de animales)
+
+export async function registrarNovedadAnimal(e: {
+  animal_id: string;
+  tipo: string;
+  cantidad: string | number;
+  fecha: string; // YYYY-MM-DD (Bogotá)
+  motivo?: string | null;
+  valor?: string | number | null;
+  tercero?: string | null;
+}): Promise<Resultado> {
+  const s = await granja();
+  if (!s) return { ok: false, error: SIN_PERMISO_GRANJA };
+
+  if (!NOVEDADES_ANIMAL.includes(e.tipo as TipoMovAnimal)) return { ok: false, error: "Elige el tipo de novedad." };
+  const tipo = e.tipo as TipoMovAnimal;
+
+  const animal = await prisma.animal.findUnique({ where: { id: e.animal_id ?? "" } });
+  if (!animal || !animal.activo) return { ok: false, error: "Elige el grupo." };
+
+  const cantidad = entero(e.cantidad);
+  const minimo = tipo === "ajuste" ? 0 : 1;
+  if (cantidad === "error" || cantidad === null || cantidad < minimo) {
+    return { ok: false, error: tipo === "ajuste" ? "Escribe las cabezas contadas (0 o más)." : "La cantidad debe ser un entero mayor a 0." };
+  }
+
+  const fecha = fechaDelHecho(e.fecha, fechaBogota());
+  if (!fecha) return { ok: false, error: "Indica la fecha en que ocurrió (no puede ser futura)." };
+
+  const motivo = texto(e.motivo);
+  if (MOTIVO_OBLIGATORIO_ANIMAL.includes(tipo) && !motivo) {
+    return { ok: false, error: tipo === "muerte" ? "Escribe la causa de la muerte." : "Escribe el motivo." };
+  }
+
+  const valor = entero(e.valor);
+  if (valor === "error" || (valor !== null && valor < 0)) return { ok: false, error: "El valor debe ser un entero en pesos." };
+
+  let saldo: number;
+  try {
+    saldo = await prisma.$transaction(async (tx) => {
+      await tx.movimientoAnimal.create({
+        data: { animal_id: animal.id, tipo, cantidad, fecha, motivo, valor, tercero: texto(e.tercero), creado_por: s.id },
+      });
+      const nuevo = await recalcularCenso(tx, animal.id, s.id, animal.nombre);
+      // Un individuo (o el último de un grupo) que muere queda marcado como fallecido.
+      if (nuevo === 0 && tipo === "muerte") {
+        await tx.animal.update({ where: { id: animal.id }, data: { estado: "fallecido" } });
+      }
+      return nuevo;
+    });
+  } catch (err) {
+    if (err instanceof SaldoNegativoError) return { ok: false, error: err.message };
+    throw err;
+  }
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "animal", entidad_id: animal.id, accion: `novedad_${tipo}`,
+    datos_antes: { cantidad: animal.cantidad },
+    datos_despues: { cantidad: saldo, tipo, movidas: cantidad, fecha: e.fecha, motivo, valor },
+  });
+  revalidatePath(RUTA);
+  return { ok: true, aviso: `${animal.nombre}: ${animal.cantidad} → ${saldo} cabezas.` };
+}
+
+/** Anula una novedad (y su pareja si es un traslado parcial). Solo administrador. Nada se borra. */
+export async function anularNovedadAnimal(id: string, motivo: string): Promise<Resultado> {
+  const s = await admin();
+  if (!s) return { ok: false, error: "Solo el administrador puede anular novedades." };
+  const m = texto(motivo);
+  if (!m) return { ok: false, error: "Escribe el motivo de la anulación." };
+
+  const mov = await prisma.movimientoAnimal.findUnique({ where: { id }, include: { animal: { select: { nombre: true } } } });
+  if (!mov) return { ok: false, error: "Novedad no encontrada." };
+  if (mov.anulado) return { ok: false, error: "La novedad ya estaba anulada." };
+  if (mov.tipo === "saldo_inicial" && mov.creado_por === "migracion") {
+    return { ok: false, error: "El saldo inicial del kardex no se anula; si el censo está mal, registra un ajuste por conteo." };
+  }
+
+  const ids = [mov.id, ...(mov.contraparte_id ? [mov.contraparte_id] : [])];
+  try {
+    await prisma.$transaction(async (tx) => {
+      const afectados = await tx.movimientoAnimal.findMany({ where: { id: { in: ids } }, include: { animal: { select: { nombre: true } } } });
+      await tx.movimientoAnimal.updateMany({
+        where: { id: { in: ids } },
+        data: { anulado: true, motivo_anulacion: m, anulado_por: s.id, anulado_en: new Date(), actualizado_por: s.id },
+      });
+      for (const a of afectados) await recalcularCenso(tx, a.animal_id, s.id, a.animal.nombre);
+    });
+  } catch (err) {
+    if (err instanceof SaldoNegativoError) return { ok: false, error: `No se puede anular: ${err.message}` };
+    throw err;
+  }
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "movimiento_animal", entidad_id: id, accion: "anular",
+    datos_antes: { tipo: mov.tipo, cantidad: mov.cantidad, grupo: mov.animal.nombre }, datos_despues: { motivo: m },
+  });
   revalidatePath(RUTA);
   return { ok: true };
 }

@@ -1,145 +1,139 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
-import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
+import { fechaBogota, formatearFechaHoraCortaBogota } from "@/lib/tiempo";
+import { resumirPorTipo, ETIQUETA_EQUIPO, type TipoMovEquipo } from "@/lib/inventario/kardex";
+import EquiposClient from "./EquiposClient";
 
 export const dynamic = "force-dynamic";
 
-const ESTADO_EQUIPO: Record<string, string> = {
-  operativo: "bg-ranch-verde/15 text-ranch-verde",
-  en_mantenimiento: "bg-amber-100 text-amber-700",
-  fuera_servicio: "bg-red-100 text-red-700",
-  dado_de_baja: "bg-ranch-marron/10 text-ranch-marron/60",
-};
-
-const ESTADO_MANT: Record<string, string> = {
-  programado: "bg-ranch-dorado/20 text-ranch-marron",
-  en_proceso: "bg-amber-100 text-amber-700",
-  realizado: "bg-ranch-verde/15 text-ranch-verde",
-  cancelado: "bg-ranch-marron/10 text-ranch-marron/60",
-};
+const dia = (d: Date | null) => (d ? fechaBogota(d) : null);
 
 export default async function EquiposPage() {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "supervisor")) return <main className="p-6">Sin acceso.</main>;
 
-  const [equipos, categorias, mantenimientos] = await Promise.all([
+  const hoy = fechaBogota();
+  const inicioMes = new Date(`${hoy.slice(0, 7)}-01T00:00:00-05:00`);
+
+  const [equiposRaw, gruposRaw, areas, empleados, proveedores, movimientosRaw, movimientosMes, mantenimientosRaw] = await Promise.all([
     prisma.equipo.findMany({
       where: { activo: true },
-      include: { categoria: { select: { nombre: true } }, area: { select: { nombre: true } } },
+      include: {
+        categoria: { select: { nombre: true } },
+        area: { select: { nombre: true } },
+        proveedor: { select: { nombre: true } },
+        responsable: { select: { nombre: true } },
+      },
       orderBy: [{ categoria: { nombre: "asc" } }, { nombre: "asc" }],
     }),
-    prisma.categoriaEquipo.count({ where: { activo: true } }),
+    prisma.categoriaEquipo.findMany({ orderBy: [{ activo: "desc" }, { nombre: "asc" }], include: { _count: { select: { equipos: { where: { activo: true, cantidad: { gt: 0 } } } } } } }),
+    prisma.areaTrabajo.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.empleado.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.proveedor.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.movimientoEquipo.findMany({
+      orderBy: [{ fecha: "desc" }, { creado_en: "desc" }],
+      take: 300,
+      include: { equipo: { select: { nombre: true, codigo: true } } },
+    }),
+    prisma.movimientoEquipo.findMany({
+      where: { fecha: { gte: inicioMes }, tipo: { notIn: ["saldo_inicial", "traslado_entrada", "traslado_salida"] } },
+      select: { tipo: true, cantidad: true, valor: true, anulado: true },
+    }),
     prisma.mantenimientoEquipo.findMany({
       include: { equipo: { select: { nombre: true, codigo: true } } },
-      orderBy: [{ fecha_programada: "desc" }],
-      take: 20,
+      orderBy: [{ fecha_programada: "desc" }, { creado_en: "desc" }],
+      take: 200,
     }),
   ]);
 
-  const operativos = equipos.filter((e) => e.estado === "operativo").length;
+  const equipos = equiposRaw.map((e) => ({
+    id: e.id,
+    nombre: e.nombre,
+    codigo: e.codigo,
+    categoria_id: e.categoria_id,
+    grupo: e.categoria.nombre,
+    marca: e.marca,
+    modelo: e.modelo,
+    referencia: e.referencia,
+    serie: e.serie,
+    area_id: e.area_id,
+    area: e.area?.nombre ?? null,
+    ubicacion: e.ubicacion,
+    cantidad: e.cantidad,
+    proveedor_id: e.proveedor_id,
+    proveedor: e.proveedor?.nombre ?? null,
+    responsable_id: e.responsable_id,
+    responsable: e.responsable?.nombre ?? null,
+    valor_compra: e.valor_compra,
+    fecha_compra: dia(e.fecha_compra),
+    fecha_instalacion: dia(e.fecha_instalacion),
+    garantia_hasta: dia(e.garantia_hasta),
+    vida_util_meses: e.vida_util_meses,
+    estado: e.estado,
+    observaciones: e.observaciones,
+  }));
+
+  const movimientos = movimientosRaw.map((m) => ({
+    id: m.id,
+    equipo_id: m.equipo_id,
+    fecha: formatearFechaHoraCortaBogota(m.fecha),
+    equipo: m.equipo.nombre,
+    codigo: m.equipo.codigo,
+    tipo: m.tipo,
+    etiqueta: ETIQUETA_EQUIPO[m.tipo as TipoMovEquipo] ?? m.tipo,
+    cantidad: m.cantidad,
+    motivo: m.motivo,
+    valor: m.valor,
+    tercero: m.tercero,
+    origen: m.origen,
+    destino: m.destino,
+    anulado: m.anulado,
+    motivo_anulacion: m.motivo_anulacion,
+    anulable: !m.anulado && m.tipo !== "traslado" && !(m.tipo === "saldo_inicial" && m.creado_por === "migracion"),
+  }));
+
+  const mantenimientos = mantenimientosRaw.map((m) => ({
+    id: m.id,
+    equipo_id: m.equipo_id,
+    equipo: m.equipo.nombre,
+    codigo: m.equipo.codigo,
+    tipo: m.tipo,
+    descripcion: m.descripcion,
+    fecha_programada: dia(m.fecha_programada),
+    fecha_realizada: dia(m.fecha_realizada),
+    costo: m.costo,
+    responsable: m.responsable,
+    estado: m.estado,
+    vencido: m.estado === "programado" && !!m.fecha_programada && fechaBogota(m.fecha_programada) < hoy,
+  }));
+
+  const enInventario = equipos.filter((e) => e.cantidad > 0);
+  const en30 = fechaBogota(new Date(Date.now() + 30 * 86400000));
+  const kpis = {
+    registros: enInventario.length,
+    unidades: enInventario.reduce((t, e) => t + e.cantidad, 0),
+    operativos: enInventario.filter((e) => e.estado === "operativo").reduce((t, e) => t + e.cantidad, 0),
+    noOperativos: enInventario.filter((e) => e.estado === "en_mantenimiento" || e.estado === "fuera_servicio").reduce((t, e) => t + e.cantidad, 0),
+    valor: enInventario.reduce((t, e) => t + (e.valor_compra ?? 0) * e.cantidad, 0),
+    mantVencidos: mantenimientos.filter((m) => m.vencido).length,
+    garantiasPorVencer: enInventario.filter((e) => e.garantia_hasta && e.garantia_hasta >= hoy && e.garantia_hasta <= en30).length,
+  };
 
   return (
-    <main className="mx-auto max-w-5xl p-4 sm:p-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-black text-ranch-marron">Equipos</h1>
-          <p className="text-sm text-ranch-marron/60">Inventario y mantenimientos</p>
-        </div>
-        <span className="rounded-full bg-ranch-dorado/20 px-3 py-1 text-xs font-semibold text-ranch-marron">
-          Boceto · datos de ejemplo
-        </span>
-      </div>
-
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <Kpi label="Equipos" valor={formatearMiles(equipos.length)} />
-        <Kpi label="Operativos" valor={formatearMiles(operativos)} />
-        <Kpi label="Categorías" valor={formatearMiles(categorias)} />
-      </div>
-
-      {/* Inventario */}
-      <h2 className="mb-2 font-bold text-ranch-marron">Inventario</h2>
-      <div className="mb-6 overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-ranch-crema/60 text-xs uppercase text-ranch-marron/60">
-            <tr>
-              <th className="px-3 py-2">Código</th>
-              <th className="px-3 py-2">Equipo</th>
-              <th className="px-3 py-2">Categoría</th>
-              <th className="px-3 py-2">Marca / Modelo</th>
-              <th className="px-3 py-2">Ubicación</th>
-              <th className="px-3 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {equipos.map((e) => (
-              <tr key={e.id} className="border-t border-ranch-marron/10">
-                <td className="px-3 py-2 font-mono text-xs text-ranch-marron/70">{e.codigo ?? "—"}</td>
-                <td className="px-3 py-2 font-semibold text-ranch-marron">{e.nombre}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{e.categoria.nombre}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{[e.marca, e.modelo].filter(Boolean).join(" ") || "—"}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{e.ubicacion ?? "—"}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ESTADO_EQUIPO[e.estado] ?? ""}`}>{e.estado.replace("_", " ")}</span>
-                </td>
-              </tr>
-            ))}
-            {equipos.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-ranch-marron/50">
-                  Aún no hay equipos. Corre <code>npm run seed:boceto</code> para cargar datos de ejemplo.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mantenimientos */}
-      <h2 className="mb-2 font-bold text-ranch-marron">Mantenimientos</h2>
-      <div className="overflow-x-auto rounded-2xl border-2 border-ranch-marron/15 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-ranch-crema/60 text-xs uppercase text-ranch-marron/60">
-            <tr>
-              <th className="px-3 py-2">Equipo</th>
-              <th className="px-3 py-2">Tipo</th>
-              <th className="px-3 py-2">Descripción</th>
-              <th className="px-3 py-2">Programado</th>
-              <th className="px-3 py-2 text-right">Costo</th>
-              <th className="px-3 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mantenimientos.map((m) => (
-              <tr key={m.id} className="border-t border-ranch-marron/10">
-                <td className="px-3 py-2 font-semibold text-ranch-marron">{m.equipo.nombre}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{m.tipo}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{m.descripcion}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{m.fecha_programada ? m.fecha_programada.toLocaleDateString("es-CO") : "—"}</td>
-                <td className="px-3 py-2 text-right text-ranch-marron/70">{formatearCOP(m.costo)}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ESTADO_MANT[m.estado] ?? ""}`}>{m.estado.replace("_", " ")}</span>
-                </td>
-              </tr>
-            ))}
-            {mantenimientos.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-ranch-marron/50">Sin mantenimientos registrados.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </main>
-  );
-}
-
-function Kpi({ label, valor }: { label: string; valor: string }) {
-  return (
-    <div className="rounded-2xl border-2 border-ranch-marron/15 bg-white p-4 text-center shadow-sm">
-      <p className="text-2xl font-black text-ranch-marron">{valor}</p>
-      <p className="text-xs uppercase tracking-wide text-ranch-marron/50">{label}</p>
-    </div>
+    <EquiposClient
+      esAdmin={tieneRol(s.rol, "administrador")}
+      hoy={hoy}
+      kpis={kpis}
+      equipos={equipos}
+      grupos={gruposRaw.map((g) => ({ id: g.id, nombre: g.nombre, descripcion: g.descripcion, activo: g.activo, equipos: g._count.equipos }))}
+      areas={areas}
+      empleados={empleados}
+      proveedores={proveedores}
+      movimientos={movimientos}
+      resumenMes={resumirPorTipo(movimientosMes).map((r) => ({ ...r, etiqueta: ETIQUETA_EQUIPO[r.tipo as TipoMovEquipo] ?? r.tipo }))}
+      mantenimientos={mantenimientos}
+    />
   );
 }
