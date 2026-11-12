@@ -52,6 +52,35 @@ const ALIMENTOS: PlanAlimento[] = [
 interface PlanRacion { horario?: string; destino: string; alimento: string; cantidad: number; unidad: string; modo: ModoRacion; frecuencia: FrecuenciaRacion; obs: string; cuadro: string }
 const ind = "individual" as const;
 const lote = "grupal" as const;
+// "A:NOMBRE|OTRO" = el grupo puede llamarse de cualquiera de las dos formas (producción vs. local).
+function dietaCaballo(cuadro: string, destino: string, alfalfaKg: number): PlanRacion[] {
+  const r = { cuadro, destino, modo: "individual" as const, frecuencia: "diaria" as const };
+  return [
+    { ...r, alimento: "HENO", cantidad: 1, unidad: "paca", obs: "1 paca por animal al día" },
+    { ...r, alimento: "ALFALFA EN CUBOS", cantidad: alfalfaKg, unidad: "kg", obs: `${alfalfaKg} kg de alfalfa humedecida` },
+    { ...r, alimento: "PODIUM", cantidad: 3, unidad: "kg", obs: "3 kg por animal al día" },
+    { ...r, horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 30, unidad: "g", obs: "30 g por animal al día" },
+  ];
+}
+function dietaPotro(cuadro: string, destino: string): PlanRacion[] {
+  const r = { cuadro, destino, modo: "individual" as const, frecuencia: "diaria" as const };
+  return [
+    { ...r, alimento: "HENO", cantidad: 7_500, unidad: "g", obs: "½ paca por potro al día" },
+    { ...r, alimento: "ALFALFA EN CUBOS", cantidad: 2, unidad: "kg", obs: "2 kg de alfalfa humedecida" },
+    { ...r, alimento: "BRÍO POTROS", cantidad: 2, unidad: "kg", obs: "2 kg de Briopotros por potro" },
+    { ...r, horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 20, unidad: "g", obs: "20 g por potro al día" },
+  ];
+}
+function dietaMini(cuadro: string, destino: string): PlanRacion[] {
+  const r = { cuadro, destino, modo: "individual" as const, frecuencia: "diaria" as const };
+  return [
+    { ...r, alimento: "HENO", cantidad: 3_750, unidad: "g", obs: "¼ paca por mini al día" },
+    { ...r, alimento: "ALFALFA EN CUBOS", cantidad: 1, unidad: "kg", obs: "1 kg de alfalfa humedecida" },
+    { ...r, alimento: "PODIUM", cantidad: 1, unidad: "kg", obs: "1 kg por mini al día" },
+    { ...r, horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 10, unidad: "g", obs: "10 g por mini al día" },
+  ];
+}
+
 const RACIONES: PlanRacion[] = [
   // ---- AVES y PECES: por lote ----------------------------------------------
   { cuadro: "Gallinas ponedoras", destino: "A:GALLINAS PONEDORAS", alimento: "PREPICO DORADO", cantidad: 12, unidad: "kg", modo: lote, frecuencia: "diaria", obs: "12 kg al día para el lote (9 bultos/mes)" },
@@ -73,19 +102,16 @@ const RACIONES: PlanRacion[] = [
   { cuadro: "Perros", destino: "A:PERROS", alimento: "ITALCÁN", cantidad: 800, unidad: "g", modo: ind, frecuencia: "diaria", obs: "800 g por perro al día" },
   { cuadro: "Conejos", destino: "A:CONEJOS", alimento: "CONEJINA", cantidad: 71, unidad: "g", modo: ind, frecuencia: "diaria", obs: "500 g al día entre 7 conejos ≈ 71 g c/u" },
   { cuadro: "Cabras", destino: "C:CAPRINOS", alimento: "LECHE 16", cantidad: 208, unidad: "g", modo: ind, frecuencia: "diaria", obs: "5 kg al día entre 24 caprinos ≈ 208 g c/u" },
-  // ---- Equinos: por animal -------------------------------------------------
-  { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "HENO", cantidad: 1, unidad: "paca", modo: ind, frecuencia: "diaria", obs: "1 paca por caballo al día" },
-  { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "ALFALFA EN CUBOS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de alfalfa humedecida" },
-  { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "PODIUM", cantidad: 3, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "3 kg por caballo al día" },
-  { cuadro: "Caballos en general", destino: "A:CABALLOS", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 30, unidad: "g", modo: ind, frecuencia: "diaria", obs: "30 g por caballo al día" },
-  { cuadro: "Potros", destino: "A:POTROS", alimento: "HENO", cantidad: 7_500, unidad: "g", modo: ind, frecuencia: "diaria", obs: "½ paca por potro al día" },
-  { cuadro: "Potros", destino: "A:POTROS", alimento: "ALFALFA EN CUBOS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de alfalfa humedecida" },
-  { cuadro: "Potros", destino: "A:POTROS", alimento: "BRÍO POTROS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de Briopotros por potro" },
-  { cuadro: "Potros", destino: "A:POTROS", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 20, unidad: "g", modo: ind, frecuencia: "diaria", obs: "20 g por potro al día" },
-  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "HENO", cantidad: 3_750, unidad: "g", modo: ind, frecuencia: "diaria", obs: "¼ paca por mini al día" },
-  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "ALFALFA EN CUBOS", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg de alfalfa humedecida" },
-  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "PODIUM", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por mini al día" },
-  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 10, unidad: "g", modo: ind, frecuencia: "diaria", obs: "10 g por mini al día" },
+  // ---- Equinos: por animal (definido por el responsable 2026-11-12) -------
+  // Dieta de caballo: CABALLOS, CABALLOS REPRODUCTORES y POTROS (los potros mayores).
+  // Yeguas lactantes y gestantes: la de caballo con 1 kg más de alfalfa.
+  // Dieta de potro del plan: POTROS MENORES. Dieta de mini: MINIS.
+  ...dietaCaballo("Caballos en general", "A:CABALLOS", 2),
+  ...dietaCaballo("Reproductores", "A:CABALLOS REPRODUCTORES", 2),
+  ...dietaCaballo("Potros mayores", "A:POTROS", 2),
+  ...dietaCaballo("Yeguas lactantes y gestantes", "A:YEGUAS LACTANTES Y GESTANTES", 3),
+  ...dietaPotro("Potros menores", "A:POTROS MENORES"),
+  ...dietaMini("Caballos mini", "A:MINIS|CABALLOS MINI"),
 ];
 
 // Grupos sin ración comprada (confirmado por el responsable 2026-11-12).
@@ -101,7 +127,8 @@ const CUADRO: Record<string, number> = {
   "Gallinas ponedoras": 720_000, "Vacas": 1_275_000, "Aves en general": 580_000, "Perros": 880_000,
   "Terneros": 680_000, "Conejos": 75_000, "Cabras": 340_000, "Peces": 305_000,
   "Sal mineralizada": 190_000, "Melaza": 312_000, "Toros y toretes": 0,
-  "Caballos en general": 30_432_883, "Potros": 5_209_995, "Caballos mini": 3_615_077,
+  "Caballos en general": 30_432_883, "Potros menores": 5_209_995, "Caballos mini": 3_615_077,
+  "Reproductores": 0, "Potros mayores": 0, "Yeguas lactantes y gestantes": 0,
 };
 
 async function main() {
@@ -117,7 +144,7 @@ async function main() {
   for (const d of new Set(RACIONES.map((r) => r.destino))) {
     const nombre = d.slice(2);
     const n = d.startsWith("A:")
-      ? grupos.filter((x) => norm(x.nombre) === norm(nombre)).length
+      ? grupos.filter((x) => nombre.split("|").some((o) => norm(x.nombre) === norm(o))).length
       : categorias.filter((x) => norm(x.nombre) === norm(nombre)).length;
     if (n !== 1) faltan.push(`${d.startsWith("A:") ? "Grupo" : "Categoría"} "${nombre}": encontré ${n}`);
   }
@@ -154,7 +181,7 @@ async function main() {
   const destino = (d: string) => {
     const [tipo, nombre] = [d.slice(0, 1), d.slice(2)];
     if (tipo === "A") {
-      const g = grupos.filter((x) => norm(x.nombre) === norm(nombre));
+      const g = grupos.filter((x) => nombre.split("|").some((o) => norm(x.nombre) === norm(o)));
       if (g.length !== 1) throw new Error(`Grupo "${nombre}": encontré ${g.length}`);
       return { animal_id: g[0].id, categoria_animal_id: null, cabezas: g[0].cantidad };
     }

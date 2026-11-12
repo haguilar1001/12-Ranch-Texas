@@ -428,6 +428,10 @@ del responsable:
   de "aves en general". Tortugas (desperdicio) y tigrilla (sobras) sin ración comprada. Ocelote y ovejo murieron:
   se registró la muerte en el kardex y quedaron fallecidos.
 
+- Equinos en producción (definido por el responsable): dieta de caballo para CABALLOS, CABALLOS REPRODUCTORES y
+  POTROS (los potros mayores); YEGUAS LACTANTES Y GESTANTES igual con 3 kg de alfalfa; POTROS MENORES con la dieta de
+  potro del plan; MINIS con la de mini. En producción el grupo se llama MINIS (en local, CABALLOS MINI).
+
 ## Bitácora: planilla por turno en vez de reparto automático (2026-11-12)
 - El cron `alimentar-automatico` daba por entregada la dieta aunque no hubiera alimento en bodega. **Queda apagado**
   (solo corre con `ALIMENTACION_AUTOMATICA=1`).
