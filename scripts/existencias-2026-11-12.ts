@@ -82,7 +82,7 @@ async function main() {
     await tx.logAuditoria.create({
       data: { entidad: "alimentos", entidad_id: POR, accion: "conteo_fisico", datos_despues: { ajustes: ajustes.map(({ id, base }) => ({ id, base })) } },
     });
-  });
+   }, { timeout: 120_000, maxWait: 20_000 }); // por el proxy público cada consulta tarda; 5 s no alcanzan
   console.log(`\n✅ Listo: ${ajustes.length} existencias ajustadas al conteo.\n`);
 }
 
