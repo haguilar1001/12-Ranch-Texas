@@ -65,6 +65,7 @@ export default async function NavBar() {
         ["🗑️", "Ventas anuladas", "/admin/reportes/anulaciones", "Quién anuló, con qué motivo", supervisor],
         ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta],
         ["🐴", "Alimentación de animales", "/admin/reportes/alimentacion", "Costo del mes por categoría", consulta],
+        ["📦", "Inventarios para imprimir", "/admin/reportes/inventarios", "Animales, alimentos, dietas y equipos en PDF", consulta || puedeOperarGranja(s.rol)],
         ["📄", "Cierre del día", "/admin/reportes/cierre", "Informe para firmar e imprimir", supervisor],
         ["💰", "Cuadre diario", "/admin/cuadre", "Consolidado de todos los turnos", supervisor],
       ],
