@@ -11,6 +11,10 @@ import {
   crearMantenimiento, actualizarMantenimiento,
   type EntradaEquipo,
 } from "./actions";
+import MenuAcciones from "@/components/MenuAcciones";
+
+/** Minúsculas y sin tildes, para que "platica" encuentre "PLÁSTICA". */
+const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // ------------------------------------------------------------------ tipos
 
@@ -183,17 +187,23 @@ function Inventario({
   const [grupo, setGrupo] = useState("");
   const [verCero, setVerCero] = useState(false);
 
-  const q = buscar.trim().toLowerCase();
-  const visibles = equipos.filter((e) =>
-    (verCero || e.cantidad > 0) &&
-    (!grupo || e.categoria_id === grupo) &&
-    (!q || [e.nombre, e.codigo, e.marca, e.referencia, e.serie, e.ubicacion, e.area].some((x) => x?.toLowerCase().includes(q))),
-  );
+  // Filtro por cualquier campo: cada palabra debe aparecer en algún dato del equipo.
+  const palabras = sinTildes(buscar).split(/\s+/).filter(Boolean);
+  const visibles = equipos.filter((e) => {
+    if (!verCero && e.cantidad === 0) return false;
+    if (grupo && e.categoria_id !== grupo) return false;
+    if (palabras.length === 0) return true;
+    const texto = sinTildes([
+      e.nombre, e.codigo, e.grupo, e.marca, e.modelo, e.referencia, e.serie, e.area, e.ubicacion, e.proveedor,
+      e.responsable, etiquetaEstado(e.estado), e.observaciones, e.fecha_compra, e.garantia_hasta,
+    ].filter(Boolean).join(" "));
+    return palabras.every((p) => texto.includes(p));
+  });
 
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input className={`${input} flex-1`} placeholder="Buscar por nombre, código, marca, referencia, serie, ubicación…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+        <input className={`${input} flex-1`} placeholder="Buscar en cualquier campo: nombre, código, marca, referencia, serie, ubicación, responsable…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
         <select className={input} value={grupo} onChange={(e) => setGrupo(e.target.value)}>
           <option value="">Todos los grupos</option>
           {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
@@ -380,13 +390,17 @@ function FilaEquipo({
           )}
         </td>
         <td className="px-3 py-2">
-          <div className="flex flex-wrap justify-end gap-1">
-            <button className={botonSec} onClick={() => irANovedad(e.id)} title="Compra, baja, robo, venta, ajuste…">Novedad</button>
-            {e.cantidad > 0 && (
-              <button className={botonSec} onClick={() => setTraslado(trasladando ? null : { id: e.id, area_id: e.area_id ?? "", ubicacion: "", cantidad: String(e.cantidad), motivo: "" })}>Trasladar</button>
-            )}
-            <button className={botonSec} onClick={editar}>Editar</button>
-            <button className={botonSec} onClick={() => setHistorial(historial === e.id ? null : e.id)}>Historial</button>
+          <div className="flex justify-end">
+            <MenuAcciones
+              opciones={[
+                { label: "Novedad (compra, baja, robo…)", onClick: () => irANovedad(e.id) },
+                ...(e.cantidad > 0
+                  ? [{ label: "Trasladar", onClick: () => setTraslado(trasladando ? null : { id: e.id, area_id: e.area_id ?? "", ubicacion: "", cantidad: String(e.cantidad), motivo: "" }) }]
+                  : []),
+                { label: "Editar", onClick: editar },
+                { label: historial === e.id ? "Ocultar historial" : "Historial", onClick: () => setHistorial(historial === e.id ? null : e.id) },
+              ]}
+            />
           </div>
         </td>
       </tr>

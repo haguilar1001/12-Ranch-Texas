@@ -14,6 +14,10 @@ import {
 } from "./actions";
 import { NOVEDADES_ANIMAL, ETIQUETA_ANIMAL, EFECTO_ANIMAL, MOTIVO_OBLIGATORIO_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
 import { subtotalLinea } from "@/lib/animales/compras";
+import MenuAcciones from "@/components/MenuAcciones";
+
+/** Minúsculas y sin tildes, para que "pekin" encuentre "PEKÍN". */
+const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // ------------------------------------------------------------------ tipos
 
@@ -206,13 +210,61 @@ function Inventario({ busy, correr, animales, categorias, recintos, irANovedad }
   const [traslado, setTraslado] = useState<{ id: string; recinto_id: string; motivo: string; cantidad: string } | null>(null);
   const [edicion, setEdicion] = useState<{ id: string; nombre: string; estado: string } | null>(null);
   const [historial, setHistorial] = useState<string | null>(null);
+  const [buscar, setBuscar] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [recinto, setRecinto] = useState("");
+  const [verCero, setVerCero] = useState(false);
   const activos = recintos.filter((r) => r.activo);
+
+  // Filtro por cualquier campo: cada palabra debe aparecer en algún dato del grupo.
+  const palabras = sinTildes(buscar).split(/\s+/).filter(Boolean);
+  const visibles = animales.filter((a) => {
+    if (!verCero && a.cantidad === 0) return false;
+    if (categoria && a.categoria_id !== categoria) return false;
+    if (recinto && (recinto === "-" ? a.recinto_id !== null : a.recinto_id !== recinto)) return false;
+    if (palabras.length === 0) return true;
+    const texto = sinTildes([
+      a.nombre, a.codigo, a.categoria, a.recinto, a.ubicacion, a.especie, a.raza, a.sexo, a.estado, a.observaciones, String(a.cantidad),
+    ].filter(Boolean).join(" "));
+    return palabras.every((p) => texto.includes(p));
+  });
+  const enCero = animales.filter((a) => a.cantidad === 0).length;
+  const cabezasVisibles = visibles.reduce((t, a) => t + a.cantidad, 0);
+  const filtrando = palabras.length > 0 || !!categoria || !!recinto;
 
   return (
     <>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-bold text-ranch-marron">Inventario ({animales.length} grupos)</h2>
+        <h2 className="font-bold text-ranch-marron">
+          Inventario ({filtrando ? `${visibles.length} de ${animales.length}` : visibles.length} grupos · {formatearMiles(cabezasVisibles)} cabezas)
+        </h2>
         <button onClick={() => setAbierto(!abierto)} className={botonSec}>{abierto ? "Cerrar" : "+ Nuevo grupo"}</button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          className={`${input} min-w-52 flex-1`}
+          placeholder="Buscar en cualquier campo: nombre, especie, raza, categoría, recinto, estado…"
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+        />
+        <select className={input} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+          <option value="">Todas las categorías</option>
+          {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <select className={input} value={recinto} onChange={(e) => setRecinto(e.target.value)}>
+          <option value="">Todos los recintos</option>
+          <option value="-">Sin ubicar</option>
+          {recintos.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+        </select>
+        {enCero > 0 && (
+          <label className="flex items-center gap-1 text-xs text-ranch-marron/70">
+            <input type="checkbox" checked={verCero} onChange={(e) => setVerCero(e.target.checked)} /> Ver grupos en 0 ({enCero})
+          </label>
+        )}
+        {filtrando && (
+          <button className={botonSec} onClick={() => { setBuscar(""); setCategoria(""); setRecinto(""); }}>Limpiar</button>
+        )}
       </div>
 
       {abierto && (
@@ -264,7 +316,7 @@ function Inventario({ busy, correr, animales, categorias, recintos, irANovedad }
             </tr>
           </thead>
           <tbody>
-            {animales.map((a) => (
+            {visibles.map((a) => (
               <FilaAnimal
                 key={a.id} a={a} busy={busy} correr={correr} recintos={activos} irANovedad={irANovedad}
                 traslado={traslado} setTraslado={setTraslado}
@@ -272,8 +324,8 @@ function Inventario({ busy, correr, animales, categorias, recintos, irANovedad }
                 historial={historial} setHistorial={setHistorial}
               />
             ))}
-            {animales.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">Aún no hay animales cargados.</td></tr>
+            {visibles.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">{animales.length === 0 ? "Aún no hay animales cargados." : "Ningún grupo coincide con el filtro."}</td></tr>
             )}
           </tbody>
         </table>
@@ -349,13 +401,22 @@ function FilaAnimal({
                 <button className={botonSec} onClick={() => setEdicion(null)}>Cancelar</button>
               </>
             ) : (
-              <>
-                <button className={botonSec} onClick={() => irANovedad(a.id)} title="Nacimiento, muerte, venta, compra, ajuste…">Novedad</button>
-                <button className={botonSec} onClick={() => setEdicion({ id: a.id, nombre: a.nombre, estado: a.estado })}>Editar</button>
-                <button className={botonSec} onClick={() => setTraslado(trasladando ? null : { id: a.id, recinto_id: "", motivo: "", cantidad: String(a.cantidad) })}>Trasladar</button>
-                <button className={botonSec} onClick={() => setHistorial(historial === a.id ? null : a.id)}>Historial</button>
-                <button className={botonSec} disabled={busy} onClick={() => correr(() => cambiarEstadoAnimal(a.id, false), "Grupo dado de baja.")}>Baja</button>
-              </>
+              <MenuAcciones
+                opciones={[
+                  { label: "Novedad (parto, muerte, venta…)", onClick: () => irANovedad(a.id) },
+                  { label: "Trasladar", onClick: () => setTraslado(trasladando ? null : { id: a.id, recinto_id: "", motivo: "", cantidad: String(a.cantidad) }) },
+                  { label: "Editar", onClick: () => setEdicion({ id: a.id, nombre: a.nombre, estado: a.estado }) },
+                  { label: historial === a.id ? "Ocultar historial" : "Historial", onClick: () => setHistorial(historial === a.id ? null : a.id) },
+                  {
+                    label: "Quitar de la lista", peligro: true, disabled: busy,
+                    onClick: () => {
+                      if (confirm(`¿Quitar "${a.nombre}" de la lista? No cambia el censo: para muertes, ventas o entregas usa una Novedad.`)) {
+                        correr(() => cambiarEstadoAnimal(a.id, false), "Grupo quitado de la lista.");
+                      }
+                    },
+                  },
+                ]}
+              />
             )}
           </div>
         </td>
