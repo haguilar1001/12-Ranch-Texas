@@ -427,3 +427,15 @@ del responsable:
 - Toros y toretes comen igual que las vacas (Leche 16, sal y melaza por animal). Faisanes y pavos reales están dentro
   de "aves en general". Tortugas (desperdicio) y tigrilla (sobras) sin ración comprada. Ocelote y ovejo murieron:
   se registró la muerte en el kardex y quedaron fallecidos.
+
+## Bitácora: planilla por turno en vez de reparto automático (2026-11-12)
+- El cron `alimentar-automatico` daba por entregada la dieta aunque no hubiera alimento en bodega. **Queda apagado**
+  (solo corre con `ALIMENTACION_AUTOMATICA=1`).
+- En Bitácora hay una **planilla por día y turno** (7 a. m., 12 m., 4 p. m.; equinos 3 turnos, el resto 2): la app trae
+  lo **teórico** de cada ración y el operario confirma con el chulito o escribe lo **real**. Cambiar el número ya marca
+  la fila. Solo se guarda lo marcado y cada fila descuenta de bodega lo real (kardex del alimento).
+- Real = teórico o más → realizada; menos → parcial; 0 → no se alimentó. La nota es opcional.
+- El heno se escribe en pacas; lo demás en kg. Sal mineralizada, melaza y sal equina son **consumo libre**: una sola
+  fila al día, en el turno de la mañana, con lo del día completo.
+- Se puede llenar la planilla de un día pasado (queda a la hora del turno); nunca de un día futuro. Un turno ya
+  registrado no se duplica; para corregirlo, el administrador anula el registro y se vuelve a llenar.

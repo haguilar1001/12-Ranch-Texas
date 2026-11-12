@@ -48,7 +48,7 @@ const ALIMENTOS: PlanAlimento[] = [
 // ------------------------------------------------------------------- RACIONES
 // destino: "A:<grupo>" = un grupo del inventario · "C:<categoría>" = toda la categoría
 // (en individual multiplica por las cabezas de todos sus grupos).
-interface PlanRacion { destino: string; alimento: string; cantidad: number; unidad: string; modo: ModoRacion; frecuencia: FrecuenciaRacion; obs: string; cuadro: string }
+interface PlanRacion { horario?: string; destino: string; alimento: string; cantidad: number; unidad: string; modo: ModoRacion; frecuencia: FrecuenciaRacion; obs: string; cuadro: string }
 const ind = "individual" as const;
 const lote = "grupal" as const;
 const RACIONES: PlanRacion[] = [
@@ -59,14 +59,14 @@ const RACIONES: PlanRacion[] = [
   { cuadro: "Peces", destino: "C:PECES", alimento: "ACUATILAPIA", cantidad: 1, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "1 bulto al mes para los estanques" },
   // ---- Granja: por animal --------------------------------------------------
   { cuadro: "Vacas", destino: "A:VACAS", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg por vaca al día" },
-  { cuadro: "Sal mineralizada", destino: "A:VACAS", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 2 bultos/mes entre 15 vacas" },
-  { cuadro: "Melaza", destino: "A:VACAS", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 6 bultos/mes entre 15 vacas" },
+  { cuadro: "Sal mineralizada", destino: "A:VACAS", horario: "CONSUMO LIBRE", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 2 bultos/mes entre 15 vacas" },
+  { cuadro: "Melaza", destino: "A:VACAS", horario: "CONSUMO LIBRE", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 6 bultos/mes entre 15 vacas" },
   { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "Igual que las vacas · 2 kg por animal al día" },
-  { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
-  { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TOROS", horario: "CONSUMO LIBRE", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TOROS", horario: "CONSUMO LIBRE", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
   { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "Igual que las vacas · 2 kg por animal al día" },
-  { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
-  { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TORETES", horario: "CONSUMO LIBRE", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TORETES", horario: "CONSUMO LIBRE", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
   { cuadro: "Terneros", destino: "A:TERNEROS", alimento: "SÚPER TERNERA", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por animal al día" },
   { cuadro: "Terneros", destino: "A:TERNERAS", alimento: "SÚPER TERNERA", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por animal al día" },
   { cuadro: "Perros", destino: "A:PERROS", alimento: "ITALCÁN", cantidad: 800, unidad: "g", modo: ind, frecuencia: "diaria", obs: "800 g por perro al día" },
@@ -76,15 +76,15 @@ const RACIONES: PlanRacion[] = [
   { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "HENO", cantidad: 1, unidad: "paca", modo: ind, frecuencia: "diaria", obs: "1 paca por caballo al día" },
   { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "ALFALFA EN CUBOS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de alfalfa humedecida" },
   { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "PODIUM", cantidad: 3, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "3 kg por caballo al día" },
-  { cuadro: "Caballos en general", destino: "A:CABALLOS", alimento: "SAL EQUINA", cantidad: 30, unidad: "g", modo: ind, frecuencia: "diaria", obs: "30 g por caballo al día" },
+  { cuadro: "Caballos en general", destino: "A:CABALLOS", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 30, unidad: "g", modo: ind, frecuencia: "diaria", obs: "30 g por caballo al día" },
   { cuadro: "Potros", destino: "A:POTROS", alimento: "HENO", cantidad: 7_500, unidad: "g", modo: ind, frecuencia: "diaria", obs: "½ paca por potro al día" },
   { cuadro: "Potros", destino: "A:POTROS", alimento: "ALFALFA EN CUBOS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de alfalfa humedecida" },
   { cuadro: "Potros", destino: "A:POTROS", alimento: "BRÍO POTROS", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg de Briopotros por potro" },
-  { cuadro: "Potros", destino: "A:POTROS", alimento: "SAL EQUINA", cantidad: 20, unidad: "g", modo: ind, frecuencia: "diaria", obs: "20 g por potro al día" },
+  { cuadro: "Potros", destino: "A:POTROS", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 20, unidad: "g", modo: ind, frecuencia: "diaria", obs: "20 g por potro al día" },
   { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "HENO", cantidad: 3_750, unidad: "g", modo: ind, frecuencia: "diaria", obs: "¼ paca por mini al día" },
   { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "ALFALFA EN CUBOS", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg de alfalfa humedecida" },
   { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "PODIUM", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por mini al día" },
-  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "SAL EQUINA", cantidad: 10, unidad: "g", modo: ind, frecuencia: "diaria", obs: "10 g por mini al día" },
+  { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", horario: "CONSUMO LIBRE", alimento: "SAL EQUINA", cantidad: 10, unidad: "g", modo: ind, frecuencia: "diaria", obs: "10 g por mini al día" },
 ];
 
 // Grupos sin ración comprada (confirmado por el responsable 2026-11-12).
@@ -169,7 +169,7 @@ async function main() {
     filas.push({
       animal_id: d.animal_id, categoria_animal_id: d.categoria_animal_id, alimento_id: al.id,
       cantidad: r.cantidad, unidad: r.unidad, modo: r.modo, frecuencia: r.frecuencia,
-      observaciones: r.obs, activo: true, creado_por: POR,
+      horario: r.horario ?? null, observaciones: r.obs, activo: true, creado_por: POR,
     });
   }
 

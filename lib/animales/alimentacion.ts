@@ -36,6 +36,8 @@ export interface DatosEntregaAlimento {
   observaciones?: string | null;
   creado_por: string;
   motivoMovimiento: string;
+  /** Cuándo se entregó (planilla de un día pasado). Por defecto, ahora. */
+  fecha?: Date;
 }
 
 /**
@@ -45,6 +47,7 @@ export interface DatosEntregaAlimento {
 export async function registrarEntregaConKardex(tx: Tx, e: DatosEntregaAlimento): Promise<{ registroId: string; saldo: number }> {
   const reg = await tx.registroAlimentacion.create({
     data: {
+      ...(e.fecha ? { fecha: e.fecha } : {}),
       racion_id: e.racion_id ?? null,
       animal_id: e.animal_id ?? null,
       categoria_animal_id: e.categoria_animal_id ?? null,
@@ -67,6 +70,7 @@ export async function registrarEntregaConKardex(tx: Tx, e: DatosEntregaAlimento)
   if (e.cantidad_entregada > 0) {
     await tx.movimientoAlimento.create({
       data: {
+        ...(e.fecha ? { fecha: e.fecha } : {}),
         alimento_id: e.alimento_id,
         tipo: "salida",
         cantidad_base: e.cantidad_entregada,

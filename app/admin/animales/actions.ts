@@ -10,6 +10,11 @@ import { recalcularExistencia, registrarEntregaConKardex } from "@/lib/animales/
 import { calcularLineasCompra, preciosQueCambian } from "@/lib/animales/compras";
 import type { Tx } from "@/lib/db";
 import { fechaBogota } from "@/lib/tiempo";
+import { TODAS_LAS_FRANJAS, esConsumoLibre, type Franja } from "@/lib/animales/auto-alimentacion";
+import {
+  ETIQUETA_FRANJA, aValorPlanilla, estadoEntrega, fechaDelTurno, teoricoEnFranja, textoPlanilla, unidadPlanilla,
+  type RacionPlanilla,
+} from "@/lib/animales/planilla";
 import { fechaDelHecho, NOVEDADES_ANIMAL, MOTIVO_OBLIGATORIO_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
 import { recalcularCenso, SaldoNegativoError } from "@/lib/inventario/recalcular";
 import type { Prisma } from "@prisma/client";
@@ -1082,4 +1087,185 @@ export async function anularAlimentacion(id: string, motivo: string): Promise<Re
   });
   revalidatePath(RUTA);
   return { ok: true };
+}
+
+// ------------------------------------------------------------ planilla por turno
+
+export interface FilaPlanilla {
+  racion_id: string;
+  destino: string;
+  alimento: string;
+  alimento_id: string;
+  consumoLibre: boolean;
+  teoricoTexto: string;
+  /** Lo teórico listo para el campo (en `unidad`). */
+  sugerido: string;
+  unidad: string;
+  bodegaTexto: string | null;
+  faltaEnBodega: boolean;
+  registrado: { id: string; realTexto: string; estado: string; automatico: boolean; motivo: string | null } | null;
+}
+
+export interface Planilla {
+  ok: boolean;
+  error?: string;
+  fecha: string;
+  turnos: Array<{ franja: Franja; etiqueta: string; filas: FilaPlanilla[] }>;
+}
+
+async function racionesParaPlanilla(): Promise<Array<RacionPlanilla & { existencia: number | null; animal_id: string | null; categoria_animal_id: string | null; recinto_id: string | null }>> {
+  const raciones = await prisma.racion.findMany({
+    where: { activo: true },
+    include: { alimento: true, categoria: true, animal: { include: { categoria: true } } },
+  });
+  const grupos = await prisma.animal.findMany({ where: { activo: true }, select: { categoria_id: true, cantidad: true } });
+  const porCategoria = new Map<string, number>();
+  for (const g of grupos) porCategoria.set(g.categoria_id, (porCategoria.get(g.categoria_id) ?? 0) + g.cantidad);
+  return raciones
+    .filter((r) => r.animal || r.categoria)
+    .map((r) => ({
+      id: r.id,
+      destino: r.animal ? r.animal.nombre : `${r.categoria!.nombre} (categoría)`,
+      categoria: r.animal ? r.animal.categoria.nombre : r.categoria!.nombre,
+      cabezas: r.animal ? r.animal.cantidad : porCategoria.get(r.categoria_animal_id!) ?? 0,
+      cantidad: r.cantidad,
+      unidad: r.unidad,
+      modo: r.modo,
+      frecuencia: r.frecuencia,
+      horario: r.horario,
+      alimento: r.alimento,
+      existencia: r.alimento.existencia_base,
+      animal_id: r.animal_id,
+      categoria_animal_id: r.categoria_animal_id,
+      recinto_id: r.animal?.recinto_id ?? null,
+    }));
+}
+
+/** Lo que toca dar en cada turno del día, con lo que ya se registró. */
+export async function cargarPlanilla(fecha: string): Promise<Planilla> {
+  const vacia = { fecha, turnos: [] };
+  const s = await granja();
+  if (!s) return { ok: false, error: SIN_PERMISO_GRANJA, ...vacia };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: "Fecha inválida.", ...vacia };
+  if (fecha > fechaBogota()) return { ok: false, error: "No se puede registrar alimentación de un día que no ha llegado.", ...vacia };
+
+  const raciones = await racionesParaPlanilla();
+  const registros = await prisma.registroAlimentacion.findMany({
+    where: {
+      anulado: false, racion_id: { not: null }, franja: { not: null },
+      fecha: { gte: new Date(`${fecha}T00:00:00-05:00`), lte: new Date(`${fecha}T23:59:59-05:00`) },
+    },
+    include: { alimento: true },
+  });
+
+  const turnos = TODAS_LAS_FRANJAS.map((franja) => {
+    const filas: FilaPlanilla[] = [];
+    for (const r of raciones) {
+      const teorico = teoricoEnFranja(r, franja);
+      if (teorico === null) continue;
+      const reg = registros.find((x) => x.racion_id === r.id && x.franja === franja);
+      filas.push({
+        racion_id: r.id,
+        destino: r.destino,
+        alimento: r.alimento.nombre,
+        alimento_id: r.alimento.id,
+        consumoLibre: esConsumoLibre(r.horario),
+        teoricoTexto: textoPlanilla(teorico, r.alimento),
+        sugerido: aValorPlanilla(teorico, r.alimento),
+        unidad: unidadPlanilla(r.alimento).unidad,
+        bodegaTexto: r.existencia === null ? null : textoPlanilla(Math.max(0, r.existencia), r.alimento),
+        faltaEnBodega: r.existencia !== null && r.existencia < teorico,
+        registrado: reg
+          ? { id: reg.id, realTexto: textoPlanilla(reg.cantidad_entregada, reg.alimento), estado: reg.estado, automatico: reg.automatico, motivo: reg.motivo }
+          : null,
+      });
+    }
+    filas.sort((a, b) => a.destino.localeCompare(b.destino) || a.alimento.localeCompare(b.alimento));
+    return { franja, etiqueta: ETIQUETA_FRANJA[franja], filas };
+  }).filter((t) => t.filas.length > 0);
+
+  return { ok: true, fecha, turnos };
+}
+
+/** Guarda las filas marcadas de un turno: lo REAL que se dio, con su salida de bodega. */
+export async function guardarPlanilla(e: {
+  fecha: string;
+  franja: string;
+  empleado_id?: string | null;
+  filas: Array<{ racion_id: string; cantidad: string; nota?: string | null }>;
+}): Promise<Resultado> {
+  const s = await granja();
+  if (!s) return { ok: false, error: SIN_PERMISO_GRANJA };
+  const franja = TODAS_LAS_FRANJAS.find((f) => f === e.franja);
+  if (!franja) return { ok: false, error: "Turno inválido." };
+  const hoy = fechaBogota();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.fecha) || e.fecha > hoy) return { ok: false, error: "Fecha inválida." };
+  if (e.filas.length === 0) return { ok: false, error: "Marca al menos una fila con el chulito." };
+
+  const raciones = new Map((await racionesParaPlanilla()).map((r) => [r.id, r]));
+  const desde = new Date(`${e.fecha}T00:00:00-05:00`);
+  const hasta = new Date(`${e.fecha}T23:59:59-05:00`);
+  const cuando = fechaDelTurno(e.fecha, franja, hoy, new Date());
+
+  // Validar todo antes de escribir: o se guarda el turno completo o nada.
+  type Entrega = { r: NonNullable<ReturnType<typeof raciones.get>>; real: number; teorico: number; nota: string | null };
+  const entregas: Entrega[] = [];
+  for (const f of e.filas) {
+    const r = raciones.get(f.racion_id);
+    if (!r) return { ok: false, error: "Una de las raciones ya no está activa. Recarga la planilla." };
+    const teorico = teoricoEnFranja(r, franja);
+    if (teorico === null) return { ok: false, error: `${r.destino} · ${r.alimento.nombre}: no le toca este turno.` };
+    const cantidad = parseCantidad(f.cantidad);
+    if (cantidad === null || cantidad < 0) return { ok: false, error: `${r.destino} · ${r.alimento.nombre}: la cantidad real no es un número.` };
+    const real = Math.round(cantidad * unidadPlanilla(r.alimento).base);
+    entregas.push({ r, real, teorico, nota: texto(f.nota) });
+  }
+
+  const ya = await prisma.registroAlimentacion.findFirst({
+    where: { anulado: false, franja, racion_id: { in: entregas.map((x) => x.r.id) }, fecha: { gte: desde, lte: hasta } },
+    select: { racion_id: true },
+  });
+  if (ya) {
+    const r = raciones.get(ya.racion_id!)!;
+    return { ok: false, error: `${r.destino} · ${r.alimento.nombre} ya está registrado en este turno. Recarga la planilla.` };
+  }
+
+  const negativos = new Set<string>();
+  await prisma.$transaction(async (tx) => {
+    for (const { r, real, teorico, nota } of entregas) {
+      const estado = estadoEntrega(real, teorico);
+      const { saldo } = await registrarEntregaConKardex(tx, {
+        fecha: cuando,
+        racion_id: r.id,
+        animal_id: r.animal_id,
+        categoria_animal_id: r.categoria_animal_id,
+        recinto_id: r.recinto_id,
+        alimento_id: r.alimento.id,
+        cantidad_planeada: teorico,
+        cantidad_entregada: real,
+        costo: real > 0 ? costoCOP(real, r.alimento) : 0,
+        estado,
+        motivo: nota ?? (estado === "omitida" ? "No se entregó (planilla)" : estado === "parcial" ? "Menos de lo teórico (planilla)" : null),
+        empleado_id: texto(e.empleado_id),
+        usuario_id: s.id,
+        franja,
+        observaciones: `Planilla · turno ${ETIQUETA_FRANJA[franja]}`,
+        creado_por: s.id,
+        motivoMovimiento: `Alimentación · turno ${ETIQUETA_FRANJA[franja]}`,
+      });
+      if (saldo < 0) negativos.add(r.alimento.nombre);
+    }
+  }, { timeout: 60000 });
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "alimentacion", entidad_id: `${e.fecha} ${franja}`, accion: "planilla",
+    datos_despues: { filas: entregas.map((x) => ({ racion_id: x.r.id, real: x.real, teorico: x.teorico })) },
+  });
+  revalidatePath(RUTA);
+  return {
+    ok: true,
+    aviso: negativos.size > 0
+      ? `Quedó en negativo en bodega: ${[...negativos].join(", ")}. Registra la compra que llegó o haz un ajuste por conteo.`
+      : undefined,
+  };
 }

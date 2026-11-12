@@ -15,6 +15,13 @@ import { franjaMasCercana } from "../lib/animales/auto-alimentacion";
 import { ejecutarAlimentacionAutomatica } from "../lib/animales/ejecutar-automatico";
 
 async function main() {
+  // APAGADO desde 2026-11-12: daba por entregada la dieta aunque no hubiera alimento en
+  // bodega. Ahora se usa la planilla por turno de la Bitácora (teórico vs. real).
+  // Para volver a encenderlo: variable ALIMENTACION_AUTOMATICA=1 en el servicio del cron.
+  if (process.env.ALIMENTACION_AUTOMATICA !== "1") {
+    console.log("[alimentar-automatico] Apagado: la alimentación se registra en la planilla por turno.");
+    return;
+  }
   const ahora = new Date();
   const hora = horaBogota(ahora);
   const franja = franjaMasCercana(hora);

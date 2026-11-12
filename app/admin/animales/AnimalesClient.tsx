@@ -15,6 +15,7 @@ import {
 import { NOVEDADES_ANIMAL, ETIQUETA_ANIMAL, EFECTO_ANIMAL, MOTIVO_OBLIGATORIO_ANIMAL, type TipoMovAnimal } from "@/lib/inventario/kardex";
 import { subtotalLinea } from "@/lib/animales/compras";
 import MenuAcciones from "@/components/MenuAcciones";
+import PlanillaAlimentacion from "./PlanillaAlimentacion";
 
 /** Minúsculas y sin tildes, para que "pekin" encuentre "PEKÍN". */
 const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -187,7 +188,7 @@ export default function AnimalesClient(p: Props) {
       {tab === "compras" && <Compras {...comun} compras={p.compras} proveedores={p.proveedores} alimentos={p.alimentos} hoy={p.hoy} />}
       {tab === "dieta" && <Dieta {...comun} raciones={p.raciones} animales={p.animales} categorias={p.categorias} alimentos={p.alimentos} />}
       {tab === "bitacora" && (
-        <Bitacora {...comun} bitacora={p.bitacora} raciones={p.raciones} animales={p.animales} alimentos={p.alimentos} empleados={p.empleados} kpis={p.kpis} />
+        <Bitacora {...comun} hoy={p.hoy} bitacora={p.bitacora} raciones={p.raciones} animales={p.animales} alimentos={p.alimentos} empleados={p.empleados} kpis={p.kpis} />
       )}
     </main>
   );
@@ -1334,8 +1335,9 @@ function Dieta({
 // ------------------------------------------------------------------ BITÁCORA
 
 function Bitacora({
-  busy, correr, esAdmin, bitacora, raciones, animales, alimentos, empleados, kpis,
+  busy, correr, esAdmin, hoy, bitacora, raciones, animales, alimentos, empleados, kpis,
 }: Comun & {
+  hoy: string;
   bitacora: BitacoraVista[]; raciones: RacionVista[]; animales: AnimalVista[];
   alimentos: AlimentoVista[]; empleados: { id: string; nombre: string }[];
   kpis: { entregasHoy: number; costoHoy: number; racionesDiariasActivas: number };
@@ -1343,6 +1345,8 @@ function Bitacora({
   const activas = useMemo(() => raciones.filter((r) => r.activo), [raciones]);
   const [form, setForm] = useState({ racion_id: "", animal_id: "", alimento_id: "", cantidad: "", unidad: "kg", estado: "realizada", motivo: "", empleado_id: "", observaciones: "" });
   const [anulando, setAnulando] = useState<{ id: string; motivo: string } | null>(null);
+  const [extra, setExtra] = useState(false);
+  const [version, setVersion] = useState(0);
 
   const racionSel = activas.find((r) => r.id === form.racion_id) ?? null;
 
@@ -1367,8 +1371,14 @@ function Bitacora({
         <Kpi label="Costo de hoy" valor={formatearCOP(kpis.costoHoy)} />
       </div>
 
-      <section className={`mb-4 ${card} p-4`}>
-        <h2 className="mb-3 font-bold text-ranch-marron">Registrar alimentación</h2>
+      <PlanillaAlimentacion hoy={hoy} busy={busy} correr={correr} empleados={empleados} version={version} />
+
+      <div className="mb-4">
+        <button className={botonSec} onClick={() => setExtra(!extra)}>{extra ? "Cerrar entrega extraordinaria" : "+ Entrega extraordinaria (fuera de la dieta)"}</button>
+      </div>
+
+      {extra && <section className={`mb-4 ${card} p-4`}>
+        <h2 className="mb-3 font-bold text-ranch-marron">Entrega extraordinaria</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           <select className={`${input} sm:col-span-2`} value={form.racion_id} onChange={(e) => elegirRacion(e.target.value)}>
             <option value="">Entrega extraordinaria (sin ración)</option>
@@ -1432,7 +1442,7 @@ function Bitacora({
             if (ok) setForm({ ...form, cantidad: "", motivo: "", observaciones: "" });
           }}
         >Registrar</button>
-      </section>
+      </section>}
 
       <div className={`overflow-x-auto ${card}`}>
         <table className="w-full text-left text-sm">
@@ -1454,9 +1464,9 @@ function Bitacora({
                 <tr key={b.id} className={`border-t border-ranch-marron/10 ${b.anulado ? "opacity-50 line-through" : ""}`}>
                   <td className="px-3 py-2 text-ranch-marron/60">
                     {b.fecha}
-                    {b.automatico && (
+                    {b.franja && (
                       <span className="mt-1 block w-fit rounded-full bg-ranch-verde/15 px-2 py-0.5 text-[10px] font-semibold text-ranch-verde">
-                        auto {b.franja}
+                        {b.automatico ? "auto" : "turno"} {b.franja}
                       </span>
                     )}
                   </td>
@@ -1491,7 +1501,7 @@ function Bitacora({
                         <input className={`${input} flex-1`} placeholder="Motivo de la anulación (obligatorio)" value={anulando.motivo} onChange={(e) => setAnulando({ ...anulando, motivo: e.target.value })} />
                         <button
                           className={boton} disabled={busy}
-                          onClick={async () => { if (await correr(() => anularAlimentacion(b.id, anulando.motivo), "Registro anulado y alimento devuelto al inventario.")) setAnulando(null); }}
+                          onClick={async () => { if (await correr(() => anularAlimentacion(b.id, anulando.motivo), "Registro anulado y alimento devuelto al inventario.")) { setAnulando(null); setVersion((v) => v + 1); } }}
                         >Anular</button>
                       </div>
                     </td>
