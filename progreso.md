@@ -19,7 +19,7 @@ Estado por fase. Se entrega una fase a la vez; no se avanza sin visto bueno del 
 | F12 | Caja: descuentos, comprador, relación de atenciones, filtros y Excel nativo, diagnóstico de impresora | ✅ Completada |
 | F13 | Atracciones editables + fila virtual (el visitante separa turno con su QR) | ✅ Completada |
 | F14 | Compras de alimento (factura → inventario + gasto) y gastos por área y por quién pide | ✅ Completada (verificada en local) |
-| F15 | Kardex de animales (partos, muertes, ventas, compras, traslados parciales) y de equipos (compra, baja, robo, traslado) + Equipos con CRUD y mantenimientos | 🟡 Código listo; falta probar contra la base |
+| F15 | Kardex de animales (partos, muertes, ventas, compras, traslados parciales) y de equipos (compra, baja, robo, traslado) + Equipos con CRUD y mantenimientos | ✅ Completada (verificada en local; falta desplegar) |
 
 
 ## F15 — Novedades del inventario: animales y equipos (2026-11-12)
@@ -63,8 +63,13 @@ marca, nombre, referencia, grupo…"*.
 - [x] Verificado: **299 pruebas verdes**, typecheck limpio, `npm run build` OK.
 
 Pendiente:
-- [ ] **Probar contra la base** (local y luego producción): Docker Desktop no arrancó en esta sesión, así que
-      la migración y las pantallas no se han ejecutado contra Postgres todavía.
+- [x] **Probado en local contra Postgres:** migración aplicada sin deriva; `scripts/verificar-f15.ts` confirma
+      que la cantidad guardada = kardex en todos los grupos y equipos. En el navegador: muerte sin causa →
+      rechazada; muerte de 2 patos (47 → 45); venta de 100 → rechazada por negativo; traslado completo +
+      parcial (40 en un corral, 5 en otro); equipo creado por compra (20 sillas, $900.000), robo de 3
+      (20 → 17), traslado parcial de 5, mantenimiento iniciar → "en mantenimiento" → realizado →
+      "operativo", y anular el robo devuelve las 3 unidades.
+- [ ] **Desplegar a producción** (lo pide el responsable: el push = despliegue). La migración se aplica sola.
 - [ ] Decidir con la administradora: ¿la compra/venta de animales y equipos crea el gasto/ingreso solo
       (como las compras de alimento)? Hoy solo guarda el valor.
 - [ ] Cargar el inventario real de equipos (Excel) y dar de baja los equipos de ejemplo del boceto si
