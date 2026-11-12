@@ -423,3 +423,7 @@ del responsable:
   Heno sin IVA; alfalfa, Podium, Briopotros y sal equina con 5%. Se creó el alimento SAL EQUINA (saco de 10 kg).
 - Diferencias conocidas frente al cuadro de granja: **vacas** 2 kg × 15 × 30 = 900 kg = 22,5 bultos (el cuadro dice
   15 bultos); **perros** el censo tiene 12, el cuadro 10. Terneros y cabras: el cuadro redondea a bultos enteros.
+  CONFIRMADO por el responsable: vacas 2 kg, perros 12, terneros como está.
+- Toros y toretes comen igual que las vacas (Leche 16, sal y melaza por animal). Faisanes y pavos reales están dentro
+  de "aves en general". Tortugas (desperdicio) y tigrilla (sobras) sin ración comprada. Ocelote y ovejo murieron:
+  se registró la muerte en el kardex y quedaron fallecidos.

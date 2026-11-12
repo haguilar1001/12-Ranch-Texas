@@ -8,12 +8,13 @@
 //
 // Nada se borra: las raciones viejas quedan inactivas (activo=false) y la bitácora que las
 // usó sigue apuntándoles. Los alimentos se actualizan de precio; ninguno se desactiva.
-// No toca el censo de animales.
+// Solo toca el censo para registrar las muertes reportadas (como novedad del kardex).
 //
 //   npx tsx scripts/dietas-2026-11.ts                → muestra qué cambiaría (no toca la base)
 //   npx tsx scripts/dietas-2026-11.ts --confirmar    → aplica
 import "dotenv/config";
 import { prisma } from "../lib/db";
+import { recalcularCenso } from "../lib/inventario/recalcular";
 import { costoMensual, consumoBaseMensual, type FrecuenciaRacion, type ModoRacion } from "../lib/animales/racion";
 
 const CONFIRMAR = process.argv.includes("--confirmar");
@@ -53,13 +54,19 @@ const lote = "grupal" as const;
 const RACIONES: PlanRacion[] = [
   // ---- AVES y PECES: por lote ----------------------------------------------
   { cuadro: "Gallinas ponedoras", destino: "A:GALLINAS PONEDORAS", alimento: "PREPICO DORADO", cantidad: 12, unidad: "kg", modo: lote, frecuencia: "diaria", obs: "12 kg al día para el lote (9 bultos/mes)" },
-  { cuadro: "Aves en general", destino: "C:AVES DE CORRAL", alimento: "MAÍZ MOLIDO", cantidad: 6, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "Aves en general · 6 bultos al mes" },
-  { cuadro: "Aves en general", destino: "C:AVES DE CORRAL", alimento: "PREPICO DORADO", cantidad: 2, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "Aves en general · 2 bultos al mes" },
+  { cuadro: "Aves en general", destino: "C:AVES DE CORRAL", alimento: "MAÍZ MOLIDO", cantidad: 6, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "Aves en general (incluye faisanes y pavos reales) · 6 bultos al mes" },
+  { cuadro: "Aves en general", destino: "C:AVES DE CORRAL", alimento: "PREPICO DORADO", cantidad: 2, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "Aves en general (incluye faisanes y pavos reales) · 2 bultos al mes" },
   { cuadro: "Peces", destino: "C:PECES", alimento: "ACUATILAPIA", cantidad: 1, unidad: "bulto", modo: lote, frecuencia: "mensual", obs: "1 bulto al mes para los estanques" },
   // ---- Granja: por animal --------------------------------------------------
   { cuadro: "Vacas", destino: "A:VACAS", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "2 kg por vaca al día" },
   { cuadro: "Sal mineralizada", destino: "A:VACAS", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 2 bultos/mes entre 15 vacas" },
   { cuadro: "Melaza", destino: "A:VACAS", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Consumo libre · 6 bultos/mes entre 15 vacas" },
+  { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "Igual que las vacas · 2 kg por animal al día" },
+  { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TOROS", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "LECHE 16", cantidad: 2, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "Igual que las vacas · 2 kg por animal al día" },
+  { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "SAL MINERALIZADA", cantidad: 2_667, unidad: "g", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
+  { cuadro: "Toros y toretes", destino: "A:TORETES", alimento: "MELAZA", cantidad: 12, unidad: "kg", modo: ind, frecuencia: "mensual", obs: "Igual que las vacas · consumo libre" },
   { cuadro: "Terneros", destino: "A:TERNEROS", alimento: "SÚPER TERNERA", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por animal al día" },
   { cuadro: "Terneros", destino: "A:TERNERAS", alimento: "SÚPER TERNERA", cantidad: 1, unidad: "kg", modo: ind, frecuencia: "diaria", obs: "1 kg por animal al día" },
   { cuadro: "Perros", destino: "A:PERROS", alimento: "ITALCÁN", cantidad: 800, unidad: "g", modo: ind, frecuencia: "diaria", obs: "800 g por perro al día" },
@@ -80,11 +87,19 @@ const RACIONES: PlanRacion[] = [
   { cuadro: "Caballos mini", destino: "A:CABALLOS MINI", alimento: "SAL EQUINA", cantidad: 10, unidad: "g", modo: ind, frecuencia: "diaria", obs: "10 g por mini al día" },
 ];
 
+// Grupos sin ración comprada (confirmado por el responsable 2026-11-12).
+const SIN_RACION: Array<[string, string]> = [
+  ["TORTUGAS", "Se alimentan con desperdicio (sin ración comprada)"],
+  ["TIGRILLA", "Se alimenta con sobras (sin ración comprada)"],
+];
+// Muertes reportadas por el responsable el 2026-11-12: se registran como novedad del kardex.
+const MUERTES = ["OCELOTE", "OVEJOS"];
+
 // Lo que dicen los cuadros, para contrastar contra lo que calcula la app con el censo real.
 const CUADRO: Record<string, number> = {
   "Gallinas ponedoras": 720_000, "Vacas": 1_275_000, "Aves en general": 580_000, "Perros": 880_000,
   "Terneros": 680_000, "Conejos": 75_000, "Cabras": 340_000, "Peces": 305_000,
-  "Sal mineralizada": 190_000, "Melaza": 312_000,
+  "Sal mineralizada": 190_000, "Melaza": 312_000, "Toros y toretes": 0,
   "Caballos en general": 30_432_883, "Potros": 5_209_995, "Caballos mini": 3_615_077,
 };
 
@@ -127,6 +142,12 @@ async function main() {
     return { animal_id: null, categoria_animal_id: c.id, cabezas };
   };
 
+  for (const [n, o] of SIN_RACION) console.log(`  · ${n}: ${o}`);
+  for (const n of MUERTES) {
+    const g = grupos.find((x) => x.nombre.toUpperCase() === n);
+    console.log(`  ✝ ${n}: ${g ? (g.cantidad === 0 ? "ya está en 0" : `muerte de ${g.cantidad} (queda fallecido)`) : "no existe"}`);
+  }
+
   // 3) raciones viejas ---------------------------------------------------------
   const viejas = await prisma.racion.findMany({ where: { activo: true } });
   console.log(`\n2) Se desactivan las ${viejas.length} raciones activas de hoy (no se borran).`);
@@ -165,6 +186,20 @@ async function main() {
 
   await prisma.$transaction(async (tx) => {
     await tx.racion.updateMany({ where: { id: { in: viejas.map((v) => v.id) } }, data: { activo: false, actualizado_por: POR } });
+    for (const [nombre, obs] of SIN_RACION) {
+      const g = grupos.find((x) => x.nombre.toUpperCase() === nombre);
+      if (g) await tx.animal.update({ where: { id: g.id }, data: { observaciones: obs, actualizado_por: POR } });
+    }
+    for (const nombre of MUERTES) {
+      const g = grupos.find((x) => x.nombre.toUpperCase() === nombre);
+      if (!g || g.cantidad === 0) continue;
+      await tx.movimientoAnimal.create({
+        data: { animal_id: g.id, tipo: "muerte", cantidad: g.cantidad, fecha: new Date(), motivo: "Reportado por el responsable (2026-11-12)", creado_por: POR },
+      });
+      if ((await recalcularCenso(tx, g.id, POR, g.nombre)) === 0) {
+        await tx.animal.update({ where: { id: g.id }, data: { estado: "fallecido" } });
+      }
+    }
     await tx.racion.createMany({ data: filas as never });
     await tx.logAuditoria.create({
       data: {
