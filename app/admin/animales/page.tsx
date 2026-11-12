@@ -172,7 +172,7 @@ export default async function AnimalesPage() {
     sexo: a.sexo,
     estado: a.estado,
     observaciones: a.observaciones,
-    raciones: raciones.filter((r) => (r.esGrupo && r.destino_id === a.id) || (!r.esGrupo && r.destino_id === a.categoria_id)).length,
+    raciones: raciones.filter((r) => r.activo && ((r.esGrupo && r.destino_id === a.id) || (!r.esGrupo && r.destino_id === a.categoria_id))).length,
     historial: a.traslados.map((t) => ({
       fecha: formatearFechaHoraCortaBogota(t.fecha),
       origen: t.recinto_origen?.nombre ?? null,

@@ -412,3 +412,14 @@ del responsable:
 - Política ante **doble ingreso/aforo en modo offline**: reconciliación al sincronizar + alerta
   auditada (no se puede "des-ingresar").
 - Verificación periódica de restauración de backups de Railway.
+
+## Dietas nuevas (2026-11-12)
+- Se reemplazaron todas las dietas por las de los cuadros "Alimento animales de granja — consumo mensual" y
+  "Plan de alimentación — 60 animales" (`scripts/dietas-2026-11.ts`). Las 20 raciones anteriores quedan inactivas.
+- **Solo aves y peces van por lote.** Todo lo demás va **por animal**, para que el consumo siga al censo del kardex.
+  Repartos de cantidades que el cuadro daba para el lote: conejos 500 g / 7 ≈ 71 g; caprinos 5 kg / 24 ≈ 208 g;
+  sal mineralizada 2 bultos / 15 vacas = 2.667 g al mes; melaza 6 bultos / 15 = 12 kg al mes.
+- Equinos: se usa la imagen (con heno para todos: 1, ½ y ¼ de paca). El PDF anterior solo daba heno a los mini.
+  Heno sin IVA; alfalfa, Podium, Briopotros y sal equina con 5%. Se creó el alimento SAL EQUINA (saco de 10 kg).
+- Diferencias conocidas frente al cuadro de granja: **vacas** 2 kg × 15 × 30 = 900 kg = 22,5 bultos (el cuadro dice
+  15 bultos); **perros** el censo tiene 12, el cuadro 10. Terneros y cabras: el cuadro redondea a bultos enteros.
