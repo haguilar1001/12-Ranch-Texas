@@ -8,8 +8,8 @@ import {
   crearGrupoEquipo, editarGrupoEquipo, cambiarEstadoGrupoEquipo,
   crearEquipo, editarEquipo, cambiarEstadoEquipo, trasladarEquipo,
   registrarNovedadEquipo, anularNovedadEquipo,
-  crearMantenimiento, actualizarMantenimiento,
-  type EntradaEquipo,
+  crearMantenimiento, actualizarMantenimiento, cargarEquiposExcel,
+  type EntradaEquipo, type ResultadoCarga,
 } from "./actions";
 import MenuAcciones from "@/components/MenuAcciones";
 
@@ -186,6 +186,8 @@ function Inventario({
   const [buscar, setBuscar] = useState("");
   const [grupo, setGrupo] = useState("");
   const [verCero, setVerCero] = useState(false);
+  const [carga, setCarga] = useState(false);
+  const router = useRouter();
 
   // Filtro por cualquier campo: cada palabra debe aparecer en algún dato del equipo.
   const palabras = sinTildes(buscar).split(/\s+/).filter(Boolean);
@@ -214,7 +216,11 @@ function Inventario({
         <button className={botonSec} onClick={() => setFicha(ficha?.id === null ? null : { id: null, f: fichaVacia() })}>
           {ficha?.id === null ? "Cerrar" : "+ Nuevo equipo"}
         </button>
+        <a className={botonSec} href="/admin/equipos/plantilla" title="Excel con las listas de grupos, áreas, empleados y proveedores de la app">⬇ Plantilla Excel</a>
+        <button className={botonSec} onClick={() => setCarga(!carga)}>{carga ? "Cerrar carga" : "⬆ Cargar Excel"}</button>
       </div>
+
+      {carga && <CargaExcel onListo={() => router.refresh()} />}
 
       {ficha && (
         <FormFicha
@@ -252,6 +258,101 @@ function Inventario({
         </table>
       </div>
     </>
+  );
+}
+
+function CargaExcel({ onListo }: { onListo: () => void }) {
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [r, setR] = useState<ResultadoCarga | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function enviar(confirmar: boolean) {
+    if (!archivo) return setR({ ok: false, error: "Elige el archivo de Excel." });
+    const fd = new FormData();
+    fd.set("archivo", archivo);
+    if (confirmar) fd.set("confirmar", "1");
+    setOcupado(true);
+    try {
+      const res = await cargarEquiposExcel(fd);
+      setR(res);
+      if (res.confirmado) onListo();
+    } catch {
+      setR({ ok: false, error: "No se pudo enviar el archivo. Revisa la conexión e inténtalo de nuevo." });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <section className={`mb-4 ${card} p-4`}>
+      <h2 className="mb-1 font-bold text-ranch-marron">Cargar equipos desde Excel</h2>
+      <p className="mb-3 text-xs text-ranch-marron/60">
+        Usa la <a className="font-semibold underline" href="/admin/equipos/plantilla">plantilla</a> (trae las listas de la app). Primero se revisa
+        fila por fila y no se guarda nada; solo se carga cuando confirmas, y solo si no hay errores.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="file" accept=".xlsx,.xls" className="text-sm"
+          onChange={(e) => { setArchivo(e.target.files?.[0] ?? null); setR(null); }}
+        />
+        <button className={boton} disabled={ocupado || !archivo} onClick={() => enviar(false)}>{ocupado ? "Revisando…" : "Revisar archivo"}</button>
+      </div>
+
+      {r && (
+        <div className="mt-4 space-y-3">
+          {r.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{r.error}</p>}
+          {r.confirmado && (
+            <p className="rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
+              Listo: se cargaron {formatearMiles(r.validas ?? 0)} equipos ({formatearMiles(r.unidades ?? 0)} unidades).
+            </p>
+          )}
+          {!r.confirmado && (r.validas ?? 0) > 0 && (
+            <p className="text-sm text-ranch-marron">
+              <strong>{formatearMiles(r.validas!)}</strong> fila(s) correctas · {formatearMiles(r.unidades ?? 0)} unidades
+              {(r.errores?.length ?? 0) > 0 && <> · <strong className="text-red-700">{r.errores!.length} fila(s) con error</strong></>}
+            </p>
+          )}
+          {r.avisos?.map((a) => <p key={a} className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{a}</p>)}
+
+          {(r.porGrupo?.length ?? 0) > 0 && (
+            <table className="text-sm">
+              <thead><tr><th className={th}>Grupo</th><th className={`${th} text-right`}>Equipos</th><th className={`${th} text-right`}>Unidades</th></tr></thead>
+              <tbody>
+                {r.porGrupo!.map((g) => (
+                  <tr key={g.grupo} className="border-t border-ranch-marron/10">
+                    <td className="px-3 py-1 text-ranch-marron">{g.grupo}</td>
+                    <td className="px-3 py-1 text-right">{formatearMiles(g.equipos)}</td>
+                    <td className="px-3 py-1 text-right">{formatearMiles(g.unidades)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {(r.errores?.length ?? 0) > 0 && (
+            <div className="max-h-72 overflow-y-auto rounded-lg border border-red-200">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-red-50"><tr><th className={th}>Fila</th><th className={th}>Qué corregir</th></tr></thead>
+                <tbody>
+                  {r.errores!.map((e) => (
+                    <tr key={e.fila} className="border-t border-red-100 align-top">
+                      <td className="px-3 py-1 font-semibold text-red-700">{e.fila}</td>
+                      <td className="px-3 py-1 text-red-700">{e.errores.join(" ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!r.confirmado && r.ok && (r.validas ?? 0) > 0 && (
+            <button className={boton} disabled={ocupado} onClick={() => enviar(true)}>
+              {ocupado ? "Cargando…" : `Confirmar carga de ${formatearMiles(r.validas!)} equipos`}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -62,6 +62,15 @@ marca, nombre, referencia, grupo…"*.
       novedades: escribían la cantidad a mano y descuadrarían el kardex.
 - [x] Verificado: **299 pruebas verdes**, typecheck limpio, `npm run build` OK.
 
+- [x] **Carga masiva de equipos por Excel (2026-11-12):** botón **⬇ Plantilla Excel** en Equipos que arma el
+      archivo en el momento con los grupos, áreas, empleados y proveedores de la app como **listas
+      desplegables** (hoja oculta LISTAS), validaciones de número y fecha, encabezados con ayuda y una hoja de
+      INSTRUCCIONES (`lib/equipos/plantilla.ts`, con `exceljs`). **⬆ Cargar Excel** revisa fila por fila sin
+      guardar nada (errores con el número de fila, resumen por grupo, proveedores nuevos, posibles duplicados) y
+      solo carga al confirmar y si no hay ni un error, todo en una transacción con su saldo inicial en el kardex
+      (`lib/equipos/importar.ts`, puro y probado). Probado en local: archivo con errores → rechazado con la lista;
+      archivo bueno → 2 equipos y 32 unidades; volver a subirlo → el código repetido se rechaza.
+
 Pendiente:
 - [x] **Probado en local contra Postgres:** migración aplicada sin deriva; `scripts/verificar-f15.ts` confirma
       que la cantidad guardada = kardex en todos los grupos y equipos. En el navegador: muerte sin causa →

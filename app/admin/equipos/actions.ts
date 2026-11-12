@@ -8,6 +8,9 @@ import { fechaBogota } from "@/lib/tiempo";
 import { fechaDelHecho, NOVEDADES_EQUIPO, MOTIVO_OBLIGATORIO_EQUIPO, EFECTO_EQUIPO, type TipoMovEquipo } from "@/lib/inventario/kardex";
 import { recalcularUnidadesEquipo, SaldoNegativoError } from "@/lib/inventario/recalcular";
 import type { Tx } from "@/lib/db";
+import { randomUUID } from "node:crypto";
+import * as XLSX from "xlsx";
+import { leerFilas, normalizar, claveDuplicado, type Catalogos, type Celda, type ErrorFila, type ResultadoLectura } from "@/lib/equipos/importar";
 
 interface Resultado {
   ok: boolean;
@@ -523,4 +526,144 @@ export async function actualizarMantenimiento(
   });
   revalidatePath(RUTA);
   return { ok: true };
+}
+
+// ============================================================ CARGA MASIVA DESDE EXCEL
+
+export interface ResultadoCarga {
+  ok: boolean;
+  error?: string;
+  /** Solo revisión (no se guardó nada) o carga confirmada. */
+  confirmado?: boolean;
+  validas?: number;
+  unidades?: number;
+  porGrupo?: { grupo: string; equipos: number; unidades: number }[];
+  errores?: ErrorFila[];
+  avisos?: string[];
+  faltanColumnas?: string[];
+}
+
+/** Lee el archivo (hoja EQUIPOS o la primera) y lo valida contra los catálogos de la app. */
+async function revisarArchivo(archivo: File) {
+  const libro = XLSX.read(Buffer.from(await archivo.arrayBuffer()), { type: "buffer", cellDates: true });
+  const nombreHoja = libro.SheetNames.find((n) => normalizar(n) === "equipos") ?? libro.SheetNames[0];
+  const filas = XLSX.utils.sheet_to_json<Celda[]>(libro.Sheets[nombreHoja], { header: 1, raw: true, defval: null, blankrows: true });
+
+  const [grupos, areas, empleados, proveedores, codigos] = await Promise.all([
+    prisma.categoriaEquipo.findMany({ where: { activo: true }, select: { id: true, nombre: true } }),
+    prisma.areaTrabajo.findMany({ where: { activo: true }, select: { id: true, nombre: true } }),
+    prisma.empleado.findMany({ where: { activo: true }, select: { id: true, nombre: true } }),
+    prisma.proveedor.findMany({ where: { activo: true }, select: { id: true, nombre: true } }),
+    prisma.equipo.findMany({ where: { activo: true, cantidad: { gt: 0 } }, select: { codigo: true, nombre: true, categoria_id: true, ubicacion: true } }),
+  ]);
+  const mapa = (xs: { id: string; nombre: string }[]) => new Map(xs.map((x) => [normalizar(x.nombre), x.id]));
+  const catalogos: Catalogos = {
+    grupos: mapa(grupos), areas: mapa(areas), empleados: mapa(empleados), proveedores: mapa(proveedores),
+    codigosExistentes: new Set(codigos.filter((c) => c.codigo).map((c) => normalizar(c.codigo!))),
+    existentes: new Set(codigos.map((c) => claveDuplicado(c.nombre, c.categoria_id, c.ubicacion))),
+  };
+  return leerFilas(filas, catalogos, 2);
+}
+
+const MAX_BYTES = 3.5 * 1024 * 1024; // por debajo del límite de 4 MB de las Server Actions (next.config.mjs)
+
+/**
+ * Carga masiva. Sin `confirmar` solo REVISA y devuelve el resumen y los errores fila por fila; con
+ * `confirmar` vuelve a revisar y, si no hay ni un error, crea todo en una sola transacción.
+ */
+export async function cargarEquiposExcel(form: FormData): Promise<ResultadoCarga> {
+  const s = await supervisor();
+  if (!s) return { ok: false, error: SIN_PERMISO };
+
+  const archivo = form.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Elige el archivo de Excel." };
+  if (archivo.size > MAX_BYTES) return { ok: false, error: "El archivo pesa más de 3,5 MB." };
+  if (!/\.xlsx?$/i.test(archivo.name)) return { ok: false, error: "El archivo debe ser de Excel (.xlsx)." };
+  const confirmar = form.get("confirmar") === "1";
+
+  let r: ResultadoLectura;
+  try {
+    r = await revisarArchivo(archivo);
+  } catch {
+    return { ok: false, error: "No se pudo leer el archivo. ¿Es la plantilla de Excel descargada de la app?" };
+  }
+
+  const porGrupoMap = new Map<string, { grupo: string; equipos: number; unidades: number }>();
+  for (const f of r.validas) {
+    const g = porGrupoMap.get(f.grupo.toUpperCase()) ?? { grupo: f.grupo.toUpperCase(), equipos: 0, unidades: 0 };
+    g.equipos += 1;
+    g.unidades += f.cantidad;
+    porGrupoMap.set(g.grupo, g);
+  }
+  const resumen = {
+    validas: r.validas.length,
+    unidades: r.validas.reduce((t, f) => t + f.cantidad, 0),
+    porGrupo: [...porGrupoMap.values()].sort((a, b) => a.grupo.localeCompare(b.grupo)),
+    errores: r.errores,
+    avisos: r.avisos,
+    faltanColumnas: r.faltanColumnas,
+  };
+
+  if (r.faltanColumnas.length) return { ok: false, error: `Faltan columnas obligatorias: ${r.faltanColumnas.join(", ")}.`, ...resumen };
+  if (r.validas.length === 0 && r.errores.length === 0) return { ok: false, error: "El archivo no tiene equipos para cargar.", ...resumen };
+  if (!confirmar || r.errores.length > 0) {
+    return {
+      ok: r.errores.length === 0, confirmado: false, ...resumen,
+      error: confirmar && r.errores.length ? "Corrige las filas con error y vuelve a subir el archivo; no se cargó nada." : undefined,
+    };
+  }
+
+  // ---- Carga: proveedores nuevos, equipos y su saldo inicial, todo o nada.
+  const ahora = new Date();
+  const dia = (t: string | null) => (t ? new Date(`${t}T12:00:00-05:00`) : null);
+  await prisma.$transaction(async (tx) => {
+    const nuevos = new Map<string, string>();
+    for (const f of r.validas) {
+      if (!f.proveedor_nuevo) continue;
+      const clave = normalizar(f.proveedor_nuevo);
+      if (!nuevos.has(clave)) nuevos.set(clave, await resolverProveedor(tx, null, f.proveedor_nuevo, s.id) as string);
+    }
+    const equipos = r.validas.map((f) => ({
+      id: randomUUID(),
+      nombre: f.nombre,
+      categoria_id: f.categoria_id,
+      codigo: f.codigo,
+      marca: f.marca,
+      referencia: f.referencia,
+      modelo: f.modelo,
+      serie: f.serie,
+      area_id: f.area_id,
+      ubicacion: f.ubicacion,
+      estado: f.estado,
+      proveedor_id: f.proveedor_id ?? (f.proveedor_nuevo ? nuevos.get(normalizar(f.proveedor_nuevo))! : null),
+      responsable_id: f.responsable_id,
+      valor_compra: f.valor_compra,
+      fecha_compra: dia(f.fecha_compra),
+      fecha_instalacion: dia(f.fecha_instalacion),
+      garantia_hasta: dia(f.garantia_hasta),
+      vida_util_meses: f.vida_util_meses,
+      observaciones: f.observaciones,
+      cantidad: f.cantidad, // = saldo del único movimiento que se crea abajo
+      creado_por: s.id,
+    }));
+    await tx.equipo.createMany({ data: equipos });
+    await tx.movimientoEquipo.createMany({
+      data: r.validas.map((f, i) => ({
+        equipo_id: equipos[i].id,
+        tipo: f.origen,
+        cantidad: f.cantidad,
+        fecha: f.origen === "compra" && f.fecha_compra ? dia(f.fecha_compra)! : ahora,
+        motivo: `Carga desde Excel (${archivo.name}, fila ${f.fila})`,
+        valor: f.origen === "compra" && f.valor_compra ? f.valor_compra * f.cantidad : null,
+        creado_por: s.id,
+      })),
+    });
+  }, { timeout: 120000 });
+
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "equipo", entidad_id: "carga_excel", accion: "carga_masiva",
+    datos_despues: { archivo: archivo.name, equipos: resumen.validas, unidades: resumen.unidades },
+  });
+  revalidatePath(RUTA);
+  return { ok: true, confirmado: true, ...resumen };
 }
