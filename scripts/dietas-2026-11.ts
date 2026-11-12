@@ -21,6 +21,7 @@ const CONFIRMAR = process.argv.includes("--confirmar");
 const POR = "dietas-2026-11";
 const cop = (n: number | null) => (n === null ? "—" : "$" + n.toLocaleString("es-CO"));
 const num = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
 const conIva = (n: number) => Math.round(n * 1.05);
 
 // ------------------------------------------------------------------ ALIMENTOS
@@ -108,6 +109,29 @@ async function main() {
   const base = url.includes("localhost") || url.includes("127.0.0.1") ? "LOCAL" : "PRODUCCIÓN";
   console.log(`\n🌾 Dietas · noviembre 2026 · base ${base} · ${CONFIRMAR ? "APLICANDO" : "simulación (no toca nada)"}\n`);
 
+  const grupos = await prisma.animal.findMany({ where: { activo: true }, select: { id: true, nombre: true, cantidad: true, categoria_id: true } });
+  const categorias = await prisma.categoriaAnimal.findMany({ where: { activo: true }, select: { id: true, nombre: true } });
+
+  // 0) Antes de escribir NADA: que existan todos los grupos y categorías de las dietas.
+  const faltan: string[] = [];
+  for (const d of new Set(RACIONES.map((r) => r.destino))) {
+    const nombre = d.slice(2);
+    const n = d.startsWith("A:")
+      ? grupos.filter((x) => norm(x.nombre) === norm(nombre)).length
+      : categorias.filter((x) => norm(x.nombre) === norm(nombre)).length;
+    if (n !== 1) faltan.push(`${d.startsWith("A:") ? "Grupo" : "Categoría"} "${nombre}": encontré ${n}`);
+  }
+  if (faltan.length > 0) {
+    console.log("⛔ No se tocó nada. Estos destinos no cuadran con la base:");
+    for (const f of faltan) console.log(`   · ${f}`);
+    console.log("\n   Grupos activos en la base (categoría · grupo · cabezas):");
+    const nomCat = new Map(categorias.map((c) => [c.id, c.nombre]));
+    for (const g of [...grupos].sort((a, b) => (nomCat.get(a.categoria_id) ?? "").localeCompare(nomCat.get(b.categoria_id) ?? "") || a.nombre.localeCompare(b.nombre))) {
+      console.log(`     ${(nomCat.get(g.categoria_id) ?? "?").padEnd(20)} ${JSON.stringify(g.nombre).padEnd(26)} ${g.cantidad}`);
+    }
+    process.exit(1);
+  }
+
   // 1) alimentos ---------------------------------------------------------------
   console.log("1) ALIMENTOS — precio por unidad de compra\n");
   const alimentos = new Map<string, { id: string; unidad_medida: string; equivalencia_g: number; costo_unitario: number }>();
@@ -127,16 +151,14 @@ async function main() {
   }
 
   // 2) destinos ----------------------------------------------------------------
-  const grupos = await prisma.animal.findMany({ where: { activo: true }, select: { id: true, nombre: true, cantidad: true, categoria_id: true } });
-  const categorias = await prisma.categoriaAnimal.findMany({ where: { activo: true }, select: { id: true, nombre: true } });
   const destino = (d: string) => {
     const [tipo, nombre] = [d.slice(0, 1), d.slice(2)];
     if (tipo === "A") {
-      const g = grupos.filter((x) => x.nombre.toUpperCase() === nombre);
+      const g = grupos.filter((x) => norm(x.nombre) === norm(nombre));
       if (g.length !== 1) throw new Error(`Grupo "${nombre}": encontré ${g.length}`);
       return { animal_id: g[0].id, categoria_animal_id: null, cabezas: g[0].cantidad };
     }
-    const c = categorias.find((x) => x.nombre.toUpperCase() === nombre);
+    const c = categorias.find((x) => norm(x.nombre) === norm(nombre));
     if (!c) throw new Error(`Categoría "${nombre}" no existe`);
     const cabezas = grupos.filter((x) => x.categoria_id === c.id).reduce((t, x) => t + x.cantidad, 0);
     return { animal_id: null, categoria_animal_id: c.id, cabezas };
@@ -144,7 +166,7 @@ async function main() {
 
   for (const [n, o] of SIN_RACION) console.log(`  · ${n}: ${o}`);
   for (const n of MUERTES) {
-    const g = grupos.find((x) => x.nombre.toUpperCase() === n);
+    const g = grupos.find((x) => norm(x.nombre) === norm(n));
     console.log(`  ✝ ${n}: ${g ? (g.cantidad === 0 ? "ya está en 0" : `muerte de ${g.cantidad} (queda fallecido)`) : "no existe"}`);
   }
 
@@ -187,11 +209,11 @@ async function main() {
   await prisma.$transaction(async (tx) => {
     await tx.racion.updateMany({ where: { id: { in: viejas.map((v) => v.id) } }, data: { activo: false, actualizado_por: POR } });
     for (const [nombre, obs] of SIN_RACION) {
-      const g = grupos.find((x) => x.nombre.toUpperCase() === nombre);
+      const g = grupos.find((x) => norm(x.nombre) === norm(nombre));
       if (g) await tx.animal.update({ where: { id: g.id }, data: { observaciones: obs, actualizado_por: POR } });
     }
     for (const nombre of MUERTES) {
-      const g = grupos.find((x) => x.nombre.toUpperCase() === nombre);
+      const g = grupos.find((x) => norm(x.nombre) === norm(nombre));
       if (!g || g.cantidad === 0) continue;
       await tx.movimientoAnimal.create({
         data: { animal_id: g.id, tipo: "muerte", cantidad: g.cantidad, fecha: new Date(), motivo: "Reportado por el responsable (2026-11-12)", creado_por: POR },
