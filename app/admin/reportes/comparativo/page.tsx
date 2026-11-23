@@ -89,7 +89,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
             </tr>
           </tfoot>
         </table>
-        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · <Marca /> = mes tomado de la taquilla en vivo; los demás salen del histórico (Excel). La taquilla solo cuenta en “Todos los productos” y ENTRADAS.</p>
+        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · <Marca /> = ENTRADAS y EVENTOS de ese mes salen de la taquilla en vivo (desde el primer mes completo de taquilla); arriendos y demás líneas, y los meses anteriores, salen del histórico.</p>
       </div>
     </main>
   );

@@ -117,7 +117,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               const v = variacionPct(m.actual, m.anterior);
               return (
                 <div key={m.mes} className="flex items-center gap-2 text-xs">
-                  <span className="w-8 shrink-0 text-ranch-marron/60" title={m.fuenteActual === "taquilla" ? "Mes tomado de la taquilla en vivo" : undefined}>{MESES_ABR[m.mes - 1]}{m.fuenteActual === "taquilla" && <sup className="ml-0.5 font-bold text-ranch-verde">T</sup>}</span>
+                  <span className="w-8 shrink-0 text-ranch-marron/60" title={m.fuenteActual === "taquilla" ? "Entradas y eventos tomados de la taquilla en vivo" : undefined}>{MESES_ABR[m.mes - 1]}{m.fuenteActual === "taquilla" && <sup className="ml-0.5 font-bold text-ranch-verde">T</sup>}</span>
                   <div className="flex-1 space-y-0.5">
                     <div className="h-2.5 rounded bg-ranch-marron/25" style={{ width: `${(m.anterior / max) * 100}%` }} />
                     <div className="h-2.5 rounded bg-ranch-dorado" style={{ width: `${(m.actual / max) * 100}%` }} />
@@ -134,7 +134,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             });
           })()}
         </div>
-        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · el % es la variación contra el mismo mes del año anterior · <sup className="font-bold text-ranch-verde">T</sup> = mes con ventas de taquilla (si no, histórico) · <Link href="/admin/reportes/comparativo" className="underline">ver detalle</Link></p>
+        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · el % es la variación contra el mismo mes del año anterior · <sup className="font-bold text-ranch-verde">T</sup> = entradas y eventos del mes tomados de la taquilla; lo demás, del histórico · <Link href="/admin/reportes/comparativo" className="underline">ver detalle</Link></p>
       </section>
     </main>
   );

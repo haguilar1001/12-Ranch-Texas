@@ -1,26 +1,49 @@
 import { describe, it, expect, vi } from "vitest";
 
-// combinarMeses e incluyeTaquilla son puras; se aísla el cliente de BD para no requerir Postgres.
+// Funciones puras; se aísla el cliente de BD para no requerir Postgres.
 vi.mock("../lib/db", () => ({ prisma: {} }));
 
-import { combinarMeses, incluyeTaquilla } from "../lib/reportes/comparativo";
+import { combinarMes, incluyeTaquilla, mesUsaTaquilla } from "../lib/reportes/comparativo";
+
+// Cifras reales del cuadro mes x producto 2026 y de la taquilla en producción.
+const OCT_HIST = { ARRIENDOS: 35_500_000 };
+const OCT_TAQ = { ENTRADAS: 424_828_000, EVENTOS: 62_585_000 }; // total taquilla 487.413.000
+const SEP_HIST = { ENTRADAS: 247_008_000, EVENTOS: 23_820_000, ARRIENDOS: 35_500_000 };
+const SEP_TAQ = { ENTRADAS: 187_361_000, EVENTOS: 9_880_000 }; // solo desde el 12-sep
+const INICIO = { anio: 2026, mes: 9 };
 
 describe("comparativo — corte por mes (histórico + taquilla)", () => {
-  it("usa la taquilla cuando el mes tiene ventas en vivo, aunque exista histórico", () => {
-    const hist = [100, 200, 0, 0, 0, 0, 0, 500, 0, 0, 0, 0];
-    const vivo = [0, 0, 0, 0, 0, 0, 0, 800, 900, 0, 0, 0];
-    const r = combinarMeses(hist, vivo);
-    expect(r[0]).toEqual({ valor: 100, fuente: "historico" });
-    expect(r[1]).toEqual({ valor: 200, fuente: "historico" });
-    expect(r[7]).toEqual({ valor: 800, fuente: "taquilla" }); // no suma 500 + 800
-    expect(r[8]).toEqual({ valor: 900, fuente: "taquilla" });
-    expect(r[11]).toEqual({ valor: 0, fuente: null });
-    expect(r).toHaveLength(12);
+  it("la taquilla manda desde el primer mes completo, no desde el mes de arranque", () => {
+    expect(mesUsaTaquilla(INICIO, 2026, 8)).toBe(false);
+    expect(mesUsaTaquilla(INICIO, 2026, 9)).toBe(false);
+    expect(mesUsaTaquilla(INICIO, 2026, 10)).toBe(true);
+    expect(mesUsaTaquilla(INICIO, 2027, 1)).toBe(true);
+    expect(mesUsaTaquilla(null, 2026, 10)).toBe(false);
   });
 
-  it("la taquilla solo cuenta en todos los productos o ENTRADAS", () => {
+  it("oct-2026: taquilla (entradas + eventos) + arriendos del histórico = total del cuadro", () => {
+    expect(combinarMes(OCT_HIST, OCT_TAQ, true)).toEqual({ valor: 522_913_000, fuente: "taquilla" });
+  });
+
+  it("no suma dos veces ENTRADAS/EVENTOS si el histórico también las trae en un mes de taquilla", () => {
+    const hist = { ...OCT_HIST, ENTRADAS: 467_353_000, EVENTOS: 20_060_000 };
+    expect(combinarMes(hist, OCT_TAQ, true).valor).toBe(522_913_000);
+  });
+
+  it("sep-2026 (mes de arranque): todo sale del histórico", () => {
+    expect(combinarMes(SEP_HIST, SEP_TAQ, false)).toEqual({ valor: 306_328_000, fuente: "historico" });
+  });
+
+  it("filtra por producto", () => {
+    expect(combinarMes(OCT_HIST, OCT_TAQ, true, "ARRIENDOS")).toEqual({ valor: 35_500_000, fuente: "historico" });
+    expect(combinarMes(OCT_HIST, OCT_TAQ, true, "EVENTOS")).toEqual({ valor: 62_585_000, fuente: "taquilla" });
+    expect(combinarMes({}, { ENTRADAS: 0, EVENTOS: 0 }, false, "GRANJA")).toEqual({ valor: 0, fuente: null });
+  });
+
+  it("la taquilla solo cuenta en todos los productos, ENTRADAS o EVENTOS", () => {
     expect(incluyeTaquilla()).toBe(true);
     expect(incluyeTaquilla("ENTRADAS")).toBe(true);
-    expect(incluyeTaquilla("GRANJA")).toBe(false);
+    expect(incluyeTaquilla("EVENTOS")).toBe(true);
+    expect(incluyeTaquilla("ARRIENDOS")).toBe(false);
   });
 });
