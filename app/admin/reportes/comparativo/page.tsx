@@ -27,7 +27,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
   return (
     <main className="mx-auto max-w-4xl p-4">
       <h1 className="mb-1 text-2xl font-black text-ranch-marron">Comparativo año vs. año</h1>
-      <p className="mb-4 text-sm text-ranch-marron/60">Venta histórica del parque</p>
+      <p className="mb-4 text-sm text-ranch-marron/60">Venta histórica del parque + ventas de taquilla (corte por mes)</p>
 
       <FormularioFiltros className="mb-4 flex flex-wrap gap-2 text-sm">
         <select name="anio" defaultValue={anio} className="rounded border px-2 py-1">
@@ -66,8 +66,8 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
               return (
                 <tr key={m.mes} className="border-t border-ranch-marron/10">
                   <td className="py-1 font-medium">{MESES[m.mes - 1]}</td>
-                  <td className="text-right text-ranch-marron/60">{m.anterior ? formatearCOP(m.anterior) : "—"}</td>
-                  <td className="text-right font-medium">{m.actual ? formatearCOP(m.actual) : "—"}</td>
+                  <td className="text-right text-ranch-marron/60">{m.anterior ? formatearCOP(m.anterior) : "—"}{m.fuenteAnterior === "taquilla" && <Marca />}</td>
+                  <td className="text-right font-medium">{m.actual ? formatearCOP(m.actual) : "—"}{m.fuenteActual === "taquilla" && <Marca />}</td>
                   <td className={`text-right ${v != null && v >= 0 ? "text-ranch-verde" : v != null ? "text-red-600" : "text-ranch-marron/40"}`}>{formatearVariacion(v)}</td>
                   <td className="py-1">
                     <div className="flex flex-col gap-0.5">
@@ -89,8 +89,12 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
             </tr>
           </tfoot>
         </table>
-        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio}</p>
+        <p className="mt-2 text-xs text-ranch-marron/50">Barra clara = {anio - 1} · barra dorada = {anio} · <Marca /> = mes tomado de la taquilla en vivo; los demás salen del histórico (Excel). La taquilla solo cuenta en “Todos los productos” y ENTRADAS.</p>
       </div>
     </main>
   );
+}
+
+function Marca() {
+  return <span title="Ventas de taquilla en vivo" className="ml-1 rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">T</span>;
 }

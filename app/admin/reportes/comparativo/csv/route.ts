@@ -4,6 +4,8 @@ import { variacionPct } from "@/lib/reportes/util";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+const FUENTE: Record<string, string> = { historico: "Historico", taquilla: "Taquilla", "": "" };
+
 export async function GET(req: Request) {
   const s = await obtenerSesion();
   if (!s || !tieneRol(s.rol, "consulta")) return new Response("No autorizado", { status: 401 });
@@ -15,12 +17,12 @@ export async function GET(req: Request) {
 
   const filas: string[][] = [
     [`Comparativo ${anio} vs ${anio - 1}${producto ? ` — ${producto}` : ""}`],
-    ["Mes", String(anio - 1), String(anio), "Variacion %"],
+    ["Mes", String(anio - 1), `Fuente ${anio - 1}`, String(anio), `Fuente ${anio}`, "Variacion %"],
     ...comp.meses.map((m) => {
       const v = variacionPct(m.actual, m.anterior);
-      return [MESES[m.mes - 1], String(m.anterior), String(m.actual), v === null ? "" : v.toFixed(1)];
+      return [MESES[m.mes - 1], String(m.anterior), FUENTE[m.fuenteAnterior ?? ""], String(m.actual), FUENTE[m.fuenteActual ?? ""], v === null ? "" : v.toFixed(1)];
     }),
-    ["Total", String(comp.totalAnterior), String(comp.totalActual), (variacionPct(comp.totalActual, comp.totalAnterior) ?? 0).toFixed(1)],
+    ["Total", String(comp.totalAnterior), "", String(comp.totalActual), "", (variacionPct(comp.totalActual, comp.totalAnterior) ?? 0).toFixed(1)],
   ];
   const csv = "﻿" + filas.map((f) => f.map((c) => `"${(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
 
