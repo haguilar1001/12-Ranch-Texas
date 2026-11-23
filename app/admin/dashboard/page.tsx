@@ -104,7 +104,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h2 className="font-bold text-ranch-marron">Comparativo {anio} vs {anio - 1} (histórico + taquilla)</h2>
           <div className={`text-right ${varAnual != null && varAnual >= 0 ? "text-ranch-verde" : "text-red-600"}`}>
             <span className="text-xl font-black">{formatearVariacion(varAnual)}</span>
-            <span className="ml-2 text-sm text-ranch-marron/60">{formatearCOP(comp.totalActual)} vs {formatearCOP(comp.totalAnterior)}</span>
+            <span className="ml-2 text-sm text-ranch-marron/60">{comp.periodo ? `${comp.periodo}: ` : ""}{formatearCOP(comp.totalActual)} vs {formatearCOP(comp.totalAnterior)}</span>
           </div>
         </div>
         <div className="space-y-1">

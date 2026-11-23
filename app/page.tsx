@@ -144,7 +144,7 @@ export default async function Home() {
         {verCifras && (
         <Link href="/admin/reportes/comparativo" className="mb-6 flex items-center justify-between rounded-2xl border-2 border-ranch-dorado bg-white p-4 shadow-sm hover:shadow-md">
           <div>
-            <p className="text-xs uppercase tracking-wide text-ranch-marron/50">Venta {anio} vs {anio - 1}</p>
+            <p className="text-xs uppercase tracking-wide text-ranch-marron/50">Venta {anio} vs {anio - 1}{comp.periodo ? ` · ${comp.periodo}` : ""}</p>
             <p className="text-2xl font-black text-ranch-marron">{formatearCOP(comp.totalActual)}</p>
           </div>
           <div className={`text-right ${varAnual != null && varAnual >= 0 ? "text-ranch-verde" : "text-red-600"}`}>

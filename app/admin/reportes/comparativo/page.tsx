@@ -23,6 +23,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
   const comp = await comparativoAnual(anio, producto);
   const max = Math.max(1, ...comp.meses.map((m) => Math.max(m.actual, m.anterior)));
   const totalVar = variacionPct(comp.totalActual, comp.totalAnterior);
+  const per = comp.periodo ? ` (${comp.periodo})` : "";
 
   return (
     <main className="mx-auto max-w-4xl p-4">
@@ -43,15 +44,16 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
       {/* Totales */}
       <div className="mb-4 grid grid-cols-3 gap-3 text-center">
         <div className="rounded-xl border-2 border-ranch-marron/20 bg-white p-3">
-          <p className="text-xs text-ranch-marron/60">{anio - 1}</p>
+          <p className="text-xs text-ranch-marron/60">{anio - 1}{per}</p>
           <p className="text-lg font-black text-ranch-marron">{formatearCOP(comp.totalAnterior)}</p>
+          {comp.periodo && <p className="text-[11px] text-ranch-marron/50">Año completo {formatearCOP(comp.totalAnteriorAnio)}</p>}
         </div>
         <div className="rounded-xl border-2 border-ranch-dorado bg-white p-3">
-          <p className="text-xs text-ranch-marron/60">{anio}</p>
+          <p className="text-xs text-ranch-marron/60">{anio}{per}</p>
           <p className="text-lg font-black text-ranch-marron">{formatearCOP(comp.totalActual)}</p>
         </div>
         <div className={`rounded-xl border-2 p-3 ${totalVar != null && totalVar >= 0 ? "border-ranch-verde" : "border-red-400"}`}>
-          <p className="text-xs text-ranch-marron/60">Variación</p>
+          <p className="text-xs text-ranch-marron/60">Variación{per}</p>
           <p className={`text-lg font-black ${totalVar != null && totalVar >= 0 ? "text-ranch-verde" : "text-red-600"}`}>{formatearVariacion(totalVar)}</p>
         </div>
       </div>
@@ -83,7 +85,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-ranch-marron/30 font-bold">
-              <td className="py-1">Total</td>
+              <td className="py-1">Total{per}</td>
               <td className="text-right tabular-nums">{formatearCOP(comp.totalAnterior)}</td>
               <td></td>
               <td className="text-right tabular-nums">{formatearCOP(comp.totalActual)}</td>

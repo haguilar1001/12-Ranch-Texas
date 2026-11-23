@@ -159,7 +159,26 @@ export interface FilaMesComparativo {
 export interface Comparativo {
   meses: FilaMesComparativo[];
   totalActual: number;
+  /** Año anterior SOLO en los meses transcurridos del año actual (comparación pareja). */
   totalAnterior: number;
+  /** Año anterior completo (12 meses), como referencia. */
+  totalAnteriorAnio: number;
+  /** "ene–nov" si el año va a medias; null si ya están todos los meses. */
+  periodo: string | null;
+}
+
+const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** Totales comparables: el año anterior se suma solo en los meses que ya pasaron este año. */
+export function totalesComparables(meses: FilaMesComparativo[]): Omit<Comparativo, "meses"> {
+  const transcurridos = meses.filter((m) => !m.futuro);
+  const n = transcurridos.length;
+  return {
+    totalActual: transcurridos.reduce((a, m) => a + m.actual, 0),
+    totalAnterior: transcurridos.reduce((a, m) => a + m.anterior, 0),
+    totalAnteriorAnio: meses.reduce((a, m) => a + m.anterior, 0),
+    periodo: n === 12 ? null : n === 0 ? "—" : n === 1 ? MES_CORTO[0] : `${MES_CORTO[0]}–${MES_CORTO[n - 1]}`,
+  };
 }
 
 /** Comparativo mensual del año vs. el año anterior (opcionalmente por producto). */
@@ -181,9 +200,5 @@ export async function comparativoAnual(anio: number, producto?: string): Promise
     fuenteAnterior: ant[i].fuente,
     futuro: esMesFuturo(anio, i + 1, hoy),
   }));
-  return {
-    meses,
-    totalActual: meses.reduce((a, m) => a + m.actual, 0),
-    totalAnterior: meses.reduce((a, m) => a + m.anterior, 0),
-  };
+  return { meses, ...totalesComparables(meses) };
 }

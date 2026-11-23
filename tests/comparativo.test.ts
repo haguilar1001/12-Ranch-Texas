@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // Funciones puras; se aísla el cliente de BD para no requerir Postgres.
 vi.mock("../lib/db", () => ({ prisma: {} }));
 
-import { combinarMes, esMesFuturo, incluyeTaquilla, mesUsaTaquilla } from "../lib/reportes/comparativo";
+import { combinarMes, esMesFuturo, incluyeTaquilla, mesUsaTaquilla, totalesComparables } from "../lib/reportes/comparativo";
 
 // Cifras reales del cuadro mes x producto 2026 y de la taquilla en producción.
 const OCT_HIST = { ARRIENDOS: 35_500_000 };
@@ -49,6 +49,15 @@ describe("comparativo — corte por mes (histórico + taquilla)", () => {
     expect(esMesFuturo(2026, 11, "2026-11-23")).toBe(false);
     expect(esMesFuturo(2025, 12, "2026-11-23")).toBe(false);
     expect(esMesFuturo(2027, 1, "2026-12-31")).toBe(true);
+  });
+
+  it("el total compara solo los meses transcurridos (ene–nov vs ene–nov)", () => {
+    const meses = Array.from({ length: 12 }, (_, i) => ({
+      mes: i + 1, anterior: 100, actual: i < 11 ? 110 : 0,
+      fuenteAnterior: null, fuenteActual: null, futuro: i === 11,
+    }));
+    expect(totalesComparables(meses)).toEqual({ totalActual: 1210, totalAnterior: 1100, totalAnteriorAnio: 1200, periodo: "ene–nov" });
+    expect(totalesComparables(meses.map((m) => ({ ...m, futuro: false }))).periodo).toBeNull();
   });
 
   it("la taquilla solo cuenta en todos los productos, ENTRADAS o EVENTOS", () => {

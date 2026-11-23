@@ -22,7 +22,8 @@ export async function GET(req: Request) {
       const v = m.futuro ? null : variacionPct(m.actual, m.anterior);
       return [MESES[m.mes - 1], String(m.anterior), FUENTE[m.fuenteAnterior ?? ""], String(m.actual), FUENTE[m.fuenteActual ?? ""], v === null ? "" : v.toFixed(1)];
     }),
-    ["Total", String(comp.totalAnterior), "", String(comp.totalActual), "", (variacionPct(comp.totalActual, comp.totalAnterior) ?? 0).toFixed(1)],
+    [`Total${comp.periodo ? ` ${comp.periodo}` : ""}`, String(comp.totalAnterior), "", String(comp.totalActual), "", (variacionPct(comp.totalActual, comp.totalAnterior) ?? 0).toFixed(1)],
+    ...(comp.periodo ? [[`Total ${anio - 1} año completo`, String(comp.totalAnteriorAnio), "", "", "", ""]] : []),
   ];
   const csv = "﻿" + filas.map((f) => f.map((c) => `"${(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
 
