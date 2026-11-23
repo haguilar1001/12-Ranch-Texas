@@ -75,6 +75,7 @@ export default async function NavBar() {
       label: "Administración",
       enlaces: [
         ["💸", "Gastos", "/admin/gastos", "Registrar por rubro, área y quién lo pidió", supervisor],
+        ["🏠", "Ventas fuera de taquilla", "/admin/ventas-otras", "Arriendos, chucherías y otros ingresos", supervisor],
         ["🏷️", "Manillas", "/admin/manillas", "Buscar, reimprimir y anular", supervisor],
         ["🙋", "Clientes", "/admin/clientes", "Editar o desactivar un perfil", supervisor],
       ],

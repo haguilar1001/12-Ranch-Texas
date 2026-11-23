@@ -8,7 +8,7 @@ import { LINEAS_TAQUILLA, inicioTaquilla, mesUsaTaquilla, taquillaPorMesYLinea }
 // (p. ej. D:\Escritorio\mes-x-producto-ranch-2026.xlsx: Mes | Total | ENTRADAS | EVENTOS | ARRIENDOS…).
 //
 // Por cada año/mes/producto calcula la diferencia entre el cuadro y lo que ya hay en el histórico
-// (de cualquier otro origen) y la guarda como fila de AJUSTE con origen `cuadro:<archivo>`, fechada
+// (de cualquier otro origen, más lo digitado en /admin/ventas-otras) y la guarda como fila de AJUSTE con origen `cuadro:<archivo>`, fechada
 // el último día del mes. Es idempotente: primero descarta sus propias filas y vuelve a calcular,
 // así que se puede correr de nuevo tras reimportar el Excel fuente sin duplicar nada.
 //
@@ -81,6 +81,15 @@ async function main() {
       console.log(`  ${MESES[mes - 1]} taquilla ${fmt(taq)} vs cuadro ENTRADAS+EVENTOS ${fmt(cuadro)}  dif ${fmt(d)}${d === 0 ? "  ✓" : "  ⚠"}`);
     }
     const enHist = new Map(hist.map((r) => [`${r.mes}|${r.producto}`, r._sum.valor ?? 0]));
+    // Lo digitado en /admin/ventas-otras también cuenta como "ya está": no se ajusta dos veces.
+    const otras = await prisma.ventaOtra.findMany({
+      where: { estado: "activa", fecha: { gte: new Date(Date.UTC(anio, 0, 1)), lt: new Date(Date.UTC(anio + 1, 0, 1)) } },
+      select: { fecha: true, linea: true, valor: true },
+    });
+    for (const o of otras) {
+      const k = `${o.fecha.getUTCMonth() + 1}|${o.linea}`;
+      enHist.set(k, (enHist.get(k) ?? 0) + o.valor);
+    }
 
     const ajustes: Celda[] = [];
     for (const c of celdas) {

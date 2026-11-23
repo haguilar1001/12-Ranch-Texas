@@ -976,6 +976,40 @@ model VentaHistorica {
   @@map("ventas_historicas")
 }
 
+// ------------------------- VENTAS QUE NO PASAN POR TAQUILLA -------------------------
+// Ingresos que no se venden en caja (arriendos, chucherías, otros), digitados en
+// /admin/ventas-otras por fecha y línea. Se suman al comparativo año vs año junto al histórico
+// y la taquilla. ENTRADAS y EVENTOS NO se cargan aquí: esas líneas salen de la taquilla.
+// Nada se borra: se anula con motivo (estado + quién + cuándo).
+
+enum EstadoVentaOtra {
+  activa
+  anulada
+}
+
+model VentaOtra {
+  id          String          @id @default(uuid())
+  fecha       DateTime        @db.Date
+  linea       String // línea de producto, igual que en ventas_historicas (ARRIENDOS, CHUCHERIAS…)
+  valor       Int // COP entero
+  descripcion String
+  estado      EstadoVentaOtra @default(activa)
+
+  motivo_anulacion String?
+  anulada_por      String?
+  anulada_en       DateTime?
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([fecha])
+  @@index([linea])
+  @@index([estado])
+  @@map("ventas_otras")
+}
+
 // ============================================================================
 //  MÓDULOS OPERATIVOS (F10) — Personal, Animales, Equipos
 //  Maestros/parámetros que se afinan con datos reales (carga por Excel).

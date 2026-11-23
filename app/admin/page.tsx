@@ -14,6 +14,7 @@ export default async function AdminPage() {
     ["📋 Reporte de ventas", "/admin/reportes/ventas", true],
     ["🎁 Relación de atenciones e invitaciones", "/admin/reportes/cortesias", tieneRol(s.rol, "supervisor")],
     ["🧾 Gastos", "/admin/gastos", tieneRol(s.rol, "supervisor")],
+    ["🏠 Ventas fuera de taquilla", "/admin/ventas-otras", tieneRol(s.rol, "supervisor")],
     ["💰 Reporte de gastos / P&G", "/admin/reportes/gastos", true],
     ["👤 Usuarios y perfiles", "/admin/usuarios", tieneRol(s.rol, "administrador")],
     ["🖨️ Diagnóstico de impresora", "/admin/impresora", tieneRol(s.rol, "supervisor")],

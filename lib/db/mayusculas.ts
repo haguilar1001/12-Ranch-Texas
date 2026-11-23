@@ -44,6 +44,7 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   Proveedor: ["nombre", "nit_cedula", "contacto"],
   RubroGasto: ["nombre"],
   Gasto: ["descripcion"],
+  VentaOtra: ["linea", "descripcion", "motivo_anulacion"],
   GastoRecurrente: ["descripcion"],
   AreaTrabajo: ["nombre", "descripcion"],
   Cargo: ["nombre"],

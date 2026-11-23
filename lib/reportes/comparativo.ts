@@ -4,6 +4,8 @@ import { prisma } from "../db";
 //  - `ventas_historicas`: venta agregada por línea (Excel de operación + ajustes de los cuadros
 //    "mes x producto" de la gerencia, ver scripts/cuadrar-cuadro-mes-producto.ts).
 //  - Taquilla en vivo (`ventas` completadas, sin cajas de prueba).
+//  - Ventas que no pasan por taquilla (`ventas_otras` activas: arriendos, chucherías…), que se
+//    suman como una línea más del histórico.
 //
 // Regla de CORTE POR MES: la taquilla vende ENTRADAS y EVENTOS. Desde el PRIMER MES COMPLETO de
 // taquilla (el mes siguiente a la primera venta real; la taquilla arrancó el 12-sep-2026, así que
@@ -92,16 +94,26 @@ export async function taquillaPorMesYLinea(anio: number): Promise<Record<LineaTa
 }
 
 export async function productosVentaHistorica(): Promise<string[]> {
-  const rows = await prisma.ventaHistorica.findMany({ distinct: ["producto"], select: { producto: true }, orderBy: { producto: "asc" } });
-  const productos = rows.map((r) => r.producto);
-  for (const l of LINEAS_TAQUILLA) if (!productos.includes(l)) productos.push(l);
-  return productos.sort();
+  const [hist, otras] = await Promise.all([
+    prisma.ventaHistorica.findMany({ distinct: ["producto"], select: { producto: true } }),
+    prisma.ventaOtra.findMany({ where: { estado: "activa" }, distinct: ["linea"], select: { linea: true } }),
+  ]);
+  return [...new Set([...hist.map((r) => r.producto), ...otras.map((o) => o.linea), ...LINEAS_TAQUILLA])].sort();
 }
 
+/** Histórico + ventas fuera de taquilla, por mes y línea. */
 async function historicoPorMesYLinea(anio: number): Promise<Record<string, number>[]> {
-  const rows = await prisma.ventaHistorica.groupBy({ by: ["mes", "producto"], where: { anio }, _sum: { valor: true } });
+  const [rows, otras] = await Promise.all([
+    prisma.ventaHistorica.groupBy({ by: ["mes", "producto"], where: { anio }, _sum: { valor: true } }),
+    prisma.ventaOtra.findMany({
+      where: { estado: "activa", fecha: { gte: new Date(Date.UTC(anio, 0, 1)), lt: new Date(Date.UTC(anio + 1, 0, 1)) } },
+      select: { fecha: true, linea: true, valor: true },
+    }),
+  ]);
   const meses: Record<string, number>[] = Array.from({ length: 12 }, () => ({}));
-  for (const r of rows) meses[r.mes - 1][r.producto] = (meses[r.mes - 1][r.producto] ?? 0) + (r._sum.valor ?? 0);
+  const sumar = (i: number, linea: string, v: number) => { meses[i][linea] = (meses[i][linea] ?? 0) + v; };
+  for (const r of rows) sumar(r.mes - 1, r.producto, r._sum.valor ?? 0);
+  for (const o of otras) sumar(o.fecha.getUTCMonth(), o.linea, o.valor);
   return meses;
 }
 
@@ -122,6 +134,8 @@ export async function resumenAnual(producto?: string): Promise<{ anio: number; t
   const anios = new Set<number>();
   const hist = await prisma.ventaHistorica.groupBy({ by: ["anio"], where: producto ? { producto } : {} });
   hist.forEach((r) => anios.add(r.anio));
+  const otras = await prisma.ventaOtra.findMany({ where: { estado: "activa", ...(producto ? { linea: producto } : {}) }, select: { fecha: true } });
+  otras.forEach((o) => anios.add(o.fecha.getUTCFullYear()));
   if (inicio && incluyeTaquilla(producto)) {
     const hoy = new Date(Date.now() - 5 * 3600000).getUTCFullYear();
     for (let a = inicio.anio; a <= hoy; a++) anios.add(a);
