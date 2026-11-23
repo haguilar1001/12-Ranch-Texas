@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // Funciones puras; se aísla el cliente de BD para no requerir Postgres.
 vi.mock("../lib/db", () => ({ prisma: {} }));
 
-import { combinarMes, incluyeTaquilla, mesUsaTaquilla } from "../lib/reportes/comparativo";
+import { combinarMes, esMesFuturo, incluyeTaquilla, mesUsaTaquilla } from "../lib/reportes/comparativo";
 
 // Cifras reales del cuadro mes x producto 2026 y de la taquilla en producción.
 const OCT_HIST = { ARRIENDOS: 35_500_000 };
@@ -38,6 +38,17 @@ describe("comparativo — corte por mes (histórico + taquilla)", () => {
     expect(combinarMes(OCT_HIST, OCT_TAQ, true, "ARRIENDOS")).toEqual({ valor: 35_500_000, fuente: "historico" });
     expect(combinarMes(OCT_HIST, OCT_TAQ, true, "EVENTOS")).toEqual({ valor: 62_585_000, fuente: "taquilla" });
     expect(combinarMes({}, { ENTRADAS: 0, EVENTOS: 0 }, false, "GRANJA")).toEqual({ valor: 0, fuente: null });
+  });
+
+  it("un mes de taquilla sin ventas (p. ej. diciembre que no ha llegado) no lleva marca", () => {
+    expect(combinarMes(OCT_HIST, { ENTRADAS: 0, EVENTOS: 0 }, true, "ENTRADAS")).toEqual({ valor: 0, fuente: null });
+  });
+
+  it("detecta meses que aún no empiezan", () => {
+    expect(esMesFuturo(2026, 12, "2026-11-23")).toBe(true);
+    expect(esMesFuturo(2026, 11, "2026-11-23")).toBe(false);
+    expect(esMesFuturo(2025, 12, "2026-11-23")).toBe(false);
+    expect(esMesFuturo(2027, 1, "2026-12-31")).toBe(true);
   });
 
   it("la taquilla solo cuenta en todos los productos, ENTRADAS o EVENTOS", () => {

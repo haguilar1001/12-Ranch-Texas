@@ -56,7 +56,8 @@ export function combinarMes(
     for (const linea of LINEAS_TAQUILLA) if (!producto || linea === producto) taq += taquilla[linea] ?? 0;
   }
   const valor = hist + taq;
-  const fuente: FuenteMes = usaTaquilla && incluyeTaquilla(producto) ? "taquilla" : valor ? "historico" : null;
+  // Sin valor no hay fuente que mostrar (p. ej. un mes que aún no llega).
+  const fuente: FuenteMes = !valor ? null : usaTaquilla && incluyeTaquilla(producto) ? "taquilla" : "historico";
   return { valor, fuente };
 }
 
@@ -151,6 +152,8 @@ export interface FilaMesComparativo {
   actual: number;
   fuenteAnterior: FuenteMes;
   fuenteActual: FuenteMes;
+  /** El mes del año actual aún no empieza: no se compara (ni −100 % ni barra). */
+  futuro: boolean;
 }
 
 export interface Comparativo {
@@ -160,7 +163,14 @@ export interface Comparativo {
 }
 
 /** Comparativo mensual del año vs. el año anterior (opcionalmente por producto). */
+/** ¿El mes (año, mes) todavía no empieza, según la fecha de Bogotá `hoy` (yyyy-mm-dd)? */
+export function esMesFuturo(anio: number, mes: number, hoy: string): boolean {
+  const [ha, hm] = hoy.split("-").map(Number);
+  return anio * 12 + mes > ha * 12 + hm;
+}
+
 export async function comparativoAnual(anio: number, producto?: string): Promise<Comparativo> {
+  const hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);
   const inicio = await inicioTaquilla();
   const [act, ant] = await Promise.all([mesesCombinados(anio, producto, inicio), mesesCombinados(anio - 1, producto, inicio)]);
   const meses = act.map((m, i) => ({
@@ -169,6 +179,7 @@ export async function comparativoAnual(anio: number, producto?: string): Promise
     anterior: ant[i].valor,
     fuenteActual: m.fuente,
     fuenteAnterior: ant[i].fuente,
+    futuro: esMesFuturo(anio, i + 1, hoy),
   }));
   return {
     meses,

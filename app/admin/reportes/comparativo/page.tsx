@@ -59,15 +59,17 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
       {/* Tabla + barras */}
       <div className="overflow-x-auto rounded-xl border-2 border-ranch-marron/20 bg-white p-4">
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-ranch-marron/60"><th className="py-1">Mes</th><th className="text-right">{anio - 1}</th><th className="text-right">{anio}</th><th className="text-right">Var.</th><th className="w-1/3">Comparación</th></tr></thead>
+          <thead><tr className="text-left text-ranch-marron/60"><th className="py-1">Mes</th><th className="text-right">{anio - 1}</th><th className="w-6"></th><th className="text-right">{anio}</th><th className="w-6"></th><th className="text-right">Var.</th><th className="w-1/3">Comparación</th></tr></thead>
           <tbody>
             {comp.meses.map((m) => {
-              const v = variacionPct(m.actual, m.anterior);
+              const v = m.futuro ? null : variacionPct(m.actual, m.anterior);
               return (
                 <tr key={m.mes} className="border-t border-ranch-marron/10">
                   <td className="py-1 font-medium">{MESES[m.mes - 1]}</td>
-                  <td className="text-right text-ranch-marron/60">{m.anterior ? formatearCOP(m.anterior) : "—"}{m.fuenteAnterior === "taquilla" && <Marca />}</td>
-                  <td className="text-right font-medium">{m.actual ? formatearCOP(m.actual) : "—"}{m.fuenteActual === "taquilla" && <Marca />}</td>
+                  <td className="text-right tabular-nums text-ranch-marron/60">{m.anterior ? formatearCOP(m.anterior) : "—"}</td>
+                  <td className="pl-1">{m.fuenteAnterior === "taquilla" && <Marca />}</td>
+                  <td className="text-right font-medium tabular-nums">{m.actual ? formatearCOP(m.actual) : "—"}</td>
+                  <td className="pl-1">{m.fuenteActual === "taquilla" && <Marca />}</td>
                   <td className={`text-right ${v != null && v >= 0 ? "text-ranch-verde" : v != null ? "text-red-600" : "text-ranch-marron/40"}`}>{formatearVariacion(v)}</td>
                   <td className="py-1">
                     <div className="flex flex-col gap-0.5">
@@ -82,8 +84,10 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
           <tfoot>
             <tr className="border-t-2 border-ranch-marron/30 font-bold">
               <td className="py-1">Total</td>
-              <td className="text-right">{formatearCOP(comp.totalAnterior)}</td>
-              <td className="text-right">{formatearCOP(comp.totalActual)}</td>
+              <td className="text-right tabular-nums">{formatearCOP(comp.totalAnterior)}</td>
+              <td></td>
+              <td className="text-right tabular-nums">{formatearCOP(comp.totalActual)}</td>
+              <td></td>
               <td className="text-right">{formatearVariacion(totalVar)}</td>
               <td></td>
             </tr>
@@ -96,5 +100,5 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
 }
 
 function Marca() {
-  return <span title="Ventas de taquilla en vivo" className="ml-1 rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">T</span>;
+  return <span title="Ventas de taquilla en vivo" className="rounded bg-ranch-verde/15 px-1 text-[10px] font-bold text-ranch-verde">T</span>;
 }
