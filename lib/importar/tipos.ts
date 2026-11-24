@@ -1,6 +1,6 @@
 import type { TipoArchivo } from "@prisma/client";
 
-// Tipos de archivo que se cargan en Configuración → Carga de archivos. Para agregar uno nuevo:
+// Tipos de archivo que se cargan en Financiero → Carga de archivos. Para agregar uno nuevo:
 // el valor en el enum TipoArchivo (schema.prisma), su entrada aquí y su lector en procesar.ts.
 export const TIPOS_ARCHIVO: Record<TipoArchivo, { nombre: string; extensiones: string[]; ayuda: string }> = {
   estado_resultados: { nombre: "Estado de resultados mensual", extensiones: [".pdf"], ayuda: "El PDF de contabilidad de un mes (consolidado por unidad)." },

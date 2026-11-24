@@ -122,7 +122,24 @@ export function construirMenu(rol: string): SeccionMenu[] {
           ],
         },
         {
-          titulo: "Finanzas",
+          titulo: "Operación",
+          filas: [
+            ["🐴", "Alimentación de animales", "/admin/reportes/alimentacion", "Costo del mes por categoría", consulta],
+            ["📦", "Inventarios para imprimir", "/admin/reportes/inventarios", "Animales, alimentos, dietas y equipos en PDF", consulta || granja],
+            ["🚙", "Uso de vehículos", "/admin/reportes/vehiculos", "Quién pide más, quién maneja más", consulta],
+          ],
+        },
+      ],
+    },
+    {
+      // Todo lo de plata del parque: cómo va (análisis), contra qué se mide (presupuesto) y lo que
+      // se registra a mano o se sube desde contabilidad.
+      id: "financiero",
+      icono: "💰",
+      label: "Financiero",
+      grupos: [
+        {
+          titulo: "Análisis",
           filas: [
             ["🩺", "Análisis financiero", "/admin/reportes/analisis-financiero", "Indicadores, equilibrio, comparativos y conclusiones", consulta],
             ["📑", "Estado de resultados", "/admin/reportes/estado-resultados", "P&G mes a mes contra el presupuesto", consulta],
@@ -130,11 +147,18 @@ export function construirMenu(rol: string): SeccionMenu[] {
           ],
         },
         {
-          titulo: "Operación",
+          titulo: "Presupuesto",
           filas: [
-            ["🐴", "Alimentación de animales", "/admin/reportes/alimentacion", "Costo del mes por categoría", consulta],
-            ["📦", "Inventarios para imprimir", "/admin/reportes/inventarios", "Animales, alimentos, dietas y equipos en PDF", consulta || granja],
-            ["🚙", "Uso de vehículos", "/admin/reportes/vehiculos", "Quién pide más, quién maneja más", consulta],
+            ["🎯", "Presupuesto de gastos", "/admin/presupuesto", "Cuentas, ejecución y equivalencias con el P&G", consulta],
+            ["👥", "Nómina presupuestada", "/admin/nomina-presupuesto", "Empleados, salarios y costo empresa", admin],
+          ],
+        },
+        {
+          titulo: "Registros",
+          filas: [
+            ["💸", "Gastos", "/admin/gastos", "Registrar por rubro, área y quién lo pidió", supervisor],
+            ["🏪", "Ventas fuera de taquilla", "/admin/ventas-otras", "Arriendos, chucherías y otros ingresos", supervisor],
+            ["📤", "Carga de archivos", "/admin/archivos", "Estados de resultados, venta por mes, histórico y presupuesto", admin],
           ],
         },
       ],
@@ -146,10 +170,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
       grupos: [
         {
           filas: [
-            ["💸", "Gastos", "/admin/gastos", "Registrar por rubro, área y quién lo pidió", supervisor],
-            ["🏪", "Ventas fuera de taquilla", "/admin/ventas-otras", "Arriendos, chucherías y otros ingresos", supervisor],
             ["👷", "Personal", "/admin/personal", "Empleados, áreas y costo de nómina", supervisor],
-            ["🧾", "Nómina presupuestada", "/admin/nomina-presupuesto", "Empleados, salarios y costo empresa del presupuesto", admin],
             ["🙋", "Clientes", "/admin/clientes", "Editar o desactivar un perfil", supervisor],
           ],
         },
@@ -174,7 +195,6 @@ export function construirMenu(rol: string): SeccionMenu[] {
           titulo: "Sistema",
           filas: [
             ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
-            ["📤", "Carga de archivos", "/admin/archivos", "Estados de resultados, venta por mes, histórico y presupuesto", admin],
             ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
             ["🖨️", "Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],
           ],

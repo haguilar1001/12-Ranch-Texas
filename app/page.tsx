@@ -196,7 +196,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
               ) : (
                 <div className="col-span-2 rounded-2xl border-2 border-dashed border-ranch-marron/20 bg-white p-4 text-sm text-ranch-marron/60 lg:col-span-3">
                   Sin estados de resultados cargados: la utilidad y los gastos aparecen aquí cuando se suban en{" "}
-                  {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Configuración → Carga de archivos</Link> : "Configuración → Carga de archivos"}.
+                  {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Financiero → Carga de archivos</Link> : "Financiero → Carga de archivos"}.
                 </div>
               )}
             </div>

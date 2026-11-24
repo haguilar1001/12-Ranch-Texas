@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { GRUPOS_GASTO, grupoGasto, normalizarCuenta } from "../pyg/cuentas";
+import { GRUPOS_GASTO, grupoGasto, normalizarCuenta, cuentaComparable, nombreCuenta } from "../pyg/cuentas";
 
 // Análisis financiero del año a partir de los estados de resultados cargados: indicadores,
 // comparativos, punto de equilibrio y conclusiones escritas a partir de los números.
@@ -38,7 +38,7 @@ export interface Analisis {
   concentracionTop3: number;
   equilibrio: { fijo_mes: number; tasa_var: number; r2: number; pe_bajo: number; pe_alto: number; margen_seguridad: number; apalancamiento: number | null; meses_bajo_pe: number[] } | null;
   personalExtra: { tasa: number; exceso: number; mesesAltos: number[] };
-  presupuesto: { gastos: number; ejecucion: number; desvioMayor: { grupo: string; diferencia: number } | null } | null;
+  presupuesto: { gastos: number; ejecucion: number; desvioMayor: { grupo: string; diferencia: number; cuentas: { cuenta: string; diferencia: number }[] } | null } | null;
   conclusiones: Conclusion[];
   alertas: Alerta[];
 }
@@ -49,7 +49,11 @@ const pp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toLocaleSt
 const lista = (ms: number[]) => ms.map((m) => NOMBRE[m - 1]).join(", ").replace(/, ([^,]*)$/, " y $1");
 const sumaCuentas = (c: Record<string, number>, f: (k: string) => boolean) => Object.entries(c).reduce((t, [k, v]) => t + (f(k) ? v : 0), 0);
 
-export function analizar(anio: number, entrada: MesPyg[], presupuestoMensual: Record<string, number> | null): Analisis | null {
+/**
+ * @param presupuestoMensual gasto presupuestado por grupo, al mes.
+ * @param presupuestoCuentas gasto presupuestado por cuenta real equivalente (ver cuentaComparable), al mes.
+ */
+export function analizar(anio: number, entrada: MesPyg[], presupuestoMensual: Record<string, number> | null, presupuestoCuentas: Record<string, number> = {}): Analisis | null {
   const base = [...entrada].sort((a, b) => a.mes - b.mes);
   if (!base.length) return null;
   const meses = base.map((m) => {
@@ -136,7 +140,16 @@ export function analizar(anio: number, entrada: MesPyg[], presupuestoMensual: Re
   if (presupuestoMensual) {
     const pres = Object.values(presupuestoMensual).reduce((t, v) => t + v, 0) * meses.length;
     const desv = estructura.filter((e) => e.presupuesto != null).map((e) => ({ grupo: e.grupo, diferencia: e.total - (e.presupuesto ?? 0) })).sort((a, b) => b.diferencia - a.diferencia)[0] ?? null;
-    presupuesto = { gastos: pres, ejecucion: pres ? acum.gastos / pres : 0, desvioMayor: desv && desv.diferencia > 0 ? desv : null };
+    // Qué cuentas explican el desvío del grupo: real contra presupuesto, por cuenta equivalente.
+    let cuentasDesv: { cuenta: string; diferencia: number }[] = [];
+    if (desv && desv.diferencia > 0) {
+      const real: Record<string, number> = {};
+      for (const m of meses) for (const [k, v] of Object.entries(m.cuentas)) if (grupoGasto(k) === desv.grupo) real[cuentaComparable(k)] = (real[cuentaComparable(k)] ?? 0) + v;
+      const claves = new Set([...Object.keys(real), ...Object.keys(presupuestoCuentas).filter((k) => grupoGasto(k) === desv.grupo)]);
+      cuentasDesv = [...claves].map((k) => ({ cuenta: k, diferencia: (real[k] ?? 0) - (presupuestoCuentas[k] ?? 0) * meses.length }))
+        .filter((c) => c.diferencia > 0).sort((a, b) => b.diferencia - a.diferencia).slice(0, 3);
+    }
+    presupuesto = { gastos: pres, ejecucion: pres ? acum.gastos / pres : 0, desvioMayor: desv && desv.diferencia > 0 ? { ...desv, cuentas: cuentasDesv } : null };
   }
 
   // ---------------- Conclusiones ----------------
@@ -153,7 +166,7 @@ export function analizar(anio: number, entrada: MesPyg[], presupuestoMensual: Re
   if (presupuesto && presupuesto.desvioMayor) {
     conclusiones.push({ tono: "malo",
       titulo: `${presupuesto.desvioMayor.grupo} se pasa del presupuesto en ${millones(presupuesto.desvioMayor.diferencia)}`,
-      detalle: `Los gastos van al ${pct(presupuesto.ejecucion)} de lo presupuestado para ${meses.length} meses (${millones(acum.gastos)} contra ${millones(presupuesto.gastos)}).` });
+      detalle: `${presupuesto.desvioMayor.cuentas.length ? `Lo explican ${presupuesto.desvioMayor.cuentas.map((c) => `${nombreCuenta(c.cuenta).toLowerCase()} (+${millones(c.diferencia)})`).join(", ").replace(/, ([^,]*)$/, " y $1")}. ` : ""}En total los gastos van al ${pct(presupuesto.ejecucion)} de lo presupuestado para ${meses.length} meses (${millones(acum.gastos)} contra ${millones(presupuesto.gastos)}).` });
   }
   if (acum.personal) {
     conclusiones.push({ tono: acum.personal / ING > 0.4 ? "malo" : "neutro",
@@ -203,9 +216,13 @@ export async function analisisFinanciero(anio: number): Promise<Analisis | null>
     porMes.set(l.mes, m);
   }
   let presupuestoMensual: Record<string, number> | null = null;
+  const presupuestoCuentas: Record<string, number> = {};
   if (pres.length) {
     presupuestoMensual = {};
-    for (const p of pres.filter((x) => x.mes == null)) presupuestoMensual[grupoGasto(p.cuenta)] = (presupuestoMensual[grupoGasto(p.cuenta)] ?? 0) + p.valor;
+    for (const p of pres.filter((x) => x.mes == null)) {
+      presupuestoMensual[grupoGasto(p.cuenta)] = (presupuestoMensual[grupoGasto(p.cuenta)] ?? 0) + p.valor;
+      presupuestoCuentas[cuentaComparable(p.cuenta)] = (presupuestoCuentas[cuentaComparable(p.cuenta)] ?? 0) + p.valor;
+    }
   }
-  return analizar(anio, [...porMes.values()], presupuestoMensual);
+  return analizar(anio, [...porMes.values()], presupuestoMensual, presupuestoCuentas);
 }

@@ -34,7 +34,7 @@ export default async function EstadoResultadosPage({ searchParams }: { searchPar
         <h1 className="mb-2 text-2xl font-black text-ranch-marron">Estado de resultados</h1>
         <p className="rounded-xl border-2 border-dashed border-ranch-marron/20 bg-white p-6 text-ranch-marron/70">
           Aún no hay estados de resultados cargados. Súbelos en PDF desde{" "}
-          {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Configuración → Carga de archivos</Link> : "Configuración → Carga de archivos (administrador)"}.
+          {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Financiero → Carga de archivos</Link> : "Financiero → Carga de archivos (administrador)"}.
         </p>
       </main>
     );
@@ -146,7 +146,7 @@ export default async function EstadoResultadosPage({ searchParams }: { searchPar
               </tbody>
             </table>
           </div>
-          {er.hayPresupuesto && <p className="mt-2 text-xs text-ranch-marron/50">El presupuesto usa sus propios nombres de cuenta (p. ej. «Comida caballos (heno)» frente a «Alimento»); compáralos por grupo en la tabla de arriba.</p>}
+          {er.hayPresupuesto && <p className="mt-2 text-xs text-ranch-marron/50">Cada cuenta del presupuesto se compara con su equivalente del estado de resultados (p. ej. «Comida caballos (heno)» y «Concentrado» con «Alimento»). La lista de equivalencias está en Financiero → Presupuesto.</p>}
         </section>
 
         {/* Por unidad */}

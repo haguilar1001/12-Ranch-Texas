@@ -38,7 +38,7 @@ export default async function AnalisisFinancieroPage({ searchParams }: { searchP
       <main className="mx-auto max-w-3xl p-6">
         <h1 className="mb-2 text-2xl font-black text-ranch-marron">Análisis financiero</h1>
         <p className="rounded-xl border-2 border-dashed border-ranch-marron/20 bg-white p-6 text-ranch-marron/70">
-          Aún no hay estados de resultados cargados. Súbelos en {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Configuración → Carga de archivos</Link> : "Configuración → Carga de archivos"} y aquí aparecen los indicadores y el análisis.
+          Aún no hay estados de resultados cargados. Súbelos en {tieneRol(s.rol, "administrador") ? <Link href="/admin/archivos" className="underline">Financiero → Carga de archivos</Link> : "Financiero → Carga de archivos"} y aquí aparecen los indicadores y el análisis.
         </p>
       </main>
     );
@@ -182,7 +182,7 @@ export default async function AnalisisFinancieroPage({ searchParams }: { searchP
       <details className="rounded-2xl border-2 border-ranch-marron/15 bg-white p-4 text-sm text-ranch-marron/70">
         <summary className="cursor-pointer font-semibold text-ranch-marron">Cómo se calcula y qué no se puede concluir</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Fuente: los estados de resultados mensuales cargados en Configuración → Carga de archivos{a.presupuesto ? " y el presupuesto de gastos" : ""}.</li>
+          <li>Fuente: los estados de resultados mensuales cargados en Financiero → Carga de archivos{a.presupuesto ? " y el presupuesto de gastos" : ""}.</li>
           <li>Punto de equilibrio en rango: el valor bajo sale de una regresión de los costos totales contra los ingresos de cada mes; el alto toma como variables solo el costo de ventas, comisiones, datáfono, impuestos e IVA (todo el personal como fijo). Con pocos meses es indicativo.</li>
           <li>Apalancamiento operativo = margen de contribución ÷ utilidad operacional del periodo.</li>
           <li>El estado no trae depreciación, gastos financieros ni impuesto de renta: la utilidad operacional no es lo que le queda al dueño. Sin balance ni flujo de caja no se puede hablar de liquidez, cartera ni endeudamiento.</li>

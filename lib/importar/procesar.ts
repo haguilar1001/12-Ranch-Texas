@@ -7,7 +7,7 @@ import { leerHistorico, NEGOCIO_HISTORICO } from "./historico";
 import { leerPresupuesto } from "./presupuesto";
 import { TIPOS_ARCHIVO } from "./tipos";
 
-// Recibe un archivo subido en Configuración → Carga de archivos, lo lee según su tipo, guarda el
+// Recibe un archivo subido en Financiero → Carga de archivos, lo lee según su tipo, guarda el
 // original y carga sus datos en una sola transacción: si algo falla no queda nada a medias.
 // Un archivo nuevo del mismo periodo deja al anterior como «reemplazado» (no se borra).
 

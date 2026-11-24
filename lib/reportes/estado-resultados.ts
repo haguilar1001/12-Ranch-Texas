@@ -1,7 +1,7 @@
 import { prisma } from "../db";
-import { GRUPOS_GASTO, GRUPOS_INGRESO, grupoGasto, grupoIngreso } from "../pyg/cuentas";
+import { GRUPOS_GASTO, GRUPOS_INGRESO, grupoGasto, grupoIngreso, cuentaComparable } from "../pyg/cuentas";
 
-// Estado de resultados del año a partir de los PDF cargados (Configuración → Carga de archivos),
+// Estado de resultados del año a partir de los PDF cargados (Financiero → Carga de archivos),
 // agrupado por grupo de cuenta, con el presupuesto mensual al lado. Solo cuentan los archivos
 // vigentes (procesados).
 
@@ -82,17 +82,19 @@ export async function estadoResultados(anio: number): Promise<EstadoResultados> 
 
   // Detalle por cuenta (gastos)
   const mapa = new Map<string, { grupo: string; cuenta: string; acumulado: number; presupuesto: number | null }>();
+  // Real y presupuesto se juntan por cuenta equivalente (el presupuesto usa otros nombres).
   for (const l of lineas.filter((x) => x.seccion === "gasto")) {
-    const k = l.cuenta;
+    const k = cuentaComparable(l.cuenta);
     const o = mapa.get(k) ?? { grupo: grupoGasto(k), cuenta: k, acumulado: 0, presupuesto: null };
     o.acumulado += l.valor;
     mapa.set(k, o);
   }
   if (hayPresupuesto) {
     for (const p of pres.filter((x) => x.seccion === "gasto")) {
-      const o = mapa.get(p.cuenta) ?? { grupo: grupoGasto(p.cuenta), cuenta: p.cuenta, acumulado: 0, presupuesto: 0 };
+      const k = cuentaComparable(p.cuenta);
+      const o = mapa.get(k) ?? { grupo: grupoGasto(k), cuenta: k, acumulado: 0, presupuesto: 0 };
       o.presupuesto = (o.presupuesto ?? 0) + (p.mes == null ? p.valor * nMeses : mesesCargados.includes(p.mes) ? p.valor : 0);
-      mapa.set(p.cuenta, o);
+      mapa.set(k, o);
     }
   }
   const cuentas = [...mapa.values()].sort((a, b) => GRUPOS_GASTO.indexOf(a.grupo as never) - GRUPOS_GASTO.indexOf(b.grupo as never) || b.acumulado - a.acumulado);

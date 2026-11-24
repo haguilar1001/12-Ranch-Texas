@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const pct = (v: number) => `${(v * 100).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
 // Nómina presupuestada: la hoja «Nomina» del P&G presupuestado que se carga en
-// Configuración → Carga de archivos. Trae nombres y salarios: solo administrador.
+// Financiero → Carga de archivos. Trae nombres y salarios: solo administrador.
 export default async function NominaPresupuestoPage({ searchParams }: { searchParams: Promise<{ anio?: string; area?: string }> }) {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
@@ -25,7 +25,7 @@ export default async function NominaPresupuestoPage({ searchParams }: { searchPa
       <main className="mx-auto max-w-3xl p-6">
         <h1 className="mb-2 text-2xl font-black text-ranch-marron">Nómina presupuestada</h1>
         <p className="rounded-xl border-2 border-dashed border-ranch-marron/20 bg-white p-6 text-ranch-marron/70">
-          Aún no hay presupuesto con nómina. Sube el P&G presupuestado (con su hoja «Nomina») en <Link href="/admin/archivos" className="underline">Configuración → Carga de archivos</Link>.
+          Aún no hay presupuesto con nómina. Sube el P&G presupuestado (con su hoja «Nomina») en <Link href="/admin/archivos" className="underline">Financiero → Carga de archivos</Link>.
         </p>
       </main>
     );

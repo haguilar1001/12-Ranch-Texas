@@ -10,9 +10,9 @@ const ids = (rol: string) => construirMenu(rol).map((s) => s.id);
 const hrefs = (rol: string) => construirMenu(rol).flatMap((s) => (s.href ? [s.href] : (s.grupos ?? []).flatMap((g) => g.enlaces.map((e) => e.href))));
 
 describe("menú lateral", () => {
-  it("administrador ve las 8 secciones en el orden acordado", () => {
+  it("administrador ve las 9 secciones en el orden acordado", () => {
     expect(ids("administrador")).toEqual([
-      "inicio", "taquilla", "equipos", "animales", "vehiculos", "reportes", "administracion", "configuracion",
+      "inicio", "taquilla", "equipos", "animales", "vehiculos", "reportes", "financiero", "administracion", "configuracion",
     ]);
   });
 
@@ -23,6 +23,8 @@ describe("menú lateral", () => {
 
   it("cada rol ve solo lo suyo (las secciones vacías no salen)", () => {
     expect(ids("granja")).toEqual(["inicio", "animales", "reportes"]);
+    expect(ids("consulta")).toContain("financiero");
+    expect(hrefs("consulta")).not.toContain("/admin/nomina-presupuesto");
     expect(hrefs("granja")).toContain("/admin/reportes/inventarios");
     expect(ids("chofer")).toEqual(["inicio", "vehiculos"]);
     expect(hrefs("chofer")).toEqual(["/", "/vehiculos/mis-viajes"]);
