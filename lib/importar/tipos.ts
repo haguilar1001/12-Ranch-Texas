@@ -6,5 +6,5 @@ export const TIPOS_ARCHIVO: Record<TipoArchivo, { nombre: string; extensiones: s
   estado_resultados: { nombre: "Estado de resultados mensual", extensiones: [".pdf"], ayuda: "El PDF de contabilidad de un mes (consolidado por unidad)." },
   cuadro_mes_producto: { nombre: "Venta por mes", extensiones: [".xlsx", ".xls"], ayuda: "El cuadro mes x producto de un año (Mes | Total | ENTRADAS | EVENTOS | ARRIENDOS…)." },
   venta_historica: { nombre: "Venta histórica", extensiones: [".xlsx", ".xls"], ayuda: "El Excel de operación con la hoja «Datos» (FECHA, PRODUCTO, VALOR, NEGOCIO). Reemplaza todo el histórico." },
-  presupuesto: { nombre: "Presupuesto (P&G presupuestado)", extensiones: [".xlsx", ".xls"], ayuda: "El P&G presupuestado del año, con las hojas «Gastos» y «PYG». El año va en el nombre del archivo." },
+  presupuesto: { nombre: "Presupuesto (P&G presupuestado)", extensiones: [".xlsx", ".xls"], ayuda: "El P&G presupuestado del año: se cargan los gastos (hoja «Gastos») y la nómina por empleado (hoja «Nomina»). El año va en el nombre del archivo." },
 };

@@ -1048,6 +1048,7 @@ model ArchivoCargado {
 
   lineas_pyg         EstadoResultadoLinea[]
   lineas_presupuesto PresupuestoPygLinea[]
+  nomina_presupuesto PresupuestoNomina[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1099,6 +1100,33 @@ model PresupuestoPygLinea {
   @@index([anio])
   @@index([archivo_id])
   @@map("presupuesto_pyg_lineas")
+}
+
+/// Un empleado de la nómina presupuestada (hoja «Nomina» del P&G presupuestado). Valores mensuales.
+/// Datos personales: solo los ve el administrador.
+model PresupuestoNomina {
+  id               String @id @default(uuid())
+  archivo_id       String
+  anio             Int
+  orden            Int
+  nombre           String
+  cargo            String
+  area             String
+  salario          Int
+  aux_transporte   Int
+  sueldo_total     Int
+  prestaciones     Int // cesantías + intereses + primas + vacaciones
+  parafiscales     Int // caja + ICBF + SENA
+  seguridad_social Int // EPS + AFP + ARL
+  total            Int // costo mensual para la empresa
+
+  archivo ArchivoCargado @relation(fields: [archivo_id], references: [id])
+
+  creado_en DateTime @default(now())
+
+  @@index([anio])
+  @@index([archivo_id])
+  @@map("presupuesto_nomina")
 }
 
 // ============================================================================

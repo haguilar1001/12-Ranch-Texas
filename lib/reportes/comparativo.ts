@@ -202,3 +202,46 @@ export async function comparativoAnual(anio: number, producto?: string): Promise
   }));
   return { meses, ...totalesComparables(meses) };
 }
+
+// ------------------------- Venta por producto y mes -------------------------
+
+export interface FilaProductoMes {
+  producto: string;
+  /** Venta por mes (índice 0 = enero) con las mismas reglas del comparativo. */
+  meses: number[];
+  /** Meses cuyo valor sale de la taquilla en vivo. */
+  taquilla: boolean[];
+  total: number;
+  /** El mismo producto el año anterior, en los mismos meses transcurridos. */
+  totalAnterior: number;
+}
+
+/** Cuadro producto × mes de un año: histórico + ventas fuera de taquilla + taquilla (corte por mes). */
+export async function ventaPorProductoMes(anio: number): Promise<{ filas: FilaProductoMes[]; mesesTranscurridos: number }> {
+  const inicio = await inicioTaquilla();
+  const hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);
+  const datos = async (a: number) => {
+    const [hist, taq] = await Promise.all([historicoPorMesYLinea(a), inicio && a >= inicio.anio ? taquillaPorMesYLinea(a) : Promise.resolve(null)]);
+    return { hist, taq };
+  };
+  const [act, ant] = await Promise.all([datos(anio), datos(anio - 1)]);
+  const productos = new Set<string>(LINEAS_TAQUILLA);
+  for (const d of [act, ant]) d.hist.forEach((h) => Object.keys(h).forEach((p) => productos.add(p)));
+  const mesesTranscurridos = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => !esMesFuturo(anio, m, hoy)).length;
+
+  const valores = (d: typeof act, a: number, p: string) =>
+    d.hist.map((h, i) => combinarMes(h, d.taq?.[i] ?? { ENTRADAS: 0, EVENTOS: 0 }, mesUsaTaquilla(inicio, a, i + 1), p));
+
+  const filas = [...productos].map((producto) => {
+    const v = valores(act, anio, producto), w = valores(ant, anio - 1, producto);
+    return {
+      producto,
+      meses: v.map((x) => x.valor),
+      taquilla: v.map((x) => x.fuente === "taquilla"),
+      total: v.reduce((t, x) => t + x.valor, 0),
+      totalAnterior: w.slice(0, mesesTranscurridos).reduce((t, x) => t + x.valor, 0),
+    };
+  }).filter((f) => f.total !== 0 || f.totalAnterior !== 0);
+  filas.sort((a, b) => b.total - a.total || b.totalAnterior - a.totalAnterior);
+  return { filas, mesesTranscurridos };
+}

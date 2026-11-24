@@ -89,11 +89,12 @@ export async function procesarArchivo(e: EntradaArchivo): Promise<ResultadoCarga
 
     // presupuesto
     const pr = leerPresupuesto(e.datos, e.nombre);
-    const resumen = { cuentas: pr.lineas.length, gastosMes: pr.totalGastos, ingresosMes: pr.lineas.find((l) => l.seccion === "ingreso")?.valor ?? null, avisos: pr.avisos };
+    const resumen = { cuentas: pr.lineas.length, gastosMes: pr.totalGastos, empleados: pr.nomina.length, nominaMes: pr.totalNomina, avisos: pr.avisos };
     const archivo = await prisma.$transaction(async (tx) => {
       await tx.archivoCargado.updateMany({ where: { tipo: e.tipo, anio: pr.anio, estado: "procesado" }, data: { estado: "reemplazado", actualizado_por: e.usuarioId } });
       const a = await tx.archivoCargado.create({ data: { ...base, anio: pr.anio, resumen } });
       await tx.presupuestoPygLinea.createMany({ data: pr.lineas.map((l) => ({ archivo_id: a.id, anio: pr.anio, mes: null, seccion: l.seccion, cuenta: l.cuenta, orden: l.orden, valor: l.valor })) });
+      if (pr.nomina.length) await tx.presupuestoNomina.createMany({ data: pr.nomina.map((n) => ({ ...n, archivo_id: a.id, anio: pr.anio })) });
       return a;
     }, OPC);
     return { ok: true, archivoId: archivo.id, resumen };

@@ -70,16 +70,24 @@ describe("lector de venta por mes", () => {
 });
 
 describe("lector del presupuesto", () => {
-  it("toma la columna TOTAL de la hoja Gastos y los ingresos de la hoja PYG", () => {
+  it("carga solo gastos (sin ingresos) y la nómina por empleado", () => {
     const datos = libro({
       Gastos: [[null, "TOTAL GASTOS", 150, 0, 150], [null, "GASTOS", "PARQUE", "RESTAURANTE", "TOTAL"], [null, "NOMINA", 100, 0, 100], [null, "ENERGIA", 50, 0, 50], [null, "SUBTOTAL", null, null, 120]],
       PYG: [[null, "INGRESOS", 500, 1], [null, "COSTO", 0, 0]],
+      Nomina: [
+        [null, null, null, "TOTALES", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 300],
+        [null, "#", "NOMBRE EMPLEADO", "CARGO", "SALARIO", "AUX. TPTE", "AUX. VIV.", "SUELDO TOTAL", "CESAN", "INT. CESAN", "PRIMAS", "VACAC.", "CAJA", "ICBF", "SENA", "EPS", "AFP", "ARL", "OTROS", "ADMON", "TOTAL", "AREA"],
+        [null, 1, "Ana Pérez", "Administradora", 100, 0, 0, 100, 8, 1, 8, 4, 4, null, null, 4, 12, 2, 143, 0, 143, "PARQUE"],
+        [null, 2, "Luis Gómez", "Celador", 120, 10, 0, 130, 11, 1, 11, 5, 5, 2, 3, 5, 14, 3, 157, 0, 157, "OTROS"],
+      ],
     });
     const r = leerPresupuesto(datos, "PYG Presupuestado Ranch Texas 2026.xlsx");
     expect(r.anio).toBe(2026);
     expect(r.totalGastos).toBe(150);
-    expect(r.avisos).toEqual([]); // cuadra con TOTAL GASTOS aunque el SUBTOTAL sea parcial
-    expect(r.lineas.map((l) => [l.seccion, l.cuenta, l.valor])).toEqual([["gasto", "NOMINA", 100], ["gasto", "ENERGIA", 50], ["ingreso", "INGRESOS", 500], ["costo_ventas", "COSTO DE VENTAS", 0]]);
+    expect(r.avisos).toEqual([]); // cuadra con TOTAL GASTOS aunque el SUBTOTAL sea parcial, y la nómina con TOTALES
+    expect(r.lineas.map((l) => [l.seccion, l.cuenta, l.valor])).toEqual([["gasto", "NOMINA", 100], ["gasto", "ENERGIA", 50]]);
+    expect(r.totalNomina).toBe(300);
+    expect(r.nomina[1]).toMatchObject({ nombre: "LUIS GÓMEZ", cargo: "CELADOR", area: "OTROS", salario: 120, aux_transporte: 10, prestaciones: 28, parafiscales: 10, seguridad_social: 22, total: 157 });
   });
 
   it("pide el año en el nombre del archivo", () => {

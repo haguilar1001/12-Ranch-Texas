@@ -23,7 +23,7 @@ function describir(tipo: string, r: Record<string, unknown>): string {
   }
   if (tipo === "cuadro_mes_producto") return `${n(r.meses)} meses · venta ${formatearCOP(n(r.total))} · ${n(r.ajustes)} ajustes al histórico`;
   if (tipo === "venta_historica") return `${n(r.filas).toLocaleString("es-CO")} filas del ${r.desde} al ${r.hasta} · ${formatearCOP(n(r.total))}`;
-  if (tipo === "presupuesto") return `${n(r.cuentas)} cuentas · gastos/mes ${formatearCOP(n(r.gastosMes))} · ingresos/mes ${formatearCOP(n(r.ingresosMes))}`;
+  if (tipo === "presupuesto") return `${n(r.cuentas)} cuentas · gastos/mes ${formatearCOP(n(r.gastosMes))}` + (r.empleados ? ` · nómina de ${n(r.empleados)} empleados (${formatearCOP(n(r.nominaMes))}/mes)` : "");
   return "";
 }
 const periodo = (a: Archivo) => (a.mes ? `${MESES[a.mes - 1]} ${a.anio}` : a.anio ? String(a.anio) : "Todo el histórico");

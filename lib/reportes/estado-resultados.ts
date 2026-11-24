@@ -35,7 +35,7 @@ export async function aniosConEstadoResultados(): Promise<number[]> {
 export async function estadoResultados(anio: number): Promise<EstadoResultados> {
   const [lineas, pres] = await Promise.all([
     prisma.estadoResultadoLinea.findMany({ where: { anio, archivo: { estado: "procesado" } }, select: { mes: true, unidad: true, seccion: true, cuenta: true, valor: true } }),
-    prisma.presupuestoPygLinea.findMany({ where: { anio, archivo: { estado: "procesado" } }, select: { mes: true, seccion: true, cuenta: true, valor: true } }),
+    prisma.presupuestoPygLinea.findMany({ where: { anio, seccion: "gasto", archivo: { estado: "procesado" } }, select: { mes: true, seccion: true, cuenta: true, valor: true } }),
   ]);
   const mesesCargados = [...new Set(lineas.map((l) => l.mes))].sort((a, b) => a - b);
   const nMeses = mesesCargados.length;
@@ -61,18 +61,18 @@ export async function estadoResultados(anio: number): Promise<EstadoResultados> 
   const cv = porMes((l) => l.seccion === "costo_ventas");
   const gas = porMes((l) => l.seccion === "gasto");
   const ub = resta(ing, cv), uo = resta(ub, gas);
-  const pIng = presDe((p) => p.seccion === "ingreso"), pCv = presDe((p) => p.seccion === "costo_ventas"), pGas = presDe((p) => p.seccion === "gasto");
-  const sub = (a: number | null, b: number | null) => (a == null || b == null ? null : a - b);
+  // El presupuesto es solo de gastos: ingresos, costo de ventas y utilidades no tienen presupuesto.
+  const pGas = presDe((p) => p.seccion === "gasto");
 
   const filas: FilaEr[] = [
-    fila("ingresos", "Ingresos", "total", ing, pIng, 1),
+    fila("ingresos", "Ingresos", "total", ing, null, 1),
     ...GRUPOS_INGRESO.map((g) => fila(`ing:${g}`, g, "grupo", porMes((l) => l.seccion === "ingreso" && grupoIngreso(l.cuenta) === g), null, 1)).filter((f) => f.acumulado !== 0),
-    fila("costo_ventas", "Costo de ventas", "total", cv, pCv, -1),
-    fila("utilidad_bruta", "Utilidad bruta", "total", ub, sub(pIng, pCv), 1),
+    fila("costo_ventas", "Costo de ventas", "total", cv, null, -1),
+    fila("utilidad_bruta", "Utilidad bruta", "total", ub, null, 1),
     fila("gastos", "Gastos operacionales", "total", gas, pGas, -1),
     ...GRUPOS_GASTO.map((g) => fila(`gas:${g}`, g, "grupo", porMes((l) => l.seccion === "gasto" && grupoGasto(l.cuenta) === g), presDe((p) => p.seccion === "gasto" && grupoGasto(p.cuenta) === g), -1))
       .filter((f) => f.acumulado !== 0 || (f.presupuesto ?? 0) !== 0),
-    fila("utilidad_operacional", "Utilidad operacional", "total", uo, sub(sub(pIng, pCv), pGas), 1),
+    fila("utilidad_operacional", "Utilidad operacional", "total", uo, null, 1),
   ];
   const pct = (clave: string, concepto: string, num: (number | null)[]) => {
     const meses = num.map((x, i) => (x == null || !ing[i] ? null : x / (ing[i] as number)));
