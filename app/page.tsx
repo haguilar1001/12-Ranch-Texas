@@ -6,7 +6,7 @@ import { comparativoAnual } from "@/lib/reportes/comparativo";
 import { variacionPct, formatearVariacion } from "@/lib/reportes/util";
 import { inicioDelDiaOperativo, fechaBogota } from "@/lib/tiempo";
 import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
-import NavBar from "@/components/NavBar";
+import AppShell from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
 
@@ -99,8 +99,7 @@ export default async function Home() {
   ] as [string, string, string, string, boolean][]).filter((x) => x[4]);
 
   return (
-    <>
-      <NavBar />
+    <AppShell>
       <main className="mx-auto max-w-6xl p-4 sm:p-6">
         {/* Hero con logo y video de fondo opcional.
             Para activar el video: sube el archivo a public/hero.mp4 (se reproduce en silencio y en bucle).
@@ -188,6 +187,6 @@ export default async function Home() {
           </section>
         )}
       </main>
-    </>
+    </AppShell>
   );
 }

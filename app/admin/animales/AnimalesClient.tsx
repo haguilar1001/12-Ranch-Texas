@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import {
@@ -73,6 +73,8 @@ export interface NovedadVista {
 export interface ResumenNovedadVista { tipo: string; etiqueta: string; movimientos: number; cantidad: number; valor: number }
 
 interface Props {
+  /** Pestaña pedida por la URL (?tab=). */
+  tabInicial?: string;
   esAdmin: boolean;
   esSupervisor: boolean;
   kpis: {
@@ -126,7 +128,14 @@ const th = "px-3 py-2 text-xs uppercase text-ranch-marron/60";
 
 export default function AnimalesClient(p: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<Pestana>("inventario");
+  // La pestaña va en la URL (?tab=) para que el menú lateral abra cada una directo y la marque.
+  const pestanaValida = (t?: string): Pestana => (PESTANAS.some((x) => x.id === t) ? (t as Pestana) : "inventario");
+  const [tab, setTabEstado] = useState<Pestana>(pestanaValida(p.tabInicial));
+  useEffect(() => setTabEstado(pestanaValida(p.tabInicial)), [p.tabInicial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setTab = (t: Pestana) => {
+    setTabEstado(t);
+    window.history.replaceState(null, "", `?tab=${t}`);
+  };
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [novedadPara, setNovedadPara] = useState("");
@@ -149,7 +158,7 @@ export default function AnimalesClient(p: Props) {
         <p className="text-sm text-ranch-marron/60">Inventario, ubicación, dieta y bitácora de alimentación</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Kpi label="Cabezas" valor={p.kpis.cabezas.toLocaleString("es-CO")} />
         <Kpi label="Grupos" valor={formatearMiles(p.kpis.grupos)} />
         <Kpi label="Recintos" valor={formatearMiles(p.kpis.recintos)} />

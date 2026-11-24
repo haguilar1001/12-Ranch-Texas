@@ -1,10 +1,5 @@
-import NavBar from "@/components/NavBar";
+import AppShell from "@/components/AppShell";
 
 export default function ControlLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <NavBar />
-      {children}
-    </>
-  );
+  return <AppShell>{children}</AppShell>;
 }

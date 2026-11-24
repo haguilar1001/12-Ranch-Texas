@@ -10,7 +10,8 @@ import AnimalesClient from "./AnimalesClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function AnimalesPage() {
+export default async function AnimalesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!puedeOperarGranja(s.rol)) return <main className="p-6">Sin acceso.</main>;
@@ -260,6 +261,7 @@ export default async function AnimalesPage() {
 
   return (
     <AnimalesClient
+      tabInicial={tab}
       esAdmin={tieneRol(s.rol, "administrador")}
       esSupervisor={tieneRol(s.rol, "supervisor")}
       kpis={kpis}

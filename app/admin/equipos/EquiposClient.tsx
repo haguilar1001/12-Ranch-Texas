@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import { NOVEDADES_EQUIPO, ETIQUETA_EQUIPO, EFECTO_EQUIPO, MOTIVO_OBLIGATORIO_EQUIPO, type TipoMovEquipo } from "@/lib/inventario/kardex";
@@ -42,6 +42,8 @@ export interface MantenimientoVista {
 interface Opcion { id: string; nombre: string }
 
 interface Props {
+  /** Pestaña pedida por la URL (?tab=). */
+  tabInicial?: string;
   esAdmin: boolean;
   hoy: string;
   kpis: { registros: number; unidades: number; operativos: number; noOperativos: number; valor: number; mantVencidos: number; garantiasPorVencer: number };
@@ -89,7 +91,14 @@ type Correr = (fn: () => Promise<{ ok: boolean; error?: string; aviso?: string }
 
 export default function EquiposClient(p: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<Pestana>("inventario");
+  // La pestaña va en la URL (?tab=) para que el menú lateral abra cada una directo y la marque.
+  const pestanaValida = (t?: string): Pestana => (PESTANAS.some((x) => x.id === t) ? (t as Pestana) : "inventario");
+  const [tab, setTabEstado] = useState<Pestana>(pestanaValida(p.tabInicial));
+  useEffect(() => setTabEstado(pestanaValida(p.tabInicial)), [p.tabInicial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setTab = (t: Pestana) => {
+    setTabEstado(t);
+    window.history.replaceState(null, "", `?tab=${t}`);
+  };
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [novedadPara, setNovedadPara] = useState("");
@@ -112,7 +121,7 @@ export default function EquiposClient(p: Props) {
         <p className="text-sm text-ranch-marron/60">Inventario, novedades (compras, bajas, robos, traslados) y mantenimientos</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Kpi label="Equipos" valor={formatearMiles(p.kpis.registros)} />
         <Kpi label="Unidades" valor={formatearMiles(p.kpis.unidades)} />
         <Kpi label="Operativas" valor={formatearMiles(p.kpis.operativos)} />

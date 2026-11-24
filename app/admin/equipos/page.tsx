@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 const dia = (d: Date | null) => (d ? fechaBogota(d) : null);
 
-export default async function EquiposPage() {
+export default async function EquiposPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
   const s = await obtenerSesion();
   if (!s) redirect("/login");
   if (!tieneRol(s.rol, "supervisor")) return <main className="p-6">Sin acceso.</main>;
@@ -123,6 +124,7 @@ export default async function EquiposPage() {
 
   return (
     <EquiposClient
+      tabInicial={tab}
       esAdmin={tieneRol(s.rol, "administrador")}
       hoy={hoy}
       kpis={kpis}
