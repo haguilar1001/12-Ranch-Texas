@@ -114,7 +114,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               // Aquí el porcentaje que dice algo NO es participación sino la variación
               // contra el mismo mes del año pasado: es un cuadro de comparación, no de
               // composición. Un mes sin dato del año anterior queda en "—", no en 0%.
-              const v = m.futuro ? null : variacionPct(m.actual, m.anterior);
+              const v = m.futuro || m.enCurso ? null : variacionPct(m.actual, m.anterior);
               return (
                 <div key={m.mes} className="flex items-center gap-2 text-xs">
                   <span className="w-8 shrink-0 text-ranch-marron/60" title={m.fuenteActual === "taquilla" ? "Entradas y eventos tomados de la taquilla en vivo" : undefined}>{MESES_ABR[m.mes - 1]}{m.fuenteActual === "taquilla" && <sup className="ml-0.5 font-bold text-ranch-verde">T</sup>}</span>

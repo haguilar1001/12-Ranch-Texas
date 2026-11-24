@@ -54,10 +54,13 @@ describe("comparativo — corte por mes (histórico + taquilla)", () => {
   it("el total compara solo los meses transcurridos (ene–nov vs ene–nov)", () => {
     const meses = Array.from({ length: 12 }, (_, i) => ({
       mes: i + 1, anterior: 100, actual: i < 11 ? 110 : 0,
-      fuenteAnterior: null, fuenteActual: null, futuro: i === 11,
+      fuenteAnterior: null, fuenteActual: null, futuro: i === 11, enCurso: false,
     }));
     expect(totalesComparables(meses)).toEqual({ totalActual: 1210, totalAnterior: 1100, totalAnteriorAnio: 1200, periodo: "ene–nov" });
     expect(totalesComparables(meses.map((m) => ({ ...m, futuro: false }))).periodo).toBeNull();
+    // El mes en curso (a medias) no entra: nov en curso → compara ene–oct.
+    const conNov = meses.map((m) => ({ ...m, enCurso: m.mes === 11 }));
+    expect(totalesComparables(conNov)).toMatchObject({ totalActual: 1100, totalAnterior: 1000, periodo: "ene–oct" });
   });
 
   it("la taquilla solo cuenta en todos los productos, ENTRADAS o EVENTOS", () => {

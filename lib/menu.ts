@@ -124,6 +124,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
         {
           titulo: "Finanzas",
           filas: [
+            ["🩺", "Análisis financiero", "/admin/reportes/analisis-financiero", "Indicadores, equilibrio, comparativos y conclusiones", consulta],
             ["📑", "Estado de resultados", "/admin/reportes/estado-resultados", "P&G mes a mes contra el presupuesto", consulta],
             ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado de gastos registrados", consulta],
           ],

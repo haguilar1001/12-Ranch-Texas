@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     [`Comparativo ${anio} vs ${anio - 1}${producto ? ` — ${producto}` : ""}`],
     ["Mes", String(anio - 1), `Fuente ${anio - 1}`, String(anio), `Fuente ${anio}`, "Variacion %"],
     ...comp.meses.map((m) => {
-      const v = m.futuro ? null : variacionPct(m.actual, m.anterior);
+      const v = m.futuro || m.enCurso ? null : variacionPct(m.actual, m.anterior);
       return [MESES[m.mes - 1], String(m.anterior), FUENTE[m.fuenteAnterior ?? ""], String(m.actual), FUENTE[m.fuenteActual ?? ""], v === null ? "" : v.toFixed(1)];
     }),
     [`Total${comp.periodo ? ` ${comp.periodo}` : ""}`, String(comp.totalAnterior), "", String(comp.totalActual), "", (variacionPct(comp.totalActual, comp.totalAnterior) ?? 0).toFixed(1)],

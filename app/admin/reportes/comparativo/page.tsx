@@ -64,7 +64,7 @@ export default async function ComparativoPage({ searchParams }: { searchParams: 
           <thead><tr className="text-left text-ranch-marron/60"><th className="py-1">Mes</th><th className="text-right">{anio - 1}</th><th className="w-6"></th><th className="text-right">{anio}</th><th className="w-6"></th><th className="text-right">Var.</th><th className="w-1/3">Comparación</th></tr></thead>
           <tbody>
             {comp.meses.map((m) => {
-              const v = m.futuro ? null : variacionPct(m.actual, m.anterior);
+              const v = m.futuro || m.enCurso ? null : variacionPct(m.actual, m.anterior);
               return (
                 <tr key={m.mes} className="border-t border-ranch-marron/10">
                   <td className="py-1 font-medium">{MESES[m.mes - 1]}</td>

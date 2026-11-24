@@ -4,6 +4,7 @@ import { obtenerSesion, tieneRol, puedeOperarGranja, puedeConducir } from "@/lib
 import { datosInicio } from "@/lib/inicio";
 import { variacionPct } from "@/lib/reportes/util";
 import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
+import { fechaBogota } from "@/lib/tiempo";
 import AppShell from "@/components/AppShell";
 import { BarrasAnioVsAnterior, BarrasDiarias, ResultadoMensual, BarrasH, Medidor, BarraEstados, millones } from "@/components/graficos";
 
@@ -51,7 +52,8 @@ function Tarjeta({ titulo, conclusion, enlace, children }: { titulo: string; con
   );
 }
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ periodo?: string }> }) {
+  const periodo: "dia" | "mes" = (await searchParams).periodo === "mes" ? "mes" : "dia";
   const s = await obtenerSesion();
 
   if (!s) {
@@ -75,7 +77,7 @@ export default async function Home() {
     equipos: tieneRol(s.rol, "supervisor"),
     vehiculos: tieneRol(s.rol, "supervisor"),
   };
-  const d = await datosInicio(permisos);
+  const d = await datosInicio(permisos, periodo);
   const atajos = ([
     ["🎟️", "Taquilla", "/taquilla", tieneRol(s.rol, "cajero")],
     ["💵", "Caja y turno", "/caja/turno", tieneRol(s.rol, "cajero")],
@@ -119,26 +121,44 @@ export default async function Home() {
         {/* ---------------- Hoy ---------------- */}
         {d.hoy && (
           <>
-            <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-ranch-marron/50">Hoy</h2>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wide text-ranch-marron/50">{d.hoy.titulo}</h2>
+              <nav className="inline-flex rounded-full border border-ranch-marron/20 bg-white p-0.5 text-sm" aria-label="Periodo de los indicadores">
+                {([["dia", "Día"], ["mes", "Mes"]] as const).map(([v, t]) => (
+                  <Link key={v} href={v === "dia" ? "/" : "/?periodo=mes"} aria-current={periodo === v ? "true" : undefined}
+                    className={`rounded-full px-4 py-1 font-semibold ${periodo === v ? "bg-ranch-marron text-ranch-crema" : "text-ranch-marron/70 hover:bg-ranch-marron/10"}`}>
+                    {t}
+                  </Link>
+                ))}
+              </nav>
+            </div>
             <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Kpi titulo="Ingreso" valor={formatearCOP(d.hoy.ventas.ingreso)}>
-                <Variacion actual={d.hoy.ventas.ingreso} base={d.hoy.ayer.ingreso} texto="vs ayer" />
+              <Kpi titulo="Ingreso" valor={periodo === "mes" ? millones(d.hoy.ventas.ingreso) : formatearCOP(d.hoy.ventas.ingreso)} completo={formatearCOP(d.hoy.ventas.ingreso)}>
+                <Variacion actual={d.hoy.ventas.ingreso} base={d.hoy.ayer.ingreso} texto={d.hoy.textoBase} />
               </Kpi>
               <Kpi titulo="Entradas" valor={formatearMiles(d.hoy.ventas.asistentes)}>
                 <span className="text-ranch-marron/50">{formatearMiles(d.hoy.ventas.numVentas)} ventas · </span>
-                <Variacion actual={d.hoy.ventas.asistentes} base={d.hoy.ayer.asistentes} texto="vs ayer" />
+                <Variacion actual={d.hoy.ventas.asistentes} base={d.hoy.ayer.asistentes} texto={d.hoy.textoBase} />
               </Kpi>
               <Kpi titulo="Ticket promedio" valor={formatearCOP(d.hoy.ventas.ticketPromedio)}>
                 <span className="text-ranch-marron/50">por entrada · {pct(d.hoy.ventas.pctCortesias)} en cortesías</span>
               </Kpi>
-              <Kpi titulo="Aforo actual" valor={formatearMiles(d.hoy.aforo)} alerta={!!d.hoy.aforoMax && d.hoy.aforo >= d.hoy.aforoMax * 0.9}>
-                {d.hoy.aforoMax ? (
-                  <>
-                    <span className="text-ranch-marron/50">de {formatearMiles(d.hoy.aforoMax)} ({pct(d.hoy.aforo / d.hoy.aforoMax)})</span>
-                    <Medidor valor={d.hoy.aforo} limite={d.hoy.aforoMax} invertido />
-                  </>
-                ) : <span className="text-ranch-marron/40">Sin aforo máximo configurado</span>}
-              </Kpi>
+              {periodo === "dia" ? (
+                <Kpi titulo="Aforo actual" valor={formatearMiles(d.hoy.aforo)} alerta={!!d.hoy.aforoMax && d.hoy.aforo >= d.hoy.aforoMax * 0.9}>
+                  {d.hoy.aforoMax ? (
+                    <>
+                      <span className="text-ranch-marron/50">de {formatearMiles(d.hoy.aforoMax)} ({pct(d.hoy.aforo / d.hoy.aforoMax)})</span>
+                      <Medidor valor={d.hoy.aforo} limite={d.hoy.aforoMax} invertido />
+                    </>
+                  ) : <span className="text-ranch-marron/40">Sin aforo máximo configurado</span>}
+                </Kpi>
+              ) : (
+                <Kpi titulo="Días con venta" valor={formatearMiles(d.hoy.diasConVenta)}>
+                  <span className="text-ranch-marron/50">
+                    {d.hoy.diasConVenta ? `promedio ${millones(d.hoy.ventas.ingreso / d.hoy.diasConVenta)} y ${formatearMiles(Math.round(d.hoy.ventas.asistentes / d.hoy.diasConVenta))} entradas por día` : "aún sin ventas este mes"}
+                  </span>
+                </Kpi>
+              )}
             </div>
           </>
         )}
@@ -151,6 +171,9 @@ export default async function Home() {
               {comp && (
                 <Kpi titulo={`Venta ${comp.periodo ?? d.anio}`} valor={millones(comp.totalActual)} completo={formatearCOP(comp.totalActual)}>
                   <Variacion actual={comp.totalActual} base={comp.totalAnterior} texto={`vs ${d.anio - 1}`} />
+                  {comp.meses.find((m) => m.enCurso && m.actual) && (
+                    <span className="block text-ranch-marron/50">+ {millones(comp.meses.find((m) => m.enCurso)!.actual)} del mes en curso</span>
+                  )}
                 </Kpi>
               )}
               {r ? (
@@ -190,7 +213,7 @@ export default async function Home() {
                     <span className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-sm bg-ranch-dorado" />{d.anio}</span>
                   </>}
                 >
-                  <BarrasAnioVsAnterior meses={comp.meses} anio={d.anio} />
+                  <BarrasAnioVsAnterior meses={comp.meses} anio={d.anio} mesEnCurso={+fechaBogota().slice(5, 7)} />
                 </Tarjeta>
               )}
               {d.diario && (
@@ -215,6 +238,29 @@ export default async function Home() {
                   </>}
                 >
                   <ResultadoMensual meses={r.meses} />
+                </Tarjeta>
+              )}
+              {d.analisis && (
+                <Tarjeta
+                  titulo={`Salud financiera · ${d.analisis.anio}`}
+                  enlace={{ href: "/admin/reportes/analisis-financiero", texto: "Ver análisis completo" }}
+                  conclusion={d.analisis.conclusiones[0] ? d.analisis.conclusiones[0].titulo + "." : undefined}
+                >
+                  {d.analisis.equilibrio && (
+                    <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-ranch-crema/60 p-2"><p className="text-[11px] text-ranch-marron/60">Equilibrio / mes</p><p className="font-black tabular-nums text-ranch-marron">{millones(d.analisis.equilibrio.pe_alto)}</p></div>
+                      <div className="rounded-xl bg-ranch-crema/60 p-2"><p className="text-[11px] text-ranch-marron/60">Margen de seguridad</p><p className={`font-black tabular-nums ${d.analisis.equilibrio.margen_seguridad < 0.15 ? "text-red-600" : "text-ranch-verde"}`}>{pct(d.analisis.equilibrio.margen_seguridad)}</p></div>
+                      <div className="rounded-xl bg-ranch-crema/60 p-2"><p className="text-[11px] text-ranch-marron/60">Apalancamiento</p><p className="font-black tabular-nums text-ranch-marron">{d.analisis.equilibrio.apalancamiento ? `${d.analisis.equilibrio.apalancamiento.toLocaleString("es-CO", { maximumFractionDigits: 1 })}x` : "—"}</p></div>
+                    </div>
+                  )}
+                  <ul className="space-y-1.5">
+                    {d.analisis.alertas.map((al) => (
+                      <li key={al.senal} className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className={al.disparada ? "text-red-700" : "text-green-700"}>{al.disparada ? "⚠" : "✓"} {al.senal}</span>
+                        <span className={`shrink-0 font-bold tabular-nums ${al.disparada ? "text-red-700" : "text-green-700"}`}>{al.valor}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </Tarjeta>
               )}
               {d.mezcla && d.mezcla.length > 0 && (

@@ -21,7 +21,7 @@ function escalaY(max: number, alto: number, arriba: number) {
 }
 
 /** Barras mes a mes: año anterior (gris) contra este año (dorado), con la variación encima. */
-export function BarrasAnioVsAnterior({ meses, anio }: { meses: { mes: number; actual: number; anterior: number; futuro: boolean }[]; anio: number }) {
+export function BarrasAnioVsAnterior({ meses, anio, mesEnCurso }: { meses: { mes: number; actual: number; anterior: number; futuro: boolean }[]; anio: number; mesEnCurso?: number }) {
   const W = 640, H = 230, ml = 6, mt = 22, mb = 22, alto = H - mt - mb;
   const max = Math.max(...meses.map((m) => Math.max(m.actual, m.anterior)), 1);
   const y = escalaY(max * 1.08, alto, mt);
@@ -31,12 +31,16 @@ export function BarrasAnioVsAnterior({ meses, anio }: { meses: { mes: number; ac
       <line x1={ml} x2={W - ml} y1={y(0)} y2={y(0)} className="stroke-ranch-marron/20" />
       {meses.map((m, i) => {
         const x = ml + i * paso + paso / 2;
-        const v = !m.futuro && m.anterior > 0 ? m.actual / m.anterior - 1 : null;
+        const parcial = m.mes === mesEnCurso;
+        const v = !m.futuro && !parcial && m.anterior > 0 ? m.actual / m.anterior - 1 : null;
         return (
           <g key={m.mes}>
-            <title>{`${MESES[i]}: ${anio} ${completo(m.actual)} · ${anio - 1} ${completo(m.anterior)}${v != null ? ` · ${v >= 0 ? "+" : ""}${pct(v)}` : ""}`}</title>
+            <title>{`${MESES[i]}${parcial ? " (en curso)" : ""}: ${anio} ${completo(m.actual)} · ${anio - 1} ${completo(m.anterior)}${v != null ? ` · ${v >= 0 ? "+" : ""}${pct(v)}` : ""}`}</title>
             <rect x={x - bw - 1} y={y(m.anterior)} width={bw} height={y(0) - y(m.anterior)} rx="2" className="fill-ranch-marron/20" />
-            {!m.futuro && <rect x={x + 1} y={y(m.actual)} width={bw} height={y(0) - y(m.actual)} rx="2" className="fill-ranch-dorado" />}
+            {!m.futuro && <rect x={x + 1} y={y(m.actual)} width={bw} height={y(0) - y(m.actual)} rx="2" className={parcial ? "fill-ranch-dorado/50" : "fill-ranch-dorado"} />}
+            {parcial && (
+              <text x={x} y={y(Math.max(m.actual, m.anterior)) - 6} textAnchor="middle" fontSize="10" className="fill-ranch-marron/50">parcial</text>
+            )}
             {v != null && (
               <text x={x} y={y(Math.max(m.actual, m.anterior)) - 6} textAnchor="middle" fontSize="11" fontWeight="700" className={v >= 0 ? "fill-ranch-verde" : "fill-red-600"}>
                 {`${v >= 0 ? "+" : ""}${Math.round(v * 100)}%`}
@@ -163,5 +167,37 @@ export function BarraEstados({ partes }: { partes: { nombre: string; valor: numb
         ))}
       </div>
     </div>
+  );
+}
+
+/** Margen bruto (gris) y operacional (dorado) de cada mes, con la línea de 0 %. */
+export function LineaMargenes({ meses }: { meses: { mes: number; margen_bruto: number; margen_op: number }[] }) {
+  const W = 640, H = 220, ml = 40, mr = 12, mt = 18, mb = 22;
+  const vals = meses.flatMap((m) => [m.margen_bruto, m.margen_op]);
+  const lo = Math.min(0, ...vals) - 0.1, hi = Math.max(0.2, ...vals) + 0.05;
+  const y = (v: number) => mt + ((hi - v) / (hi - lo)) * (H - mt - mb);
+  const paso = (W - ml - mr) / Math.max(1, meses.length - 1);
+  const x = (i: number) => (meses.length === 1 ? (ml + W - mr) / 2 : ml + i * paso);
+  const linea = (k: "margen_bruto" | "margen_op") => meses.map((m, i) => `${i ? "L" : "M"}${x(i)},${y(m[k])}`).join(" ");
+  const ticks = [-0.5, -0.25, 0, 0.25, 0.5, 0.75, 1].filter((t) => t >= lo && t <= hi);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Margen bruto y operacional por mes">
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={ml} x2={W - mr} y1={y(t)} y2={y(t)} className={t === 0 ? "stroke-ranch-marron/50" : "stroke-ranch-marron/10"} />
+          <text x={ml - 6} y={y(t) + 4} textAnchor="end" fontSize="10" className="fill-ranch-marron/50">{Math.round(t * 100)}%</text>
+        </g>
+      ))}
+      <path d={linea("margen_bruto")} fill="none" strokeWidth="2" className="stroke-ranch-marron/25" />
+      <path d={linea("margen_op")} fill="none" strokeWidth="2.5" className="stroke-ranch-dorado" />
+      {meses.map((m, i) => (
+        <g key={m.mes}>
+          <title>{`${MESES[m.mes - 1]}: margen bruto ${pct(m.margen_bruto)} · margen operacional ${pct(m.margen_op)}`}</title>
+          <circle cx={x(i)} cy={y(m.margen_op)} r="4" className={m.margen_op < 0 ? "fill-red-600" : "fill-ranch-dorado"} />
+          <text x={x(i)} y={y(m.margen_op) - 8} textAnchor="middle" fontSize="10.5" fontWeight="700" className={m.margen_op < 0 ? "fill-red-600" : "fill-ranch-marron"}>{`${Math.round(m.margen_op * 100)}%`}</text>
+          <text x={x(i)} y={H - 6} textAnchor="middle" fontSize="11" className="fill-ranch-marron/60">{MESES[m.mes - 1]}</text>
+        </g>
+      ))}
+    </svg>
   );
 }

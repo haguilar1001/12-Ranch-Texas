@@ -154,6 +154,8 @@ export interface FilaMesComparativo {
   fuenteActual: FuenteMes;
   /** El mes del año actual aún no empieza: no se compara (ni −100 % ni barra). */
   futuro: boolean;
+  /** Es el mes que va corriendo: está a medias, así que no entra en los totales comparables. */
+  enCurso: boolean;
 }
 
 export interface Comparativo {
@@ -171,7 +173,9 @@ const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep"
 
 /** Totales comparables: el año anterior se suma solo en los meses que ya pasaron este año. */
 export function totalesComparables(meses: FilaMesComparativo[]): Omit<Comparativo, "meses"> {
-  const transcurridos = meses.filter((m) => !m.futuro);
+  // Solo meses cerrados: el mes en curso (a medias) contra el mes completo del año anterior
+  // castigaría el total sin razón.
+  const transcurridos = meses.filter((m) => !m.futuro && !m.enCurso);
   const n = transcurridos.length;
   return {
     totalActual: transcurridos.reduce((a, m) => a + m.actual, 0),
@@ -199,6 +203,7 @@ export async function comparativoAnual(anio: number, producto?: string): Promise
     fuenteActual: m.fuente,
     fuenteAnterior: ant[i].fuente,
     futuro: esMesFuturo(anio, i + 1, hoy),
+    enCurso: `${anio}-${String(i + 1).padStart(2, "0")}` === hoy.slice(0, 7),
   }));
   return { meses, ...totalesComparables(meses) };
 }
@@ -212,12 +217,14 @@ export interface FilaProductoMes {
   /** Meses cuyo valor sale de la taquilla en vivo. */
   taquilla: boolean[];
   total: number;
-  /** El mismo producto el año anterior, en los mismos meses transcurridos. */
+  /** Este año, solo meses cerrados (sin el mes en curso): la base justa para comparar. */
+  totalComparable: number;
+  /** El mismo producto el año anterior, en esos mismos meses cerrados. */
   totalAnterior: number;
 }
 
 /** Cuadro producto × mes de un año: histórico + ventas fuera de taquilla + taquilla (corte por mes). */
-export async function ventaPorProductoMes(anio: number): Promise<{ filas: FilaProductoMes[]; mesesTranscurridos: number }> {
+export async function ventaPorProductoMes(anio: number): Promise<{ filas: FilaProductoMes[]; mesesTranscurridos: number; mesesCerrados: number }> {
   const inicio = await inicioTaquilla();
   const hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);
   const datos = async (a: number) => {
@@ -228,6 +235,8 @@ export async function ventaPorProductoMes(anio: number): Promise<{ filas: FilaPr
   const productos = new Set<string>(LINEAS_TAQUILLA);
   for (const d of [act, ant]) d.hist.forEach((h) => Object.keys(h).forEach((p) => productos.add(p)));
   const mesesTranscurridos = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => !esMesFuturo(anio, m, hoy)).length;
+  const enCurso = +hoy.slice(0, 4) === anio;
+  const mesesCerrados = enCurso ? mesesTranscurridos - 1 : mesesTranscurridos;
 
   const valores = (d: typeof act, a: number, p: string) =>
     d.hist.map((h, i) => combinarMes(h, d.taq?.[i] ?? { ENTRADAS: 0, EVENTOS: 0 }, mesUsaTaquilla(inicio, a, i + 1), p));
@@ -239,9 +248,10 @@ export async function ventaPorProductoMes(anio: number): Promise<{ filas: FilaPr
       meses: v.map((x) => x.valor),
       taquilla: v.map((x) => x.fuente === "taquilla"),
       total: v.reduce((t, x) => t + x.valor, 0),
-      totalAnterior: w.slice(0, mesesTranscurridos).reduce((t, x) => t + x.valor, 0),
+      totalComparable: v.slice(0, mesesCerrados).reduce((t, x) => t + x.valor, 0),
+      totalAnterior: w.slice(0, mesesCerrados).reduce((t, x) => t + x.valor, 0),
     };
   }).filter((f) => f.total !== 0 || f.totalAnterior !== 0);
   filas.sort((a, b) => b.total - a.total || b.totalAnterior - a.totalAnterior);
-  return { filas, mesesTranscurridos };
+  return { filas, mesesTranscurridos, mesesCerrados };
 }
