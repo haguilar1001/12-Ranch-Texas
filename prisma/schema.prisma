@@ -1010,6 +1010,97 @@ model VentaOtra {
   @@map("ventas_otras")
 }
 
+// ------------------------- CARGA DE ARCHIVOS -------------------------
+// Archivos que se suben en Configuración → Carga de archivos. La app lee cada uno y carga sus
+// datos (estado de resultados, cuadro de ventas, venta histórica, presupuesto). Se guarda el
+// archivo original para poder descargarlo. Nada se borra: se anula (o se reemplaza al subir
+// otro del mismo periodo) y sus datos dejan de contar.
+
+enum TipoArchivo {
+  estado_resultados
+  cuadro_mes_producto
+  venta_historica
+  presupuesto
+}
+
+enum EstadoArchivo {
+  procesado
+  reemplazado
+  anulado
+}
+
+model ArchivoCargado {
+  id        String        @id @default(uuid())
+  tipo      TipoArchivo
+  nombre    String
+  mime      String
+  tamano    Int
+  contenido Bytes
+  anio      Int?
+  mes       Int?
+  estado    EstadoArchivo @default(procesado)
+  /// Qué se cargó (filas, totales, avisos), para mostrarlo en la pantalla.
+  resumen   Json?
+
+  motivo_anulacion String?
+  anulado_por      String?
+  anulado_en       DateTime?
+
+  lineas_pyg         EstadoResultadoLinea[]
+  lineas_presupuesto PresupuestoPygLinea[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([tipo, anio, mes])
+  @@index([estado])
+  @@map("archivos_cargados")
+}
+
+/// Una cuenta del estado de pérdidas y ganancias mensual, por unidad de negocio.
+/// Cuentan solo las de archivos en estado `procesado`.
+model EstadoResultadoLinea {
+  id         String @id @default(uuid())
+  archivo_id String
+  anio       Int
+  mes        Int
+  unidad     String // ADMINISTRACION, OPERATIVO, CABALLOS… como viene en el PDF
+  seccion    String // ingreso | costo_ventas | gasto
+  cuenta     String // ENTRADAS, NOMINA… como viene en el PDF
+  orden      Int // posición en el estado, para mostrarlo en el mismo orden
+  valor      Int // COP entero
+
+  archivo ArchivoCargado @relation(fields: [archivo_id], references: [id])
+
+  creado_en DateTime @default(now())
+
+  @@index([anio, mes])
+  @@index([archivo_id])
+  @@map("estado_resultados_lineas")
+}
+
+/// Una cuenta del P&G presupuestado. `mes` null = el mismo valor para cada mes del año.
+model PresupuestoPygLinea {
+  id         String @id @default(uuid())
+  archivo_id String
+  anio       Int
+  mes        Int?
+  seccion    String // ingreso | costo_ventas | gasto
+  cuenta     String
+  orden      Int
+  valor      Int
+
+  archivo ArchivoCargado @relation(fields: [archivo_id], references: [id])
+
+  creado_en DateTime @default(now())
+
+  @@index([anio])
+  @@index([archivo_id])
+  @@map("presupuesto_pyg_lineas")
+}
+
 // ============================================================================
 //  MÓDULOS OPERATIVOS (F10) — Personal, Animales, Equipos
 //  Maestros/parámetros que se afinan con datos reales (carga por Excel).

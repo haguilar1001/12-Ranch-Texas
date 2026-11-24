@@ -122,7 +122,10 @@ export function construirMenu(rol: string): SeccionMenu[] {
         },
         {
           titulo: "Finanzas",
-          filas: [["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado", consulta]],
+          filas: [
+            ["📑", "Estado de resultados", "/admin/reportes/estado-resultados", "P&G mes a mes contra el presupuesto", consulta],
+            ["🧾", "Gastos y P&G", "/admin/reportes/gastos", "Presupuesto vs. ejecutado de gastos registrados", consulta],
+          ],
         },
         {
           titulo: "Operación",
@@ -168,6 +171,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
           titulo: "Sistema",
           filas: [
             ["🚙", "Vehículos y solicitantes", "/admin/vehiculos", "Catálogo de vehículos y de quién puede pedirlos", admin],
+            ["📤", "Carga de archivos", "/admin/archivos", "Estados de resultados, venta por mes, histórico y presupuesto", admin],
             ["👤", "Usuarios y perfiles", "/admin/usuarios", "Crear, activar y resetear clave", admin],
             ["🖨️", "Diagnóstico de impresora", "/admin/impresora", "Probar la Zebra", supervisor],
           ],
