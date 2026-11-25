@@ -56,10 +56,18 @@ export function construirMenu(rol: string): SeccionMenu[] {
       label: "Equipos parque",
       grupos: [
         {
+          titulo: "Mantenimiento",
+          filas: [
+            ["🛠️", "Tablero de mantenimiento", "/admin/equipos/mantenimiento", "Fallas, preventivos, órdenes e indicadores", supervisor],
+            ["🗓️", "Planes preventivos", "/admin/equipos/planes", "Qué se hace y cada cuánto", supervisor],
+            ["⚠️", "Reportar falla", "/reportar-falla", "Un equipo no funciona bien", true],
+          ],
+        },
+        {
+          titulo: "Inventario",
           filas: [
             ["📋", "Inventario", "/admin/equipos?tab=inventario", "Equipos, estado y ubicación", supervisor],
             ["📝", "Novedades", "/admin/equipos?tab=novedades", "Compras, bajas, traslados y ajustes", supervisor],
-            ["🛠️", "Mantenimientos", "/admin/equipos?tab=mantenimientos", "Programados y realizados", supervisor],
             ["🗂️", "Grupos", "/admin/equipos?tab=grupos", "Categorías de equipos", supervisor],
           ],
         },

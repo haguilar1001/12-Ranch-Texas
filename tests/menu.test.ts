@@ -22,12 +22,12 @@ describe("menú lateral", () => {
   });
 
   it("cada rol ve solo lo suyo (las secciones vacías no salen)", () => {
-    expect(ids("granja")).toEqual(["inicio", "animales", "reportes"]);
+    expect(ids("granja")).toEqual(["inicio", "equipos", "animales", "reportes"]);
     expect(ids("consulta")).toContain("financiero");
     expect(hrefs("consulta")).not.toContain("/admin/nomina-presupuesto");
     expect(hrefs("granja")).toContain("/admin/reportes/inventarios");
-    expect(ids("chofer")).toEqual(["inicio", "vehiculos"]);
-    expect(hrefs("chofer")).toEqual(["/", "/vehiculos/mis-viajes"]);
+    expect(ids("chofer")).toEqual(["inicio", "equipos", "vehiculos"]);
+    expect(hrefs("chofer")).toEqual(["/", "/reportar-falla", "/vehiculos/mis-viajes"]); // cualquiera reporta fallas
     expect(hrefs("cajero")).toContain("/taquilla");
     expect(ids("cajero")).not.toContain("configuracion");
     expect(hrefs("supervisor")).not.toContain("/admin/tarifas");
@@ -42,6 +42,7 @@ describe("menú lateral", () => {
     expect(enlaceActivo(menu, "/admin/animales", "dieta")).toBe("/admin/animales?tab=dieta");
     expect(enlaceActivo(menu, "/admin/animales", null)).toBe("/admin/animales?tab=inventario");
     expect(enlaceActivo(menu, "/admin/equipos", "grupos")).toBe("/admin/equipos?tab=grupos");
+    expect(enlaceActivo(menu, "/admin/equipos/mantenimiento/abc", null)).toBe("/admin/equipos/mantenimiento");
     expect(enlaceActivo(menu, "/login", null)).toBeNull();
   });
 });

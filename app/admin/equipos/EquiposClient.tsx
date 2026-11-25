@@ -8,7 +8,7 @@ import {
   crearGrupoEquipo, editarGrupoEquipo, cambiarEstadoGrupoEquipo,
   crearEquipo, editarEquipo, cambiarEstadoEquipo, trasladarEquipo,
   registrarNovedadEquipo, anularNovedadEquipo,
-  crearMantenimiento, actualizarMantenimiento, cargarEquiposExcel,
+  cargarEquiposExcel,
   type EntradaEquipo, type ResultadoCarga,
 } from "./actions";
 import MenuAcciones from "@/components/MenuAcciones";
@@ -61,7 +61,6 @@ type Pestana = "inventario" | "novedades" | "mantenimientos" | "grupos";
 const PESTANAS: { id: Pestana; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "novedades", label: "Novedades" },
-  { id: "mantenimientos", label: "Mantenimientos" },
   { id: "grupos", label: "Grupos" },
 ];
 
@@ -158,7 +157,12 @@ export default function EquiposClient(p: Props) {
       {tab === "novedades" && (
         <Novedades esAdmin={p.esAdmin} hoy={p.hoy} equipos={p.equipos} movimientos={p.movimientos} resumenMes={p.resumenMes} inicial={novedadPara} busy={busy} correr={correr} />
       )}
-      {tab === "mantenimientos" && <Mantenimientos hoy={p.hoy} equipos={p.equipos} mantenimientos={p.mantenimientos} busy={busy} correr={correr} />}
+      {tab === "mantenimientos" && (
+        <section className={`${card} p-5 text-sm`}>
+          <p className="mb-2 text-ranch-marron">El mantenimiento ahora tiene su propio módulo: fallas reportadas, planes preventivos que se programan solos, órdenes con repuestos, costos y fotos.</p>
+          <a href="/admin/equipos/mantenimiento" className="inline-block rounded-lg bg-ranch-marron px-4 py-2 font-semibold text-ranch-crema">Ir al tablero de mantenimiento</a>
+        </section>
+      )}
       {tab === "grupos" && <Grupos grupos={p.grupos} busy={busy} correr={correr} />}
     </main>
   );
@@ -475,7 +479,7 @@ function FilaEquipo({
       <tr className={`border-t border-ranch-marron/10 align-top ${e.cantidad === 0 ? "opacity-50" : ""}`}>
         <td className="px-3 py-2 font-mono text-xs text-ranch-marron/70">{e.codigo ?? "—"}</td>
         <td className="px-3 py-2 font-semibold text-ranch-marron">
-          {e.nombre}
+          <a href={`/admin/equipos/${e.id}`} className="hover:underline" title="Hoja de vida">{e.nombre}</a>
           <span className="block text-xs font-normal text-ranch-marron/50">
             {[e.serie && `Serie ${e.serie}`, e.responsable && `A cargo: ${e.responsable}`, garantiaVigente && `Garantía hasta ${e.garantia_hasta}`].filter(Boolean).join(" · ")}
           </span>
@@ -709,91 +713,6 @@ function Novedades({
 }
 
 // ------------------------------------------------------------------ MANTENIMIENTOS
-
-function Mantenimientos({ hoy, equipos, mantenimientos, busy, correr }: Pick<Props, "hoy" | "equipos" | "mantenimientos"> & { busy: boolean; correr: Correr }) {
-  const vacio = { equipo_id: "", tipo: "preventivo", descripcion: "", fecha_programada: hoy, responsable: "", costo: "" };
-  const [f, setF] = useState(vacio);
-  const [cerrando, setCerrando] = useState<{ id: string; costo: string; fecha_realizada: string } | null>(null);
-  const [verTodos, setVerTodos] = useState(false);
-  const visibles = verTodos ? mantenimientos : mantenimientos.filter((m) => m.estado === "programado" || m.estado === "en_proceso");
-
-  return (
-    <>
-      <section className={`mb-4 ${card} p-4`}>
-        <h2 className="mb-3 font-bold text-ranch-marron">Programar mantenimiento</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <select className={input} value={f.equipo_id} onChange={(e) => setF({ ...f, equipo_id: e.target.value })}>
-            <option value="">Equipo…</option>
-            {equipos.filter((e) => e.cantidad > 0).map((e) => <option key={e.id} value={e.id}>{e.codigo ? `${e.codigo} · ` : ""}{e.nombre}</option>)}
-          </select>
-          <select className={input} value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>
-            <option value="preventivo">Preventivo</option>
-            <option value="correctivo">Correctivo (reparación)</option>
-          </select>
-          <label className="flex flex-col text-xs text-ranch-marron/60">
-            Fecha programada
-            <input className={input} type="date" value={f.fecha_programada} onChange={(e) => setF({ ...f, fecha_programada: e.target.value })} />
-          </label>
-          <input className={`${input} sm:col-span-3`} placeholder="Qué se va a hacer (p. ej. cambio de aceite y filtros)" value={f.descripcion} onChange={(e) => setF({ ...f, descripcion: e.target.value })} />
-          <input className={input} placeholder="Responsable (técnico o proveedor)" value={f.responsable} onChange={(e) => setF({ ...f, responsable: e.target.value })} />
-          <input className={input} inputMode="numeric" placeholder="Costo estimado ($)" value={f.costo} onChange={(e) => setF({ ...f, costo: e.target.value })} />
-        </div>
-        <button className={`${boton} mt-3`} disabled={busy} onClick={async () => { if (await correr(() => crearMantenimiento(f), "Mantenimiento programado.")) setF(vacio); }}>Programar</button>
-      </section>
-
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="font-bold text-ranch-marron">{verTodos ? "Todos los mantenimientos" : "Pendientes"}</h2>
-        <label className="flex items-center gap-1 text-xs text-ranch-marron/70">
-          <input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} /> Ver realizados y cancelados
-        </label>
-      </div>
-      <div className={`overflow-x-auto ${card}`}>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-ranch-crema/60">
-            <tr>
-              <th className={th}>Equipo</th><th className={th}>Tipo</th><th className={th}>Descripción</th>
-              <th className={th}>Programado</th><th className={`${th} text-right`}>Costo</th><th className={th}>Estado</th><th className={th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map((m) => (
-              <tr key={m.id} className="border-t border-ranch-marron/10 align-top">
-                <td className="px-3 py-2 font-semibold text-ranch-marron">{m.equipo}{m.codigo && <span className="block font-mono text-xs font-normal text-ranch-marron/50">{m.codigo}</span>}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{m.tipo}</td>
-                <td className="px-3 py-2 text-ranch-marron/70">{m.descripcion}{m.responsable && <span className="block text-xs text-ranch-marron/50">{m.responsable}</span>}</td>
-                <td className={`whitespace-nowrap px-3 py-2 ${m.vencido ? "font-semibold text-red-600" : "text-ranch-marron/70"}`}>
-                  {m.fecha_programada ?? "—"}{m.vencido && <span className="block text-xs">vencido</span>}
-                  {m.fecha_realizada && <span className="block text-xs text-ranch-verde">hecho {m.fecha_realizada}</span>}
-                </td>
-                <td className="px-3 py-2 text-right text-ranch-marron/70">{formatearCOP(m.costo)}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ESTADO_MANT[m.estado] ?? ""}`}>{etiquetaEstado(m.estado)}</span></td>
-                <td className="px-3 py-2">
-                  {cerrando?.id === m.id ? (
-                    <div className="flex flex-wrap justify-end gap-1">
-                      <input className={`${input} w-32`} inputMode="numeric" placeholder="Costo real" value={cerrando.costo} onChange={(e) => setCerrando({ ...cerrando, costo: e.target.value })} />
-                      <input className={input} type="date" max={hoy} value={cerrando.fecha_realizada} onChange={(e) => setCerrando({ ...cerrando, fecha_realizada: e.target.value })} />
-                      <button className={botonSec} disabled={busy} onClick={async () => { if (await correr(() => actualizarMantenimiento(m.id, { estado: "realizado", costo: cerrando.costo || null, fecha_realizada: cerrando.fecha_realizada }), "Mantenimiento cerrado.")) setCerrando(null); }}>Guardar</button>
-                      <button className={botonSec} onClick={() => setCerrando(null)}>No</button>
-                    </div>
-                  ) : (m.estado === "programado" || m.estado === "en_proceso") && (
-                    <div className="flex flex-wrap justify-end gap-1">
-                      {m.estado === "programado" && <button className={botonSec} disabled={busy} onClick={() => correr(() => actualizarMantenimiento(m.id, { estado: "en_proceso" }), "Mantenimiento en proceso; el equipo quedó en mantenimiento.")}>Iniciar</button>}
-                      <button className={botonSec} onClick={() => setCerrando({ id: m.id, costo: m.costo ? String(m.costo) : "", fecha_realizada: hoy })}>Realizado</button>
-                      <button className={botonSec} disabled={busy} onClick={() => correr(() => actualizarMantenimiento(m.id, { estado: "cancelado" }), "Mantenimiento cancelado.")}>Cancelar</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {visibles.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-ranch-marron/50">Sin mantenimientos pendientes.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-// ------------------------------------------------------------------ GRUPOS
 
 function Grupos({ grupos, busy, correr }: { grupos: Props["grupos"]; busy: boolean; correr: Correr }) {
   const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "" });

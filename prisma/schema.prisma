@@ -774,6 +774,8 @@ model Proveedor {
   compras_alimento CompraAlimento[]
   equipos          Equipo[]
 
+  mantenimientos_equipo MantenimientoEquipo[]
+
   creado_en       DateTime @default(now())
   creado_por      String?
   actualizado_en  DateTime @updatedAt
@@ -836,7 +838,8 @@ model Gasto {
   area        AreaTrabajo?     @relation(fields: [area_id], references: [id])
   solicitante Empleado?        @relation(fields: [solicitante_id], references: [id])
 
-  compra_alimento CompraAlimento? // si el gasto nació de una compra de alimento
+  compra_alimento      CompraAlimento? // si el gasto nació de una compra de alimento
+  mantenimiento_equipo MantenimientoEquipo? // si el gasto nació de una orden de mantenimiento
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1207,6 +1210,8 @@ model Empleado {
 
   gastos_solicitados Gasto[]
   equipos_a_cargo    Equipo[]
+
+  mantenimientos_equipo MantenimientoEquipo[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1609,6 +1614,7 @@ model CategoriaEquipo {
   activo      Boolean @default(true)
 
   equipos Equipo[]
+  planes  PlanMantenimiento[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1640,6 +1646,10 @@ model Equipo {
   estado            EstadoEquipo @default(operativo)
   observaciones     String?
   activo            Boolean      @default(true)
+  /// Lleva horómetro (plantas, karts, motos, botes): los preventivos pueden ir por horas de uso.
+  usa_horometro     Boolean      @default(false)
+  /// Última lectura del horómetro, en horas. Se actualiza con cada lectura (lecturas_horometro).
+  horometro         Int?
 
   categoria      CategoriaEquipo       @relation(fields: [categoria_id], references: [id])
   area           AreaTrabajo?          @relation(fields: [area_id], references: [id])
@@ -1647,6 +1657,9 @@ model Equipo {
   responsable    Empleado?             @relation(fields: [responsable_id], references: [id])
   mantenimientos MantenimientoEquipo[]
   movimientos    MovimientoEquipo[]
+  planes         PlanMantenimiento[]
+  lecturas       LecturaHorometro[]
+  fallas         ReporteFalla[]
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1712,11 +1725,34 @@ model MantenimientoEquipo {
   descripcion      String
   fecha_programada DateTime?
   fecha_realizada  DateTime?
-  costo            Int                 @default(0)
-  responsable      String? // empleado o proveedor (texto libre en el boceto)
+  costo            Int                 @default(0) // total = repuestos_total + mano_obra
+  responsable      String? // texto libre (registros viejos); los nuevos usan empleado / proveedor
   estado           EstadoMantenimiento @default(programado)
 
-  equipo Equipo @relation(fields: [equipo_id], references: [id])
+  plan_id              String? // preventivo generado por un plan
+  ejecutor             EjecutorMantenimiento?
+  empleado_id          String? // lo hizo alguien del parque
+  proveedor_id         String? // lo hizo un tercero
+  trabajos_realizados  String?
+  observaciones        String?
+  repuestos_total      Int                    @default(0)
+  mano_obra            Int                    @default(0)
+  fecha_inicio         DateTime?
+  horas_fuera_servicio Int? // horas que el equipo estuvo parado por esta orden
+  horometro            Int? // lectura al cerrar la orden
+  horometro_objetivo   Int? // preventivo por horas: se hace al llegar a estas horas
+  numero_factura       String?
+  gasto_id             String?                @unique // gasto pendiente que nace al cerrar con costo
+  motivo_cancelacion   String?
+
+  equipo    Equipo                  @relation(fields: [equipo_id], references: [id])
+  plan      PlanMantenimiento?      @relation(fields: [plan_id], references: [id])
+  empleado  Empleado?               @relation(fields: [empleado_id], references: [id])
+  proveedor Proveedor?              @relation(fields: [proveedor_id], references: [id])
+  gasto     Gasto?                  @relation(fields: [gasto_id], references: [id])
+  repuestos RepuestoMantenimiento[]
+  fotos     FotoMantenimiento[]
+  falla     ReporteFalla?
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -1725,7 +1761,144 @@ model MantenimientoEquipo {
 
   @@index([equipo_id])
   @@index([estado])
+  @@index([plan_id])
   @@map("mantenimientos_equipo")
+}
+
+enum EjecutorMantenimiento {
+  interno // personal del parque
+  externo // proveedor / técnico contratado
+}
+
+/// Plan de mantenimiento preventivo: qué se hace y cada cuánto. Aplica a UN equipo o a todo un
+/// GRUPO. La app programa sola la siguiente orden de cada equipo (por fecha y/o por horas de uso).
+model PlanMantenimiento {
+  id               String  @id @default(uuid())
+  nombre           String // "Cambio de aceite y filtro"
+  instrucciones    String? // lista de chequeo, una tarea por renglón
+  equipo_id        String?
+  categoria_id     String?
+  frecuencia_dias  Int? // cada cuántos días (30 = mensual)
+  frecuencia_horas Int? // cada cuántas horas de uso (equipos con horómetro)
+  aviso_dias       Int     @default(7) // cuántos días antes avisa
+  costo_estimado   Int?
+  activo           Boolean @default(true)
+
+  equipo         Equipo?               @relation(fields: [equipo_id], references: [id])
+  categoria      CategoriaEquipo?      @relation(fields: [categoria_id], references: [id])
+  mantenimientos MantenimientoEquipo[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([equipo_id])
+  @@index([categoria_id])
+  @@map("planes_mantenimiento")
+}
+
+/// Lectura del horómetro (horas de uso acumuladas). La última queda en equipos.horometro.
+model LecturaHorometro {
+  id        String   @id @default(uuid())
+  equipo_id String
+  fecha     DateTime @default(now())
+  horas     Int
+  origen    String   @default("manual") // manual | mantenimiento
+  equipo    Equipo   @relation(fields: [equipo_id], references: [id])
+
+  creado_en  DateTime @default(now())
+  creado_por String?
+
+  @@index([equipo_id, fecha])
+  @@map("lecturas_horometro")
+}
+
+enum PrioridadFalla {
+  baja
+  media
+  alta
+  critica // equipo detenido o riesgo para visitantes
+}
+
+enum EstadoFalla {
+  abierta
+  en_atencion // ya tiene orden correctiva
+  resuelta
+  descartada
+}
+
+/// Falla o daño reportado por cualquier usuario (operario, cajero...). El supervisor la convierte
+/// en orden correctiva o la descarta con motivo.
+model ReporteFalla {
+  id               String         @id @default(uuid())
+  equipo_id        String
+  descripcion      String
+  prioridad        PrioridadFalla @default(media)
+  equipo_detenido  Boolean        @default(false)
+  estado           EstadoFalla    @default(abierta)
+  mantenimiento_id String?        @unique
+  motivo_cierre    String?
+
+  equipo        Equipo               @relation(fields: [equipo_id], references: [id])
+  mantenimiento MantenimientoEquipo? @relation(fields: [mantenimiento_id], references: [id])
+  fotos         FotoMantenimiento[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([equipo_id])
+  @@index([estado])
+  @@map("reportes_falla")
+}
+
+/// Repuesto o insumo usado en una orden de mantenimiento.
+model RepuestoMantenimiento {
+  id               String  @id @default(uuid())
+  mantenimiento_id String
+  descripcion      String
+  cantidad         Decimal @db.Decimal(10, 2)
+  unidad           String?
+  precio_unitario  Int
+  subtotal         Int
+
+  mantenimiento MantenimientoEquipo @relation(fields: [mantenimiento_id], references: [id])
+
+  creado_en  DateTime @default(now())
+  creado_por String?
+
+  @@index([mantenimiento_id])
+  @@map("repuestos_mantenimiento")
+}
+
+enum TipoFotoMantenimiento {
+  falla
+  antes
+  despues
+  factura
+}
+
+/// Foto de evidencia (se comprime en el celular antes de subirla).
+model FotoMantenimiento {
+  id               String                @id @default(uuid())
+  falla_id         String?
+  mantenimiento_id String?
+  tipo             TipoFotoMantenimiento
+  mime             String
+  tamano           Int
+  contenido        Bytes
+
+  falla         ReporteFalla?        @relation(fields: [falla_id], references: [id])
+  mantenimiento MantenimientoEquipo? @relation(fields: [mantenimiento_id], references: [id])
+
+  creado_en  DateTime @default(now())
+  creado_por String?
+
+  @@index([falla_id])
+  @@index([mantenimiento_id])
+  @@map("fotos_mantenimiento")
 }
 
 // ------------------------- CONTROL DE VEHÍCULOS -------------------------

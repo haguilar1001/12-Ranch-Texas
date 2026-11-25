@@ -83,6 +83,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
     ["💵", "Caja y turno", "/caja/turno", tieneRol(s.rol, "cajero")],
     ["🚪", "Escaneo", "/escaneo", tieneRol(s.rol, "control_acceso")],
     ["🐄", "Alimentación", "/admin/animales?tab=bitacora", puedeOperarGranja(s.rol)],
+    ["⚠️", "Reportar falla", "/reportar-falla", true],
     ["🚗", "Mis viajes", "/vehiculos/mis-viajes", puedeConducir(s.rol) && !tieneRol(s.rol, "supervisor")],
   ] as [string, string, string, boolean][]).filter((a) => a[3]);
 
@@ -297,8 +298,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
               {d.equipos && (
                 <Tarjeta
                   titulo="Equipos"
-                  enlace={{ href: "/admin/equipos?tab=mantenimientos", texto: "Ver mantenimientos" }}
-                  conclusion={d.equipos.mantVencidos ? `${d.equipos.mantVencidos} mantenimiento(s) programado(s) ya vencido(s).` : "Sin mantenimientos vencidos."}
+                  enlace={{ href: "/admin/equipos/mantenimiento", texto: "Ver mantenimiento" }}
+                  conclusion={[
+                    d.equipos.fallas ? `${d.equipos.fallas} falla(s) por atender${d.equipos.fallasCriticas ? ` (${d.equipos.fallasCriticas} crítica(s))` : ""}` : "Sin fallas pendientes",
+                    d.equipos.mantVencidos ? `${d.equipos.mantVencidos} mantenimiento(s) vencido(s)` : null,
+                    d.equipos.mantProximos ? `${d.equipos.mantProximos} próximo(s)` : null,
+                  ].filter(Boolean).join(" · ") + "."}
                 >
                   <BarraEstados partes={[
                     { nombre: "Operativos", valor: eq.operativo ?? 0, color: "bg-ranch-verde" },

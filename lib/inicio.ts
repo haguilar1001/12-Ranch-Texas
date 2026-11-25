@@ -4,6 +4,7 @@ import { comparativoAnual, ventaPorProductoMes, type Comparativo } from "./repor
 import { estadoResultados, aniosConEstadoResultados } from "./reportes/estado-resultados";
 import { analisisFinanciero, type Analisis } from "./analisis/financiero";
 import { inicioDelDiaOperativo, fechaBogota } from "./tiempo";
+import { alertasEquipos } from "./equipos/mantenimiento";
 
 // Datos del tablero de Inicio: la realidad del parque en una pantalla. Cada bloque se pide solo si
 // el rol lo puede ver; lo que no aplica llega en null y la página no lo dibuja.
@@ -32,7 +33,7 @@ export interface DatosInicio {
   mezcla: { producto: string; total: number }[] | null;
   /** Análisis financiero del año del último estado de resultados (equilibrio, alertas…). */
   analisis: Analisis | null;
-  equipos: { porEstado: Record<string, number>; mantVencidos: number } | null;
+  equipos: { porEstado: Record<string, number>; mantVencidos: number; mantProximos: number; fallas: number; fallasCriticas: number } | null;
   animales: { porEstado: Record<string, number>; sinUbicar: number } | null;
   vehiculos: { pendientes: number } | null;
 }
@@ -139,11 +140,17 @@ export async function datosInicio(
     permisos.cifras ? ventaPorProductoMes(anio).then((r) => r.filas.map((f) => ({ producto: f.producto, total: f.total })).filter((f) => f.total > 0)) : Promise.resolve(null),
     permisos.equipos
       ? (async () => {
-          const [g, venc] = await Promise.all([
+          const [g, alertas] = await Promise.all([
             prisma.equipo.groupBy({ by: ["estado"], where: { activo: true }, _sum: { cantidad: true } }),
-            prisma.mantenimientoEquipo.count({ where: { estado: "programado", fecha_programada: { lt: inicioHoy } } }),
+            alertasEquipos(),
           ]);
-          return { porEstado: Object.fromEntries(g.map((x) => [x.estado, x._sum.cantidad ?? 0])), mantVencidos: venc };
+          const fallas = alertas.filter((a) => a.tipo === "falla");
+          return {
+            porEstado: Object.fromEntries(g.map((x) => [x.estado, x._sum.cantidad ?? 0])),
+            mantVencidos: alertas.filter((a) => a.tipo === "vencido").length,
+            mantProximos: alertas.filter((a) => a.tipo === "proximo").length,
+            fallas: fallas.length, fallasCriticas: fallas.filter((a) => a.nivel === "critica").length,
+          };
         })()
       : Promise.resolve(null),
     permisos.animales
