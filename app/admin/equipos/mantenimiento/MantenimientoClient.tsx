@@ -8,7 +8,7 @@ import type { AlertaEquipo } from "@/lib/equipos/mantenimiento";
 import type { IndicadoresMantenimiento } from "@/lib/equipos/indicadores";
 import { formatearCOP } from "@/lib/dinero/cop";
 
-interface Falla { id: string; equipo: string; codigo: string | null; equipoId: string; descripcion: string; prioridad: string; detenido: boolean; fecha: string; reporto: string; fotos: string[] }
+interface Falla { id: string; equipo: string; codigo: string | null; equipoId: string; descripcion: string; solucion: string | null; prioridad: string; detenido: boolean; fecha: string; reporto: string; fotos: string[] }
 interface Abierta { id: string; equipo: string; codigo: string | null; grupo: string; equipoId: string; tipo: string; descripcion: string; estado: string; fecha: string | null; horasObjetivo: number | null; horometro: number | null; vencimiento: "vencido" | "proximo" | "al_dia"; dePlan: boolean }
 interface Realizada { id: string; equipo: string; codigo: string | null; tipo: string; descripcion: string; fecha: string | null; quien: string; costo: number }
 
@@ -123,6 +123,7 @@ export default function MantenimientoClient(p: {
                     <Link href={`/admin/equipos/${f.equipoId}`} className="font-bold text-ranch-marron underline-offset-2 hover:underline">{f.equipo}{f.codigo ? ` (${f.codigo})` : ""}</Link>
                   </div>
                   <p className="mt-1 text-sm text-ranch-marron/80">{f.descripcion}</p>
+                  {f.solucion && <p className="text-sm text-ranch-marron/70"><b>Solución sugerida:</b> {f.solucion}</p>}
                   <p className="text-xs text-ranch-marron/50">Reportó {f.reporto} · {new Date(f.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}</p>
                   {f.fotos.length > 0 && (
                     <div className="mt-2 flex gap-2">

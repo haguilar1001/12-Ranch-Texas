@@ -1834,6 +1834,8 @@ model ReporteFalla {
   id               String         @id @default(uuid())
   equipo_id        String
   descripcion      String
+  /// Lo que propone quien reporta para arreglarlo (opcional).
+  solucion_sugerida String?
   prioridad        PrioridadFalla @default(media)
   equipo_detenido  Boolean        @default(false)
   estado           EstadoFalla    @default(abierta)

@@ -8,7 +8,7 @@ import ResumenFallaWhatsApp from "@/components/ResumenFallaWhatsApp";
 import type { DatosResumenFalla } from "@/lib/equipos/resumen-falla";
 
 interface EquipoOpcion { id: string; nombre: string; codigo: string | null; grupo: string; ubicacion: string | null; estado: string }
-interface Mio { id: string; equipo: string; codigo: string | null; grupo: string; ubicacion: string | null; descripcion: string; estado: string; prioridad: string; detenido: boolean; fotos: number; fotoIds: string[]; fecha: string }
+interface Mio { id: string; equipo: string; codigo: string | null; grupo: string; ubicacion: string | null; descripcion: string; solucion: string | null; estado: string; prioridad: string; detenido: boolean; fotos: number; fotoIds: string[]; fecha: string }
 
 const PRIORIDADES = [
   { id: "baja", label: "Baja", ayuda: "Detalle estético o menor" },
@@ -24,6 +24,7 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
   const [buscar, setBuscar] = useState("");
   const [equipo, setEquipo] = useState<EquipoOpcion | null>(null);
   const [descripcion, setDescripcion] = useState("");
+  const [solucion, setSolucion] = useState("");
   const [prioridad, setPrioridad] = useState("media");
   const [detenido, setDetenido] = useState(false);
   const [fotos, setFotos] = useState<File[]>([]);
@@ -46,18 +47,18 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
     if (!equipo) { setMsg({ ok: false, t: "Escoge el equipo." }); return; }
     setEnviando(true); setMsg(null);
     const fd = new FormData();
-    fd.set("equipo_id", equipo.id); fd.set("descripcion", descripcion); fd.set("prioridad", prioridad); fd.set("detenido", detenido ? "si" : "no");
+    fd.set("equipo_id", equipo.id); fd.set("descripcion", descripcion); fd.set("solucion_sugerida", solucion); fd.set("prioridad", prioridad); fd.set("detenido", detenido ? "si" : "no");
     fotos.forEach((f) => fd.append("fotos", f));
     const r = await reportarFalla(fd);
     setEnviando(false);
     if (r.ok) {
       if (r.id) setResumen({
-        datos: { id: r.id, equipo: equipo.nombre, codigo: equipo.codigo, grupo: equipo.grupo, ubicacion: equipo.ubicacion, descripcion: descripcion.trim(),
+        datos: { id: r.id, equipo: equipo.nombre, codigo: equipo.codigo, grupo: equipo.grupo, ubicacion: equipo.ubicacion, descripcion: descripcion.trim(), solucion: solucion.trim() || null,
           prioridad, detenido, reportadoPor: usuario, fecha: new Date().toISOString(), fotos: fotos.length },
         foto: fotos[0] ?? null,
       });
       setMsg({ ok: true, t: `Falla reportada: ${equipo.nombre}. Mantenimiento ya la ve.` });
-      setEquipo(null); setBuscar(""); setDescripcion(""); setPrioridad("media"); setDetenido(false); setFotos([]); setClaveFotos((k) => k + 1);
+      setEquipo(null); setBuscar(""); setDescripcion(""); setSolucion(""); setPrioridad("media"); setDetenido(false); setFotos([]); setClaveFotos((k) => k + 1);
       router.refresh();
     } else setMsg({ ok: false, t: r.error ?? "No se pudo enviar." });
   }
@@ -100,8 +101,13 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
           <textarea id="descripcion" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} placeholder="Ej.: el kart no arranca, se apaga al acelerar" className="mt-1 w-full rounded-xl border px-3 py-2 text-base" />
         </label>
 
+        <label className="block text-sm">
+          <span className="text-ranch-marron/70">3. Solución sugerida <span className="text-ranch-marron/40">(opcional)</span></span>
+          <textarea id="solucion" value={solucion} onChange={(e) => setSolucion(e.target.value)} rows={2} placeholder="Ej.: cambiar la bujía, revisar el filtro de gasolina" className="mt-1 w-full rounded-xl border px-3 py-2 text-base" />
+        </label>
+
         <fieldset>
-          <legend className="text-sm text-ranch-marron/70">3. ¿Qué tan grave es?</legend>
+          <legend className="text-sm text-ranch-marron/70">4. ¿Qué tan grave es?</legend>
           <div className="mt-1 grid grid-cols-2 gap-2">
             {PRIORIDADES.map((p) => (
               <button key={p.id} type="button" onClick={() => setPrioridad(p.id)} aria-pressed={prioridad === p.id}
@@ -118,7 +124,7 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
           <span><b className="text-ranch-marron">El equipo quedó detenido</b><span className="block text-xs text-ranch-marron/60">Se marca «fuera de servicio» hasta que lo reparen.</span></span>
         </label>
 
-        <FotosEvidencia key={claveFotos} onCambio={setFotos} etiqueta="4. Fotos (opcional, hasta 3)" />
+        <FotosEvidencia key={claveFotos} onCambio={setFotos} etiqueta="5. Fotos (opcional, hasta 3)" />
 
         <button type="button" onClick={enviar} disabled={enviando} className="w-full rounded-xl bg-ranch-marron py-3 text-lg font-bold text-ranch-crema disabled:opacity-50">
           {enviando ? "Enviando…" : "Reportar falla"}
@@ -135,6 +141,7 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
               <li key={m.id} className="rounded-xl border border-ranch-marron/15 bg-white px-3 py-2 text-sm">
                 <div className="flex justify-between gap-2"><b className="text-ranch-marron">{m.equipo}</b><span className={`text-xs ${m.estado === "resuelta" ? "text-green-700" : m.estado === "descartada" ? "text-ranch-marron/40" : "text-amber-700"}`}>{ESTADO[m.estado] ?? m.estado}</span></div>
                 <p className="text-ranch-marron/70">{m.descripcion}</p>
+                {m.solucion && <p className="text-xs text-ranch-marron/60"><b>Solución sugerida:</b> {m.solucion}</p>}
                 {m.fotoIds.length > 0 && (
                   <div className="mt-1 flex gap-1">
                     {m.fotoIds.map((id) => (
@@ -183,6 +190,7 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
 function EditarFalla({ mio, onListo }: { mio: Mio; onListo: (datos: Mio, foto: File | string | null) => void }) {
   const abierta = mio.estado === "abierta";
   const [descripcion, setDescripcion] = useState(mio.descripcion);
+  const [solucion, setSolucion] = useState(mio.solucion ?? "");
   const [prioridad, setPrioridad] = useState(mio.prioridad);
   const [detenido, setDetenido] = useState(mio.detenido);
   const [fotos, setFotos] = useState<File[]>([]);
@@ -193,13 +201,13 @@ function EditarFalla({ mio, onListo }: { mio: Mio; onListo: (datos: Mio, foto: F
   async function guardar() {
     setGuardando(true); setError(null);
     const fd = new FormData();
-    fd.set("falla_id", mio.id); fd.set("descripcion", descripcion); fd.set("prioridad", prioridad); fd.set("detenido", detenido ? "si" : "no");
+    fd.set("falla_id", mio.id); fd.set("descripcion", descripcion); fd.set("solucion_sugerida", solucion); fd.set("prioridad", prioridad); fd.set("detenido", detenido ? "si" : "no");
     fotos.forEach((f) => fd.append("fotos", f));
     const r = await editarFalla(fd);
     setGuardando(false);
     if (!r.ok) { setError(r.error ?? "No se pudo guardar."); return; }
     const foto = mio.fotoIds[0] ? `/admin/equipos/fotos/${mio.fotoIds[0]}` : fotos[0] ?? null;
-    onListo(abierta ? { ...mio, descripcion: descripcion.trim(), prioridad, detenido, fotos: mio.fotos + fotos.length } : { ...mio, fotos: mio.fotos + fotos.length }, foto);
+    onListo(abierta ? { ...mio, descripcion: descripcion.trim(), solucion: solucion.trim() || null, prioridad, detenido, fotos: mio.fotos + fotos.length } : { ...mio, fotos: mio.fotos + fotos.length }, foto);
   }
 
   return (
@@ -209,6 +217,10 @@ function EditarFalla({ mio, onListo }: { mio: Mio; onListo: (datos: Mio, foto: F
           <label className="block text-sm">
             <span className="text-ranch-marron/70">¿Qué le pasa?</span>
             <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-base" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-ranch-marron/70">Solución sugerida <span className="text-ranch-marron/40">(opcional)</span></span>
+            <textarea value={solucion} onChange={(e) => setSolucion(e.target.value)} rows={2} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-base" />
           </label>
           <div className="grid grid-cols-4 gap-1">
             {PRIORIDADES.map((p) => (

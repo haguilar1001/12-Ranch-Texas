@@ -55,8 +55,10 @@ async function dibujar(d: DatosResumenFalla, foto?: File | string | null): Promi
   const altoEnc = 150;
   const altoFilas = filas.reduce((a, f) => a + f.lineas.length * 30 + 14, 0);
   const altoDesc = 52 + desc.length * 30 + 20;
+  const sol = d.solucion ? partir(medir, d.solucion, W - PAD * 2 - 32).slice(0, 6) : [];
+  const altoSol = sol.length ? 52 + sol.length * 30 + 20 : 0;
   const altoFoto = img ? 300 : 0;
-  const H = altoEnc + 24 + altoFilas + 16 + altoDesc + altoFoto + 70;
+  const H = altoEnc + 24 + altoFilas + 16 + altoDesc + altoSol + altoFoto + 70;
 
   const c = document.createElement("canvas");
   const esc = 2; // nitidez en pantallas de celular
@@ -111,6 +113,16 @@ async function dibujar(d: DatosResumenFalla, foto?: File | string | null): Promi
   ctx.font = `22px ${FUENTE}`;
   desc.forEach((l, i) => ctx.fillText(l, PAD + 16, y + 68 + i * 30));
   y += altoDesc;
+
+  // Solución sugerida (si la escribieron)
+  if (sol.length) {
+    ctx.fillStyle = "#EEF6EA"; rect(ctx, PAD, y, W - PAD * 2, altoSol - 20, 16); ctx.fill();
+    ctx.fillStyle = "#57A23C"; ctx.fillRect(PAD, y + 12, 5, altoSol - 44);
+    ctx.fillStyle = MARRON; ctx.font = `800 18px ${FUENTE}`; ctx.fillText("SOLUCIÓN SUGERIDA", PAD + 16, y + 34);
+    ctx.font = `22px ${FUENTE}`;
+    sol.forEach((l, i) => ctx.fillText(l, PAD + 16, y + 68 + i * 30));
+    y += altoSol;
+  }
 
   // Foto (la primera, si hay)
   if (img) {

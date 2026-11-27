@@ -31,5 +31,7 @@ describe("resumen de falla para WhatsApp", () => {
     expect(t).toContain("*REPORTE DE FALLA #A1B2C3D4*");
     expect(t).toContain("*Falla:* No arranca");
     expect(t).toContain("🔴 Crítica");
+    expect(t).not.toContain("Solución sugerida");
+    expect(textoWhatsApp({ ...base, solucion: "Cambiar la bujía" })).toContain("*Solución sugerida:* Cambiar la bujía");
   });
 });

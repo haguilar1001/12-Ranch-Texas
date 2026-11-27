@@ -8,6 +8,7 @@ export interface DatosResumenFalla {
   grupo?: string | null;
   ubicacion?: string | null;
   descripcion: string;
+  solucion?: string | null;
   prioridad: string;
   detenido: boolean;
   reportadoPor: string;
@@ -54,5 +55,6 @@ export function textoWhatsApp(d: DatosResumenFalla): string {
     `🛠️ *REPORTE DE FALLA #${numeroReporte(d.id)}* — Ranch Texas`,
     ...filasResumen(d).map((f) => `*${f.etiqueta}:* ${f.etiqueta === "Prioridad" && p ? `${p.emoji} ` : ""}${f.valor}`),
     `*Falla:* ${d.descripcion}`,
+    ...(d.solucion ? [`*Solución sugerida:* ${d.solucion}`] : []),
   ].join("\n");
 }

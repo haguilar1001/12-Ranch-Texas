@@ -63,6 +63,7 @@ export async function reportarFalla(form: FormData): Promise<Resultado> {
   if (!equipo) return { ok: false, error: "Escoge el equipo." };
   const descripcion = texto(form.get("descripcion"));
   if (!descripcion) return { ok: false, error: "Cuenta qué le pasa al equipo." };
+  const solucion_sugerida = texto(form.get("solucion_sugerida"));
   const prioridad = String(form.get("prioridad") ?? "media");
   if (!["baja", "media", "alta", "critica"].includes(prioridad)) return { ok: false, error: "Escoge la prioridad." };
   const detenido = form.get("detenido") === "si";
@@ -71,7 +72,7 @@ export async function reportarFalla(form: FormData): Promise<Resultado> {
 
   const falla = await prisma.$transaction(async (tx) => {
     const r = await tx.reporteFalla.create({
-      data: { equipo_id: equipo.id, descripcion, prioridad: prioridad as "media", equipo_detenido: detenido, creado_por: s.id,
+      data: { equipo_id: equipo.id, descripcion, solucion_sugerida, prioridad: prioridad as "media", equipo_detenido: detenido, creado_por: s.id,
         fotos: { create: f.fotos.map((x) => ({ tipo: "falla" as const, mime: x.mime, tamano: x.datos.length, contenido: x.datos, creado_por: s.id })) } },
     });
     if (detenido && equipo.estado === "operativo") await tx.equipo.update({ where: { id: equipo.id }, data: { estado: "fuera_servicio", actualizado_por: s.id } });
@@ -102,13 +103,15 @@ export async function editarFalla(form: FormData): Promise<Resultado> {
   if (!f.ok) return f;
   if (falla._count.fotos + f.fotos.length > MAX_FOTOS) return { ok: false, error: `El reporte ya tiene ${falla._count.fotos} foto(s); el máximo es ${MAX_FOTOS}.` };
 
-  const data: { descripcion?: string; prioridad?: "media"; equipo_detenido?: boolean } = {};
+  const data: { descripcion?: string; solucion_sugerida?: string | null; prioridad?: "media"; equipo_detenido?: boolean } = {};
   if (falla.estado === "abierta") {
     const descripcion = texto(form.get("descripcion"));
     if (!descripcion) return { ok: false, error: "Cuenta qué le pasa al equipo." };
     const prioridad = String(form.get("prioridad") ?? falla.prioridad);
     if (!["baja", "media", "alta", "critica"].includes(prioridad)) return { ok: false, error: "Escoge la prioridad." };
     if (descripcion !== falla.descripcion) data.descripcion = descripcion;
+    const solucion = texto(form.get("solucion_sugerida"));
+    if (form.has("solucion_sugerida") && solucion !== falla.solucion_sugerida) data.solucion_sugerida = solucion;
     if (prioridad !== falla.prioridad) data.prioridad = prioridad as "media";
     // Solo se puede marcar como detenido: devolverlo a operativo lo decide mantenimiento.
     if (form.get("detenido") === "si" && !falla.equipo_detenido) data.equipo_detenido = true;
@@ -125,7 +128,7 @@ export async function editarFalla(form: FormData): Promise<Resultado> {
   });
   await registrarAuditoria({
     usuario_id: s.id, entidad: "reporte_falla", entidad_id: falla.id, accion: "editar",
-    datos_antes: { descripcion: falla.descripcion, prioridad: falla.prioridad, detenido: falla.equipo_detenido, fotos: falla._count.fotos },
+    datos_antes: { descripcion: falla.descripcion, solucion_sugerida: falla.solucion_sugerida, prioridad: falla.prioridad, detenido: falla.equipo_detenido, fotos: falla._count.fotos },
     datos_despues: { ...data, fotos_agregadas: f.fotos.length },
   });
   refrescar();
@@ -140,7 +143,7 @@ export async function crearOrdenDesdeFalla(fallaId: string): Promise<Resultado> 
   if (!f || f.estado !== "abierta") return { ok: false, error: "La falla ya no está abierta." };
   const orden = await prisma.$transaction(async (tx) => {
     const o = await tx.mantenimientoEquipo.create({
-      data: { equipo_id: f.equipo_id, tipo: "correctivo", descripcion: f.descripcion, fecha_programada: new Date(), estado: "programado", creado_por: s.id },
+      data: { equipo_id: f.equipo_id, tipo: "correctivo", descripcion: f.solucion_sugerida ? `${f.descripcion}\nSolución sugerida: ${f.solucion_sugerida}` : f.descripcion, fecha_programada: new Date(), estado: "programado", creado_por: s.id },
     });
     await tx.reporteFalla.update({ where: { id: f.id }, data: { estado: "en_atencion", mantenimiento_id: o.id, actualizado_por: s.id } });
     await tx.fotoMantenimiento.updateMany({ where: { falla_id: f.id }, data: { mantenimiento_id: o.id } });

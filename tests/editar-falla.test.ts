@@ -34,7 +34,7 @@ describe("editar reporte de falla", () => {
   beforeEach(() => {
     sesion.id = "u1"; sesion.rol = "consulta";
     db.update.mockReset(); db.equipoUpdate.mockReset();
-    db.falla = { id: "f1", equipo_id: "e1", descripcion: "No arranca", prioridad: "media", equipo_detenido: false, estado: "abierta", creado_por: "u1",
+    db.falla = { id: "f1", equipo_id: "e1", descripcion: "No arranca", solucion_sugerida: null, prioridad: "media", equipo_detenido: false, estado: "abierta", creado_por: "u1",
       equipo: { estado: "operativo" }, _count: { fotos: 0 } };
   });
 
@@ -73,6 +73,15 @@ describe("editar reporte de falla", () => {
     expect(r.ok).toBe(true);
     expect(db.update.mock.calls[0][0].data).toMatchObject({ descripcion: "Se apaga", prioridad: "critica", equipo_detenido: true });
     expect(db.equipoUpdate).toHaveBeenCalledOnce();
+  });
+
+  it("agrega y quita la solución sugerida", async () => {
+    let r = await editarFalla(form({ solucion_sugerida: "Cambiar la bujía" }));
+    expect(r.ok).toBe(true);
+    expect(db.update.mock.calls[0][0].data.solucion_sugerida).toBe("Cambiar la bujía");
+    db.falla!.solucion_sugerida = "Cambiar la bujía";
+    r = await editarFalla(form({ solucion_sugerida: "  " }));
+    expect(db.update.mock.calls[1][0].data.solucion_sugerida).toBeNull();
   });
 
   it("sin cambios avisa", async () => {

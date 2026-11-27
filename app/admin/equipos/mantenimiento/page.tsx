@@ -43,7 +43,7 @@ export default async function MantenimientoPage() {
       anio={anio}
       hoy={fechaBogota()}
       alertas={alertas}
-      fallas={fallas.map((f) => ({ id: f.id, equipo: f.equipo.nombre, codigo: f.equipo.codigo, equipoId: f.equipo.id, descripcion: f.descripcion, prioridad: f.prioridad, detenido: f.equipo_detenido, fecha: f.creado_en.toISOString(), reporto: f.creado_por ? usuarios.get(f.creado_por) ?? "—" : "—", fotos: f.fotos.map((x) => x.id) }))}
+      fallas={fallas.map((f) => ({ id: f.id, equipo: f.equipo.nombre, codigo: f.equipo.codigo, equipoId: f.equipo.id, descripcion: f.descripcion, solucion: f.solucion_sugerida, prioridad: f.prioridad, detenido: f.equipo_detenido, fecha: f.creado_en.toISOString(), reporto: f.creado_por ? usuarios.get(f.creado_por) ?? "—" : "—", fotos: f.fotos.map((x) => x.id) }))}
       abiertas={abiertas.map((o) => ({
         id: o.id, equipo: o.equipo.nombre, codigo: o.equipo.codigo, grupo: o.equipo.categoria.nombre, equipoId: o.equipo.id, tipo: o.tipo, descripcion: o.descripcion,
         estado: o.estado, fecha: iso(o.fecha_programada), horasObjetivo: o.horometro_objetivo, horometro: o.equipo.horometro,
