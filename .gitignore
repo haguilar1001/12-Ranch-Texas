@@ -38,3 +38,6 @@ Thumbs.db
 
 # datos exportados (CSV para Power BI, plan B)
 /export
+
+# wasm del lector QR (lo copia scripts/copiar-zxing-wasm.mjs)
+/public/vendor/zxing_reader.wasm

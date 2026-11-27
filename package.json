@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/copiar-zxing-wasm.mjs && next build",
     "start": "prisma migrate deploy && next start",
     "lint": "next lint",
     "test": "vitest run",
@@ -21,7 +21,7 @@
     "import:historico": "tsx scripts/import-historico.ts",
     "import:animales": "tsx scripts/import-inventario-animales.ts",
     "export:analitica": "tsx scripts/export-analitica.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copiar-zxing-wasm.mjs",
     "verificar:f12": "tsx scripts/verificar-f12.ts",
     "verificar:f13": "tsx scripts/verificar-f13.ts",
     "import:atracciones": "tsx scripts/import-atracciones.ts",
@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "barcode-detector": "^3.2.5",
     "bcryptjs": "^2.4.3",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",

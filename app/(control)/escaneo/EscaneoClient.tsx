@@ -21,12 +21,22 @@ const REGLA_TXT: Record<Punto["tipo_regla"], string> = {
 
 type Resultado = ResultadoEscaneo | { error: string };
 
+function mensajeError(e: unknown): string {
+  const nombre = e instanceof Error || e instanceof DOMException ? e.name : "";
+  if (nombre === "NotAllowedError") return "permiso de cámara denegado. Habilítalo en el navegador.";
+  if (nombre === "NotFoundError" || nombre === "OverconstrainedError") return "no se encontró ninguna cámara.";
+  if (nombre === "NotReadableError") return "la cámara está en uso por otra aplicación.";
+  if (nombre === "SecurityError") return "el navegador bloqueó la cámara (se requiere HTTPS).";
+  return e instanceof Error ? e.message : String(e);
+}
+
 export default function EscaneoClient({ usuario, puntos }: { usuario: string; puntos: Punto[] }) {
   const [punto, setPunto] = useState<Punto | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [historial, setHistorial] = useState<{ txt: string; ok: boolean }[]>([]);
   const [procesando, setProcesando] = useState(false);
   const [camara, setCamara] = useState(false);
+  const [errorCamara, setErrorCamara] = useState<string | null>(null);
   const [pendientes, setPendientes] = useState(0);
   const [offline, setOffline] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,34 +93,71 @@ export default function EscaneoClient({ usuario, puntos }: { usuario: string; pu
     } catch { /* sigue en cola */ }
   }
 
-  // Cámara con BarcodeDetector (mejora progresiva; si no está, se usa el lector manual/USB).
+  // Cámara: BarcodeDetector nativo (Android/Chrome) o, si no existe (Chrome Windows, Safari iOS),
+  // el ponyfill "barcode-detector" (ZXing/WASM), importado dinámicamente para no tocar el SSR.
   useEffect(() => {
     if (!camara || !punto) return;
-    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-    if (!BD) return;
+    setErrorCamara(null);
+    type Detector = { detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]> };
+    let cancelado = false;
     let stream: MediaStream | null = null;
     let raf = 0;
-    const detector = new BD({ formats: ["qr_code"] });
     (async () => {
+      let detector: Detector;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const Nativo = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+        if (Nativo) {
+          detector = new Nativo({ formats: ["qr_code"] });
+        } else {
+          const { BarcodeDetector, prepareZXingModule } = await import("barcode-detector/ponyfill");
+          // WASM servido desde la app (public/vendor), no desde el CDN: funciona en red local / sin internet.
+          prepareZXingModule({
+            overrides: { locateFile: (ruta: string, prefijo: string) => (ruta.endsWith(".wasm") ? "/vendor/zxing_reader.wasm" : prefijo + ruta) },
+          });
+          detector = new BarcodeDetector({ formats: ["qr_code"] });
+        }
+      } catch (e) {
+        if (!cancelado) setErrorCamara(`No se pudo cargar el lector QR: ${mensajeError(e)}`);
+        return;
+      }
+      if (cancelado) return;
+
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("El navegador no permite usar la cámara (se requiere HTTPS).");
+        }
+        // facingMode como preferencia (no exact): si no hay cámara trasera, usa la frontal.
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        if (cancelado) { stream.getTracks().forEach((t) => t.stop()); return; }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
-        const loop = async () => {
-          if (videoRef.current && videoRef.current.readyState === 4) {
-            try {
-              const codes = await detector.detect(videoRef.current);
-              if (codes[0]?.rawValue) await procesar(codes[0].rawValue);
-            } catch { /* frame sin código */ }
+      } catch (e) {
+        if (!cancelado) setErrorCamara(`No se pudo abrir la cámara: ${mensajeError(e)}`);
+        return;
+      }
+
+      let fallosSeguidos = 0;
+      const loop = async () => {
+        if (cancelado) return;
+        const v = videoRef.current;
+        if (v && v.readyState >= 2) {
+          try {
+            const codes = await detector.detect(v);
+            fallosSeguidos = 0;
+            if (codes[0]?.rawValue) await procesar(codes[0].rawValue);
+          } catch (e) {
+            // Un frame suelto puede fallar; si falla de forma continua, se informa en pantalla.
+            if (++fallosSeguidos === 30 && !cancelado) setErrorCamara(`El lector QR falló: ${mensajeError(e)}`);
           }
-          raf = requestAnimationFrame(loop);
-        };
-        raf = requestAnimationFrame(loop);
-      } catch { setCamara(false); }
+        }
+        if (!cancelado) raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
     })();
     return () => {
+      cancelado = true;
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
@@ -235,8 +282,13 @@ export default function EscaneoClient({ usuario, puntos }: { usuario: string; pu
         {procesando && <span className="text-sm text-ranch-marron/50">Validando…</span>}
       </div>
 
+      {camara && errorCamara && (
+        <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          📷 {errorCamara} Puedes seguir con el lector manual/USB.
+        </p>
+      )}
       {camara && (
-        <video ref={videoRef} muted playsInline className="mt-3 w-full rounded-lg bg-black" />
+        <video ref={videoRef} muted playsInline autoPlay className={`mt-3 w-full rounded-lg bg-black ${errorCamara ? "hidden" : ""}`} />
       )}
 
       {/* Historial */}
