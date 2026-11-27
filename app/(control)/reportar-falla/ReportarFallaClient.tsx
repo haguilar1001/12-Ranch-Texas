@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { reportarFalla } from "@/app/admin/equipos/mantenimiento/actions";
 import FotosEvidencia from "@/components/FotosEvidencia";
+import ResumenFallaWhatsApp from "@/components/ResumenFallaWhatsApp";
+import type { DatosResumenFalla } from "@/lib/equipos/resumen-falla";
 
 interface EquipoOpcion { id: string; nombre: string; codigo: string | null; grupo: string; ubicacion: string | null; estado: string }
-interface Mio { id: string; equipo: string; descripcion: string; estado: string; prioridad: string; fecha: string }
+interface Mio { id: string; equipo: string; codigo: string | null; grupo: string; ubicacion: string | null; descripcion: string; estado: string; prioridad: string; detenido: boolean; fotos: number; fecha: string }
 
 const PRIORIDADES = [
   { id: "baja", label: "Baja", ayuda: "Detalle estético o menor" },
@@ -17,7 +19,7 @@ const PRIORIDADES = [
 const ESTADO: Record<string, string> = { abierta: "Recibida", en_atencion: "En reparación", resuelta: "Resuelta", descartada: "Descartada" };
 const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default function ReportarFallaClient({ equipos, mias }: { equipos: EquipoOpcion[]; mias: Mio[] }) {
+export default function ReportarFallaClient({ equipos, mias, usuario }: { equipos: EquipoOpcion[]; mias: Mio[]; usuario: string }) {
   const router = useRouter();
   const [buscar, setBuscar] = useState("");
   const [equipo, setEquipo] = useState<EquipoOpcion | null>(null);
@@ -28,6 +30,10 @@ export default function ReportarFallaClient({ equipos, mias }: { equipos: Equipo
   const [claveFotos, setClaveFotos] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  // Resumen para WhatsApp: el del reporte recién enviado (con su primera foto) o uno de "Mis reportes".
+  const [resumen, setResumen] = useState<{ datos: DatosResumenFalla; foto: File | null } | null>(null);
+  const refResumen = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (resumen) refResumen.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [resumen]);
 
   const resultados = useMemo(() => {
     const q = norm(buscar.trim());
@@ -44,6 +50,11 @@ export default function ReportarFallaClient({ equipos, mias }: { equipos: Equipo
     const r = await reportarFalla(fd);
     setEnviando(false);
     if (r.ok) {
+      if (r.id) setResumen({
+        datos: { id: r.id, equipo: equipo.nombre, codigo: equipo.codigo, grupo: equipo.grupo, ubicacion: equipo.ubicacion, descripcion: descripcion.trim(),
+          prioridad, detenido, reportadoPor: usuario, fecha: new Date().toISOString(), fotos: fotos.length },
+        foto: fotos[0] ?? null,
+      });
       setMsg({ ok: true, t: `Falla reportada: ${equipo.nombre}. Mantenimiento ya la ve.` });
       setEquipo(null); setBuscar(""); setDescripcion(""); setPrioridad("media"); setDetenido(false); setFotos([]); setClaveFotos((k) => k + 1);
       router.refresh();
@@ -112,6 +123,7 @@ export default function ReportarFallaClient({ equipos, mias }: { equipos: Equipo
           {enviando ? "Enviando…" : "Reportar falla"}
         </button>
         {msg && <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
+        {resumen && <div ref={refResumen}><ResumenFallaWhatsApp key={resumen.datos.id} datos={resumen.datos} foto={resumen.foto} onCerrar={() => setResumen(null)} /></div>}
       </section>
 
       {mias.length > 0 && (
@@ -122,7 +134,13 @@ export default function ReportarFallaClient({ equipos, mias }: { equipos: Equipo
               <li key={m.id} className="rounded-xl border border-ranch-marron/15 bg-white px-3 py-2 text-sm">
                 <div className="flex justify-between gap-2"><b className="text-ranch-marron">{m.equipo}</b><span className={`text-xs ${m.estado === "resuelta" ? "text-green-700" : m.estado === "descartada" ? "text-ranch-marron/40" : "text-amber-700"}`}>{ESTADO[m.estado] ?? m.estado}</span></div>
                 <p className="text-ranch-marron/70">{m.descripcion}</p>
-                <p className="text-xs text-ranch-marron/40">{new Date(m.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-ranch-marron/40">{new Date(m.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}</p>
+                  <button type="button" className="text-xs font-semibold text-green-700 underline"
+                    onClick={() => setResumen({ datos: { ...m, reportadoPor: usuario }, foto: null })}>
+                    Compartir por WhatsApp
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
