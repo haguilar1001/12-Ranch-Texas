@@ -12,6 +12,10 @@ import {
   validarProveedor, validarMateriaPrima, validarRubro, validarArea,
   type EntradaProveedor, type EntradaMateriaPrima, type EntradaRubro, type NivelRubro,
 } from "@/lib/catalogos/validar";
+import * as XLSX from "xlsx";
+import { normalizar, type Celda } from "@/lib/equipos/importar";
+import { DEFS, esTipoCatalogo, leerCatalogo, type LecturaCatalogo } from "@/lib/catalogos/importar";
+import { existentesDe, aplicarCarga } from "@/lib/catalogos/carga-bd";
 import { crearAlimento as crearAlimentoAnimales, editarAlimento as editarAlimentoAnimales, cambiarEstadoAlimento as estadoAlimentoAnimales } from "@/app/admin/animales/actions";
 import { crearGrupoEquipo as crearGrupo, editarGrupoEquipo as editarGrupo, cambiarEstadoGrupoEquipo as estadoGrupo } from "@/app/admin/equipos/actions";
 
@@ -196,4 +200,80 @@ export async function cambiarEstadoGrupoEquipo(id: string, activo: boolean): Pro
   const r = await estadoGrupo(id, activo);
   refrescar();
   return r;
+}
+
+// ============================================================ carga desde Excel
+
+export interface ResultadoCargaCatalogo {
+  ok: boolean;
+  error?: string;
+  confirmado?: boolean;
+  titulo?: string;
+  nuevos?: number;
+  actualizar?: number;
+  /** Primeros nombres de cada grupo, para que la persona vea qué va a pasar. */
+  muestraNuevos?: string[];
+  muestraActualizar?: string[];
+  errores?: { fila: number; errores: string[] }[];
+  avisos?: string[];
+}
+
+const MAX_BYTES = 3.5 * 1024 * 1024; // por debajo del límite de 4 MB de las Server Actions
+
+/**
+ * Sin `confirmar` solo REVISA (no guarda nada). Con `confirmar` vuelve a revisar y, si no hay
+ * errores, crea y actualiza todo en una sola transacción.
+ */
+export async function cargarCatalogoExcel(form: FormData): Promise<ResultadoCargaCatalogo> {
+  const s = await supervisor();
+  if (!s) return { ok: false, error: SIN_PERMISO };
+  const tipo = String(form.get("tipo") ?? "");
+  if (!esTipoCatalogo(tipo)) return { ok: false, error: "Escoge qué catálogo vas a subir." };
+  const def = DEFS[tipo];
+  const archivo = form.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Elige el archivo de Excel." };
+  if (archivo.size > MAX_BYTES) return { ok: false, error: "El archivo pesa más de 3,5 MB." };
+  if (!/\.xlsx?$/i.test(archivo.name)) return { ok: false, error: "El archivo debe ser de Excel (.xlsx)." };
+  const confirmar = form.get("confirmar") === "1";
+
+  let lectura: LecturaCatalogo;
+  try {
+    const libro = XLSX.read(Buffer.from(await archivo.arrayBuffer()), { type: "buffer", cellDates: true });
+    const hoja = libro.SheetNames.find((n) => normalizar(n) === normalizar(def.hoja)) ?? libro.SheetNames[0];
+    const filas = XLSX.utils.sheet_to_json<Celda[]>(libro.Sheets[hoja], { header: 1, raw: true, defval: null, blankrows: true });
+    lectura = leerCatalogo(tipo, filas, await existentesDe(tipo));
+  } catch {
+    return { ok: false, error: `No se pudo leer el archivo. ¿Es la plantilla de ${def.titulo.toLowerCase()} descargada de la app?` };
+  }
+
+  const resumen = {
+    titulo: def.titulo,
+    nuevos: lectura.nuevos.length,
+    actualizar: lectura.actualizar.length,
+    muestraNuevos: lectura.nuevos.slice(0, 12).map((f) => f.nombre),
+    muestraActualizar: lectura.actualizar.slice(0, 12).map((f) => f.nombre),
+    errores: lectura.errores,
+    avisos: lectura.avisos,
+  };
+  if (lectura.faltanColumnas.length) {
+    return { ok: false, ...resumen, error: `No es la plantilla de ${def.titulo.toLowerCase()}: faltan las columnas ${lectura.faltanColumnas.join(", ")}.` };
+  }
+  if (!resumen.nuevos && !resumen.actualizar && !lectura.errores.length) {
+    return { ok: false, ...resumen, error: "No hay nada que cargar: el archivo está vacío o todo ya está igual en la app." };
+  }
+  if (!confirmar || lectura.errores.length) {
+    return {
+      ok: lectura.errores.length === 0, confirmado: false, ...resumen,
+      error: confirmar && lectura.errores.length ? "Corrige las filas con error y vuelve a subir el archivo; no se cargó nada." : undefined,
+    };
+  }
+
+  const r = await prisma.$transaction((tx) => aplicarCarga(tx, tipo, lectura.nuevos, lectura.actualizar, s.id), { timeout: 120000 });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: tipo, entidad_id: "carga_excel", accion: "carga_masiva",
+    datos_despues: { archivo: archivo.name, creados: r.creados, actualizados: r.actualizados },
+  });
+  refrescar();
+  revalidatePath("/admin/subir");
+  return { ok: true, confirmado: true, ...resumen, nuevos: r.creados, actualizar: r.actualizados };
 }

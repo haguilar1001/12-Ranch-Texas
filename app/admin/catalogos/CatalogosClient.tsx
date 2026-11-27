@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatearCOP } from "@/lib/dinero/cop";
+import SubirCatalogo from "@/components/SubirCatalogo";
 import { CONDICIONES_PAGO, TIPOS_PROVEEDOR, UNIDADES, etiquetaCondicion } from "@/lib/catalogos/validar";
 import {
   guardarProveedor, cambiarEstadoProveedor, guardarMateriaPrima, cambiarEstadoMateriaPrima,
@@ -241,6 +242,7 @@ function ListaCatalogo({ c }: { c: Config<FilaBase> }) {
   const [buscar, setBuscar] = useState("");
   const [verInactivos, setVerInactivos] = useState(false);
   const [ficha, setFicha] = useState<{ id: string | null; v: Valores } | null>(null);
+  const [subir, setSubir] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
 
@@ -278,7 +280,21 @@ function ListaCatalogo({ c }: { c: Config<FilaBase> }) {
         <button className={boton} onClick={() => { setFicha(ficha?.id === null ? null : { id: null, v: { ...c.vacio } }); setMsg(null); }}>
           {ficha?.id === null ? "Cerrar" : `+ Nuevo ${c.singular}`}
         </button>
+        <button className={botonSec} onClick={() => setSubir(!subir)}>{subir ? "Cerrar carga" : "⬆ Subir Excel"}</button>
+        <a className={botonSec} href={`/admin/catalogos/plantilla/${c.id}`} title="Plantilla vacía con listas y ayudas">⬇ Plantilla</a>
+        <a className={botonSec} href={`/admin/catalogos/plantilla/${c.id}?datos=1`} title="Lo que hay hoy en la app, para corregirlo en Excel y volver a subirlo">⬇ Excel con los datos actuales</a>
       </div>
+
+      {subir && (
+        <section className={`mb-4 ${card} p-4`}>
+          <h2 className="mb-1 font-bold text-ranch-marron">Subir {c.titulo.toLowerCase()} desde Excel</h2>
+          <p className="mb-3 text-xs text-ranch-marron/60">
+            Usa la plantilla. Si el nombre ya existe, la fila actualiza ese registro (las celdas vacías no borran nada); si no, lo crea.
+            Primero se revisa y no se guarda nada hasta que confirmes.
+          </p>
+          <SubirCatalogo tipo={c.id} titulo={c.titulo} />
+        </section>
+      )}
 
       {msg && <p className={`mb-3 rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
 

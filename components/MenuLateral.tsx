@@ -18,11 +18,14 @@ export default function MenuLateral({
   secciones,
   usuario,
   colapsadoInicial,
+  puedeSubir = false,
   children,
 }: {
   secciones: SeccionMenu[];
   usuario: { nombre: string; rol: string };
   colapsadoInicial: boolean;
+  /** Muestra siempre el botón "Subir archivos" (supervisor en adelante). */
+  puedeSubir?: boolean;
   children: ReactNode;
 }) {
   const path = usePathname();
@@ -101,6 +104,18 @@ export default function MenuLateral({
             </button>
           )}
         </div>
+
+        {/* Subir archivos: siempre a mano, en cualquier pantalla */}
+        {puedeSubir && (
+          <div className="px-2 pt-3">
+            <Link href="/admin/subir" title="Subir archivos de Excel: equipos, proveedores, materias primas, rubros…"
+              onClick={() => setCajon(false)}
+              className={`flex items-center gap-2 rounded-lg bg-ranch-dorado px-3 py-2 text-sm font-bold text-ranch-marron-oscuro shadow hover:brightness-110 ${angosto ? "justify-center px-0" : ""} ${path === "/admin/subir" ? "ring-2 ring-ranch-crema" : ""}`}>
+              <span className="w-6 text-center text-lg">⬆</span>
+              {!angosto && <span className="whitespace-nowrap">Subir archivos</span>}
+            </Link>
+          </div>
+        )}
 
         {/* Secciones */}
         <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-3" aria-label="Menú principal">
@@ -201,6 +216,9 @@ export default function MenuLateral({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Ranch Texas" className="h-9 w-auto" />
         </Link>
+        {puedeSubir && (
+          <Link href="/admin/subir" className="ml-auto mr-2 rounded-lg bg-ranch-dorado px-3 py-2 text-sm font-bold text-ranch-marron-oscuro">⬆ Subir</Link>
+        )}
         <button
           onClick={() => setCajon(true)}
           aria-label="Abrir menú"

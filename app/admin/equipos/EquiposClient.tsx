@@ -275,7 +275,7 @@ function Inventario({
   );
 }
 
-function CargaExcel({ onListo }: { onListo: () => void }) {
+export function CargaExcel({ onListo }: { onListo: () => void }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [r, setR] = useState<ResultadoCarga | null>(null);
   const [ocupado, setOcupado] = useState(false);

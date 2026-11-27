@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
-import { obtenerSesion } from "@/lib/auth/sesion";
+import { obtenerSesion, tieneRol } from "@/lib/auth/sesion";
 import { construirMenu } from "@/lib/menu";
 import MenuLateral from "./MenuLateral";
 
@@ -19,7 +19,7 @@ export default async function AppShell({ children }: { children: ReactNode }) {
   const colapsado = (await cookies()).get("menu_colapsado")?.value === "1";
 
   return (
-    <MenuLateral secciones={construirMenu(s.rol)} usuario={{ nombre: s.nombre, rol: s.rol }} colapsadoInicial={colapsado}>
+    <MenuLateral secciones={construirMenu(s.rol)} usuario={{ nombre: s.nombre, rol: s.rol }} colapsadoInicial={colapsado} puedeSubir={tieneRol(s.rol, "supervisor")}>
       {children}
     </MenuLateral>
   );
