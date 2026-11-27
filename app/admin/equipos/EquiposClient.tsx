@@ -155,7 +155,8 @@ export default function EquiposClient(p: Props) {
         />
       )}
       {tab === "novedades" && (
-        <Novedades esAdmin={p.esAdmin} hoy={p.hoy} equipos={p.equipos} movimientos={p.movimientos} resumenMes={p.resumenMes} inicial={novedadPara} busy={busy} correr={correr} />
+        <Novedades esAdmin={p.esAdmin} hoy={p.hoy} equipos={p.equipos} movimientos={p.movimientos} resumenMes={p.resumenMes} inicial={novedadPara} busy={busy} correr={correr}
+          grupos={gruposActivos} areas={p.areas} empleados={p.empleados} proveedores={p.proveedores} />
       )}
       {tab === "mantenimientos" && (
         <section className={`${card} p-5 text-sm`}>
@@ -583,8 +584,11 @@ const AYUDA_MOTIVO: Partial<Record<TipoMovEquipo, string>> = {
 };
 
 function Novedades({
-  esAdmin, hoy, equipos, movimientos, resumenMes, inicial, busy, correr,
-}: Pick<Props, "esAdmin" | "hoy" | "equipos" | "movimientos" | "resumenMes"> & { inicial: string; busy: boolean; correr: Correr }) {
+  esAdmin, hoy, equipos, movimientos, resumenMes, inicial, busy, correr, grupos, areas, empleados, proveedores,
+}: Pick<Props, "esAdmin" | "hoy" | "equipos" | "movimientos" | "resumenMes" | "grupos" | "areas" | "empleados" | "proveedores"> & { inicial: string; busy: boolean; correr: Correr }) {
+  // Equipo que aún no existe: se crea aquí mismo y su entrada (compra, donación o "ya estaba")
+  // queda registrada como novedad al crearlo, así que no hay que registrar otra.
+  const [nuevo, setNuevo] = useState<{ id: string | null; f: Ficha } | null>(null);
   const vacio = { equipo_id: inicial, tipo: "", cantidad: "1", fecha: hoy, motivo: "", valor: "", tercero: "" };
   const [f, setF] = useState(vacio);
   const [filtro, setFiltro] = useState("");
@@ -602,11 +606,20 @@ function Novedades({
   return (
     <>
       <section className={`mb-4 ${card} p-4`}>
-        <h2 className="mb-1 font-bold text-ranch-marron">Registrar novedad</h2>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-ranch-marron">Registrar novedad</h2>
+          <button className={botonSec} onClick={() => setNuevo(nuevo ? null : { id: null, f: { ...fichaVacia(), origen: "compra", fecha_compra: hoy } })}>
+            {nuevo ? "Cerrar equipo nuevo" : "+ Equipo nuevo (no está en la lista)"}
+          </button>
+        </div>
         <p className="mb-3 text-xs text-ranch-marron/60">Todo lo que cambia cuántos equipos hay entra por aquí; las unidades se recalculan solas. Para cambiar de lugar usa “Trasladar” en el inventario.</p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <select className={input} value={f.equipo_id} onChange={(e) => setF({ ...f, equipo_id: e.target.value })}>
+          <select className={input} value={f.equipo_id} onChange={(e) => {
+            if (e.target.value === "__nuevo__") { setNuevo({ id: null, f: { ...fichaVacia(), origen: "compra", fecha_compra: hoy } }); return; }
+            setF({ ...f, equipo_id: e.target.value });
+          }}>
             <option value="">Equipo…</option>
+            <option value="__nuevo__">➕ Crear equipo nuevo…</option>
             {equipos.map((e) => <option key={e.id} value={e.id}>{e.codigo ? `${e.codigo} · ` : ""}{e.nombre} · {e.cantidad} und.{e.ubicacion ? ` · ${e.ubicacion}` : ""}</option>)}
           </select>
           <select className={input} value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>
@@ -645,6 +658,15 @@ function Novedades({
           {MOTIVO_OBLIGATORIO_EQUIPO.includes(tipo) && !f.motivo.trim() && <span className="text-xs text-amber-700">Falta el motivo.</span>}
         </div>
       </section>
+
+      {nuevo && (
+        <>
+          <p className="mb-2 rounded-lg bg-ranch-crema/70 px-3 py-2 text-xs text-ranch-marron/80">
+            Al crear el equipo, su entrada queda registrada sola como novedad (compra, donación o “ya estaba”), con las unidades que pongas. No hace falta registrar otra novedad.
+          </p>
+          <FormFicha ficha={nuevo} setFicha={setNuevo} grupos={grupos} areas={areas} empleados={empleados} proveedores={proveedores} busy={busy} correr={correr} />
+        </>
+      )}
 
       <h2 className="mb-2 font-bold text-ranch-marron">Este mes</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
