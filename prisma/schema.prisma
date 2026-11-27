@@ -767,8 +767,18 @@ model Proveedor {
   contacto   String?
   telefono   String?
   email      String?
+  direccion  String?
+  ciudad     String?
+  /// Qué tipo de proveedor es (alimentos, repuestos, materias primas…).
+  tipo       String?
+  /// Qué productos o servicios le compramos.
+  suministra String?
+  /// contado, credito_15, credito_30, credito_60, otro
+  condiciones_pago String?
+  observaciones    String?
   activo     Boolean @default(true)
 
+  materias_primas MateriaPrima[]
   gastos           Gasto[]
   recurrentes      GastoRecurrente[]
   compras_alimento CompraAlimento[]
@@ -782,6 +792,29 @@ model Proveedor {
   actualizado_por String?
 
   @@map("proveedores")
+}
+
+/// Materia prima o insumo que compra el parque (solo catálogo: sin existencias por ahora).
+model MateriaPrima {
+  id               String  @id @default(uuid())
+  nombre           String
+  categoria        String?
+  unidad_medida    String  @default("unidad")
+  /// COP por unidad de medida (referencia, no es un precio fijo).
+  costo_referencia Int?
+  proveedor_id     String?
+  observaciones    String?
+  activo           Boolean @default(true)
+
+  proveedor Proveedor? @relation(fields: [proveedor_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([proveedor_id])
+  @@map("materias_primas")
 }
 
 model RubroGasto {

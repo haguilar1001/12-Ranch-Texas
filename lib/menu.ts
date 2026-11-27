@@ -191,6 +191,12 @@ export function construirMenu(rol: string): SeccionMenu[] {
       label: "Configuración",
       grupos: [
         {
+          titulo: "Catálogos",
+          filas: [
+            ["📚", "Catálogos", "/admin/catalogos", "Proveedores, materias primas, rubros, alimentos, grupos y áreas", supervisor],
+          ],
+        },
+        {
           titulo: "Venta y caja",
           filas: [
             ["🎫", "Tarifas", "/admin/tarifas", "Tipos de visitante y precios", admin],
