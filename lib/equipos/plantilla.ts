@@ -109,7 +109,7 @@ export async function construirPlantillaEquipos(l: ListasPlantilla): Promise<Buf
   ins.addRow([`Plantilla generada el ${l.fecha}. Las listas traen los grupos, áreas, empleados y proveedores que había en la app ese día.`]);
   ins.addRow(["1. Llene la hoja EQUIPOS, una fila por equipo (o por lote de equipos iguales en el mismo sitio)."]);
   ins.addRow(["2. Las columnas en DORADO con * son obligatorias. Pase el mouse por cada título para ver la ayuda."]);
-  ins.addRow(["3. Súbala en la app: Parque → Equipos → Cargar Excel. Primero verá una revisión fila por fila; nada se guarda hasta confirmar."]);
+  ins.addRow(["3. Súbala en la app: Equipos Parque → Inventario → botón Cargar Excel. Primero verá una revisión fila por fila; nada se guarda hasta confirmar."]);
   ins.addRow(["4. Si un grupo, área o empleado no aparece en la lista, créelo primero en la app y descargue la plantilla otra vez."]);
   ins.addRow([]);
   const t = ins.addRow(["COLUMNA", "OBLIGATORIA", "QUÉ ESCRIBIR"]);
