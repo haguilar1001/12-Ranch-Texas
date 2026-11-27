@@ -82,6 +82,56 @@ export async function reportarFalla(form: FormData): Promise<Resultado> {
   return { ok: true, id: falla.id };
 }
 
+/**
+ * Quien reportó la falla (o un supervisor) la corrige y le agrega fotos mientras no esté cerrada.
+ * La descripción y la prioridad solo cambian si sigue "abierta" (aún no tiene orden); fotos se
+ * pueden agregar también "en atención". Las fotos existentes no se quitan (nada se borra).
+ */
+export async function editarFalla(form: FormData): Promise<Resultado> {
+  const s = await obtenerSesion();
+  if (!s) return { ok: false, error: "Sesión expirada. Vuelve a ingresar." };
+  const falla = await prisma.reporteFalla.findUnique({
+    where: { id: String(form.get("falla_id") ?? "") },
+    include: { equipo: true, _count: { select: { fotos: true } } },
+  });
+  if (!falla) return { ok: false, error: "El reporte no existe." };
+  if (falla.creado_por !== s.id && !tieneRol(s.rol, "supervisor")) return { ok: false, error: "Solo quien reportó la falla o un supervisor puede editarla." };
+  if (falla.estado === "resuelta" || falla.estado === "descartada") return { ok: false, error: "El reporte ya está cerrado; no se puede editar." };
+
+  const f = await leerFotos(form);
+  if (!f.ok) return f;
+  if (falla._count.fotos + f.fotos.length > MAX_FOTOS) return { ok: false, error: `El reporte ya tiene ${falla._count.fotos} foto(s); el máximo es ${MAX_FOTOS}.` };
+
+  const data: { descripcion?: string; prioridad?: "media"; equipo_detenido?: boolean } = {};
+  if (falla.estado === "abierta") {
+    const descripcion = texto(form.get("descripcion"));
+    if (!descripcion) return { ok: false, error: "Cuenta qué le pasa al equipo." };
+    const prioridad = String(form.get("prioridad") ?? falla.prioridad);
+    if (!["baja", "media", "alta", "critica"].includes(prioridad)) return { ok: false, error: "Escoge la prioridad." };
+    if (descripcion !== falla.descripcion) data.descripcion = descripcion;
+    if (prioridad !== falla.prioridad) data.prioridad = prioridad as "media";
+    // Solo se puede marcar como detenido: devolverlo a operativo lo decide mantenimiento.
+    if (form.get("detenido") === "si" && !falla.equipo_detenido) data.equipo_detenido = true;
+  }
+  if (!Object.keys(data).length && !f.fotos.length) return { ok: false, error: "No hay cambios para guardar." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.reporteFalla.update({
+      where: { id: falla.id },
+      data: { ...data, actualizado_por: s.id,
+        fotos: { create: f.fotos.map((x) => ({ tipo: "falla" as const, mime: x.mime, tamano: x.datos.length, contenido: x.datos, creado_por: s.id })) } },
+    });
+    if (data.equipo_detenido && falla.equipo.estado === "operativo") await tx.equipo.update({ where: { id: falla.equipo_id }, data: { estado: "fuera_servicio", actualizado_por: s.id } });
+  });
+  await registrarAuditoria({
+    usuario_id: s.id, entidad: "reporte_falla", entidad_id: falla.id, accion: "editar",
+    datos_antes: { descripcion: falla.descripcion, prioridad: falla.prioridad, detenido: falla.equipo_detenido, fotos: falla._count.fotos },
+    datos_despues: { ...data, fotos_agregadas: f.fotos.length },
+  });
+  refrescar();
+  return { ok: true, id: falla.id };
+}
+
 /** La falla se vuelve orden correctiva (queda "en atención"). */
 export async function crearOrdenDesdeFalla(fallaId: string): Promise<Resultado> {
   const s = await supervisor();

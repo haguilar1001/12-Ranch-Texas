@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { reportarFalla } from "@/app/admin/equipos/mantenimiento/actions";
+import { editarFalla, reportarFalla } from "@/app/admin/equipos/mantenimiento/actions";
 import FotosEvidencia from "@/components/FotosEvidencia";
 import ResumenFallaWhatsApp from "@/components/ResumenFallaWhatsApp";
 import type { DatosResumenFalla } from "@/lib/equipos/resumen-falla";
 
 interface EquipoOpcion { id: string; nombre: string; codigo: string | null; grupo: string; ubicacion: string | null; estado: string }
-interface Mio { id: string; equipo: string; codigo: string | null; grupo: string; ubicacion: string | null; descripcion: string; estado: string; prioridad: string; detenido: boolean; fotos: number; fecha: string }
+interface Mio { id: string; equipo: string; codigo: string | null; grupo: string; ubicacion: string | null; descripcion: string; estado: string; prioridad: string; detenido: boolean; fotos: number; fotoIds: string[]; fecha: string }
 
 const PRIORIDADES = [
   { id: "baja", label: "Baja", ayuda: "Detalle estético o menor" },
@@ -31,7 +31,8 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   // Resumen para WhatsApp: el del reporte recién enviado (con su primera foto) o uno de "Mis reportes".
-  const [resumen, setResumen] = useState<{ datos: DatosResumenFalla; foto: File | null } | null>(null);
+  const [resumen, setResumen] = useState<{ datos: DatosResumenFalla; foto: File | string | null; enLista?: boolean } | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
   const refResumen = useRef<HTMLDivElement>(null);
   useEffect(() => { if (resumen) refResumen.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [resumen]);
 
@@ -123,7 +124,7 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
           {enviando ? "Enviando…" : "Reportar falla"}
         </button>
         {msg && <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
-        {resumen && <div ref={refResumen}><ResumenFallaWhatsApp key={resumen.datos.id} datos={resumen.datos} foto={resumen.foto} onCerrar={() => setResumen(null)} /></div>}
+        {resumen && !resumen.enLista && <div ref={refResumen}><ResumenFallaWhatsApp key={resumen.datos.id} datos={resumen.datos} foto={resumen.foto} onCerrar={() => setResumen(null)} /></div>}
       </section>
 
       {mias.length > 0 && (
@@ -134,18 +135,106 @@ export default function ReportarFallaClient({ equipos, mias, usuario }: { equipo
               <li key={m.id} className="rounded-xl border border-ranch-marron/15 bg-white px-3 py-2 text-sm">
                 <div className="flex justify-between gap-2"><b className="text-ranch-marron">{m.equipo}</b><span className={`text-xs ${m.estado === "resuelta" ? "text-green-700" : m.estado === "descartada" ? "text-ranch-marron/40" : "text-amber-700"}`}>{ESTADO[m.estado] ?? m.estado}</span></div>
                 <p className="text-ranch-marron/70">{m.descripcion}</p>
-                <div className="flex items-center justify-between gap-2">
+                {m.fotoIds.length > 0 && (
+                  <div className="mt-1 flex gap-1">
+                    {m.fotoIds.map((id) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={id} src={`/admin/equipos/fotos/${id}`} alt="Foto de la falla" className="h-12 w-12 rounded-md object-cover" />
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-ranch-marron/40">{new Date(m.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}</p>
-                  <button type="button" className="text-xs font-semibold text-green-700 underline"
-                    onClick={() => setResumen({ datos: { ...m, reportadoPor: usuario }, foto: null })}>
-                    Compartir por WhatsApp
-                  </button>
+                  <div className="flex gap-3">
+                    {(m.estado === "abierta" || m.estado === "en_atencion") && (
+                      <button type="button" className="text-xs font-semibold text-ranch-marron underline"
+                        onClick={() => { setEditando(editando === m.id ? null : m.id); setResumen(null); }}>
+                        {editando === m.id ? "Cerrar edición" : m.estado === "abierta" ? "Editar / agregar foto" : "Agregar foto"}
+                      </button>
+                    )}
+                    <button type="button" className="text-xs font-semibold text-green-700 underline"
+                      onClick={() => { setEditando(null); setResumen({ datos: { ...m, reportadoPor: usuario }, foto: m.fotoIds[0] ? `/admin/equipos/fotos/${m.fotoIds[0]}` : null, enLista: true }); }}>
+                      Compartir por WhatsApp
+                    </button>
+                  </div>
                 </div>
+                {editando === m.id && (
+                  <EditarFalla mio={m} onListo={(datos, foto) => {
+                    setEditando(null);
+                    setResumen({ datos: { ...datos, reportadoPor: usuario }, foto, enLista: true });
+                    router.refresh();
+                  }} />
+                )}
+                {resumen?.enLista && resumen.datos.id === m.id && (
+                  <div ref={refResumen} className="mt-2">
+                    <ResumenFallaWhatsApp key={`${m.id}-${resumen.datos.fotos}-${resumen.datos.descripcion}`} datos={resumen.datos} foto={resumen.foto} onCerrar={() => setResumen(null)} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         </section>
       )}
     </main>
+  );
+}
+
+/** Corrige un reporte propio: descripción y prioridad (si sigue abierto) y fotos adicionales. */
+function EditarFalla({ mio, onListo }: { mio: Mio; onListo: (datos: Mio, foto: File | string | null) => void }) {
+  const abierta = mio.estado === "abierta";
+  const [descripcion, setDescripcion] = useState(mio.descripcion);
+  const [prioridad, setPrioridad] = useState(mio.prioridad);
+  const [detenido, setDetenido] = useState(mio.detenido);
+  const [fotos, setFotos] = useState<File[]>([]);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cupo = Math.max(0, 3 - mio.fotos);
+
+  async function guardar() {
+    setGuardando(true); setError(null);
+    const fd = new FormData();
+    fd.set("falla_id", mio.id); fd.set("descripcion", descripcion); fd.set("prioridad", prioridad); fd.set("detenido", detenido ? "si" : "no");
+    fotos.forEach((f) => fd.append("fotos", f));
+    const r = await editarFalla(fd);
+    setGuardando(false);
+    if (!r.ok) { setError(r.error ?? "No se pudo guardar."); return; }
+    const foto = mio.fotoIds[0] ? `/admin/equipos/fotos/${mio.fotoIds[0]}` : fotos[0] ?? null;
+    onListo(abierta ? { ...mio, descripcion: descripcion.trim(), prioridad, detenido, fotos: mio.fotos + fotos.length } : { ...mio, fotos: mio.fotos + fotos.length }, foto);
+  }
+
+  return (
+    <div className="mt-2 space-y-3 rounded-xl bg-ranch-crema/40 p-3">
+      {abierta ? (
+        <>
+          <label className="block text-sm">
+            <span className="text-ranch-marron/70">¿Qué le pasa?</span>
+            <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-base" />
+          </label>
+          <div className="grid grid-cols-4 gap-1">
+            {PRIORIDADES.map((p) => (
+              <button key={p.id} type="button" onClick={() => setPrioridad(p.id)} aria-pressed={prioridad === p.id}
+                className={`rounded-lg border-2 px-1 py-1.5 text-xs font-bold ${prioridad === p.id ? (p.id === "critica" ? "border-red-500 bg-red-50" : "border-ranch-marron bg-white") : "border-ranch-marron/15 text-ranch-marron/60"}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {!mio.detenido && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={detenido} onChange={(e) => setDetenido(e.target.checked)} className="h-5 w-5" />
+              <span className="text-ranch-marron">El equipo quedó detenido</span>
+            </label>
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-ranch-marron/60">El reporte ya está en reparación: solo se le pueden agregar fotos.</p>
+      )}
+      {cupo > 0
+        ? <FotosEvidencia max={cupo} onCambio={setFotos} etiqueta={`Agregar fotos (te quedan ${cupo})`} />
+        : <p className="text-xs text-ranch-marron/60">Ya tiene las 3 fotos permitidas.</p>}
+      <button type="button" onClick={guardar} disabled={guardando} className="w-full rounded-xl bg-ranch-marron py-2.5 font-bold text-ranch-crema disabled:opacity-50">
+        {guardando ? "Guardando…" : "Guardar cambios"}
+      </button>
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+    </div>
   );
 }

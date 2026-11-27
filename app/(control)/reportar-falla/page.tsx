@@ -19,7 +19,8 @@ export default async function ReportarFallaPage() {
     prisma.reporteFalla.findMany({
       where: { creado_por: s.id }, orderBy: { creado_en: "desc" }, take: 8,
       select: {
-        id: true, descripcion: true, estado: true, prioridad: true, equipo_detenido: true, creado_en: true, _count: { select: { fotos: true } },
+        id: true, descripcion: true, estado: true, prioridad: true, equipo_detenido: true, creado_en: true,
+        fotos: { select: { id: true }, orderBy: { creado_en: "asc" } },
         equipo: { select: { nombre: true, codigo: true, ubicacion: true, categoria: { select: { nombre: true } } } },
       },
     }),
@@ -30,7 +31,7 @@ export default async function ReportarFallaPage() {
       usuario={s.nombre}
       mias={mias.map((m) => ({
         id: m.id, equipo: m.equipo.nombre, codigo: m.equipo.codigo, grupo: m.equipo.categoria.nombre, ubicacion: m.equipo.ubicacion,
-        descripcion: m.descripcion, estado: m.estado, prioridad: m.prioridad, detenido: m.equipo_detenido, fotos: m._count.fotos, fecha: m.creado_en.toISOString(),
+        descripcion: m.descripcion, estado: m.estado, prioridad: m.prioridad, detenido: m.equipo_detenido, fotos: m.fotos.length, fotoIds: m.fotos.map((f) => f.id), fecha: m.creado_en.toISOString(),
       }))}
     />
   );

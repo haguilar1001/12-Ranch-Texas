@@ -39,8 +39,10 @@ function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h:
 }
 
 /** Dibuja la tarjeta del reporte y la devuelve como PNG. */
-async function dibujar(d: DatosResumenFalla, foto?: File | null): Promise<Blob> {
-  const [logo, img] = await Promise.all([cargarImagen("/logo.png"), foto ? cargarImagen(URL.createObjectURL(foto)) : Promise.resolve(null)]);
+async function dibujar(d: DatosResumenFalla, foto?: File | string | null): Promise<Blob> {
+  const urlFoto = foto instanceof File ? URL.createObjectURL(foto) : foto ?? null;
+  const [logo, img] = await Promise.all([cargarImagen("/logo.png"), urlFoto ? cargarImagen(urlFoto) : Promise.resolve(null)]);
+  if (foto instanceof File && urlFoto) URL.revokeObjectURL(urlFoto);
   const medir = document.createElement("canvas").getContext("2d")!;
   const anchoValor = W - PAD * 2 - 200;
   const filas = filasResumen(d).map((f) => {
@@ -130,7 +132,8 @@ async function dibujar(d: DatosResumenFalla, foto?: File | null): Promise<Blob> 
 }
 
 /** Tarjeta con la imagen del reporte y botones para mandarla por WhatsApp. */
-export default function ResumenFallaWhatsApp({ datos, foto, onCerrar }: { datos: DatosResumenFalla; foto?: File | null; onCerrar?: () => void }) {
+/** `foto`: el archivo recién tomado o la dirección de una foto ya guardada. */
+export default function ResumenFallaWhatsApp({ datos, foto, onCerrar }: { datos: DatosResumenFalla; foto?: File | string | null; onCerrar?: () => void }) {
   const [png, setPng] = useState<Blob | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
