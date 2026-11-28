@@ -44,6 +44,11 @@ export default function SubirClient({ inicial, catalogos, financieros }: Props) 
             <span className="font-bold text-ranch-marron">Subir {o.titulo.toLowerCase()}</span>
           </button>
         ))}
+        <a href="/admin/granja/produccion" className={`${card} flex flex-col items-start gap-1 p-3 hover:border-ranch-marron/40`}>
+          <span className="text-2xl">🥚</span>
+          <span className="font-bold text-ranch-marron">Ventas y egresos de la granja</span>
+          <span className="text-xs text-ranch-marron/60">El Excel de huevos, queso y suero: se sube en Granja → Producción y ventas</span>
+        </a>
         {financieros && (
           <a href="/admin/archivos" className={`${card} flex flex-col items-start gap-1 p-3 hover:border-ranch-marron/40`}>
             <span className="text-2xl">💰</span>

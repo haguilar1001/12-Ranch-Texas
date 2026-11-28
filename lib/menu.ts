@@ -90,6 +90,12 @@ export function construirMenu(rol: string): SeccionMenu[] {
           ],
         },
         {
+          titulo: "Producción",
+          filas: [
+            ["🥚", "Producción y ventas", "/admin/granja/produccion", "Huevos, queso y suero: producción, ventas, donaciones y egresos", granja],
+          ],
+        },
+        {
           titulo: "Sanidad e insumos",
           filas: [
             ["🧴", "Insumos y medicamentos", "/admin/granja/insumos", "Aseo, desinfección, venenos y medicamentos: existencias y kardex", granja],
