@@ -21,7 +21,10 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
       include: {
         movimientos: {
           orderBy: [{ fecha: "desc" }, { creado_en: "desc" }], take: 60,
-          include: { proveedor: { select: { nombre: true } }, fumigacion: { select: { zona: true, recinto: { select: { nombre: true } } } } },
+          include: {
+            proveedor: { select: { nombre: true } }, fumigacion: { select: { zona: true, recinto: { select: { nombre: true } } } },
+            tratamiento: { select: { animal: { select: { nombre: true } } } },
+          },
         },
       },
     }),
@@ -40,7 +43,8 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
         const movs = i.movimientos.map((m) => ({
           id: m.id, tipo: m.tipo as TipoMovInsumo, cantidad: Number(m.cantidad), fecha: d(m.fecha)!, motivo: m.motivo, valor: m.valor,
           proveedor: m.proveedor?.nombre ?? null, lote: m.lote, vencimiento: d(m.vencimiento), anulado: m.anulado, motivo_anulacion: m.motivo_anulacion,
-          de_fumigacion: !!m.fumigacion_id, donde: m.fumigacion ? m.fumigacion.recinto?.nombre ?? m.fumigacion.zona : null,
+          de_fumigacion: !!m.fumigacion_id || !!m.tratamiento_id,
+          donde: m.fumigacion ? m.fumigacion.recinto?.nombre ?? m.fumigacion.zona : m.tratamiento ? `tratamiento de ${m.tratamiento.animal.nombre}` : null,
           quien: m.creado_por ? usuarios.get(m.creado_por) ?? null : null,
         }));
         return {

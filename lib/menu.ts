@@ -98,6 +98,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
         {
           titulo: "Sanidad e insumos",
           filas: [
+            ["🩺", "Tratamientos", "/admin/granja/tratamientos", "Reporte médico: diagnóstico, medicamentos, fotos y seguimiento", granja],
             ["🧴", "Insumos y medicamentos", "/admin/granja/insumos", "Aseo, desinfección, venenos y medicamentos: existencias y kardex", granja],
             ["🪰", "Fumigación", "/admin/granja/fumigacion", "Dónde, con qué producto, cuánto, quién y fotos", granja],
           ],

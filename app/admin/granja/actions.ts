@@ -4,13 +4,14 @@
 // Registrar lo hace quien opera la granja; anular, un supervisor. Nada se borra.
 
 import { revalidatePath } from "next/cache";
-import { prisma, type Tx } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { obtenerSesion, tieneRol, puedeOperarGranja } from "@/lib/auth/sesion";
 import { registrarAuditoria } from "@/lib/audit";
 import { fechaBogota } from "@/lib/tiempo";
+import { recalcularInsumo, SaldoNegativo } from "@/lib/granja/insumos-bd";
 import {
-  calcularExistencia, validarInsumo, validarMovimiento, validarProductosFumigacion, formatearCantidad,
-  type EntradaInsumo, type EntradaMovInsumo, type TipoMovInsumo,
+  validarInsumo, validarMovimiento, validarProductosFumigacion, formatearCantidad,
+  type EntradaInsumo, type EntradaMovInsumo,
 } from "@/lib/granja/insumos";
 
 export interface Resultado { ok: boolean; error?: string; id?: string }
@@ -28,20 +29,6 @@ async function supervisor() {
 }
 const SIN_PERMISO = "No tienes permiso para registrar en la granja.";
 const dia = (t: string) => new Date(`${t}T12:00:00-05:00`);
-
-class SaldoNegativo extends Error {}
-
-/** Recalcula la existencia desde el kardex. Si quedaría negativa, aborta la transacción. */
-async function recalcular(tx: Tx, insumoId: string, usuario: string) {
-  const movs = await tx.movimientoInsumo.findMany({ where: { insumo_id: insumoId }, select: { tipo: true, cantidad: true, fecha: true, creado_en: true, anulado: true } });
-  const existencia = calcularExistencia(movs.map((m) => ({ ...m, tipo: m.tipo as TipoMovInsumo, cantidad: Number(m.cantidad) })));
-  if (existencia < 0) {
-    const ins = await tx.insumoGranja.findUnique({ where: { id: insumoId }, select: { nombre: true } });
-    throw new SaldoNegativo(`${ins?.nombre ?? "El insumo"} quedaría en ${formatearCantidad(existencia)}.`);
-  }
-  await tx.insumoGranja.update({ where: { id: insumoId }, data: { existencia, actualizado_por: usuario } });
-  return existencia;
-}
 
 // ============================================================ insumos (catálogo)
 
@@ -97,7 +84,7 @@ export async function registrarMovimientoInsumo(insumoId: string, e: EntradaMovI
           proveedor_id: v.datos.tipo === "compra" ? e.proveedor_id || null : null, creado_por: s.id,
         },
       });
-      await recalcular(tx, insumoId, s.id);
+      await recalcularInsumo(tx, insumoId, s.id);
       return m;
     });
     await registrarAuditoria({ usuario_id: s.id, entidad: "movimiento_insumo", entidad_id: mov.id, accion: "crear", datos_despues: { insumo: ins.nombre, ...v.datos } });
@@ -116,10 +103,11 @@ export async function anularMovimientoInsumo(id: string, motivo: string): Promis
   const m = await prisma.movimientoInsumo.findUnique({ where: { id }, include: { insumo: true } });
   if (!m || m.anulado) return { ok: false, error: "El movimiento no existe o ya está anulado." };
   if (m.fumigacion_id) return { ok: false, error: "Este movimiento es de una fumigación: anula la fumigación completa." };
+  if (m.tratamiento_id) return { ok: false, error: "Este movimiento es de un tratamiento: anula el tratamiento completo." };
   try {
     await prisma.$transaction(async (tx) => {
       await tx.movimientoInsumo.update({ where: { id }, data: { anulado: true, motivo_anulacion: motivo.trim(), anulado_por: s.id, anulado_en: new Date(), actualizado_por: s.id } });
-      await recalcular(tx, m.insumo_id, s.id);
+      await recalcularInsumo(tx, m.insumo_id, s.id);
     });
   } catch (err) {
     if (err instanceof SaldoNegativo) return { ok: false, error: `No se puede anular: ${err.message}` };
@@ -180,7 +168,7 @@ export async function registrarFumigacion(form: FormData): Promise<Resultado> {
         await tx.movimientoInsumo.create({
           data: { insumo_id: p.insumo_id, tipo: "fumigacion", cantidad: p.cantidad, fecha: dia(fecha), fumigacion_id: fum.id, motivo: plaga ? `FUMIGACIÓN: ${plaga}` : "FUMIGACIÓN", creado_por: s.id },
         });
-        await recalcular(tx, p.insumo_id, s.id);
+        await recalcularInsumo(tx, p.insumo_id, s.id);
       }
       return fum.id;
     });
@@ -203,7 +191,7 @@ export async function anularFumigacion(id: string, motivo: string): Promise<Resu
   await prisma.$transaction(async (tx) => {
     await tx.fumigacion.update({ where: { id }, data: { estado: "anulada", motivo_anulacion: motivo.trim(), actualizado_por: s.id } });
     await tx.movimientoInsumo.updateMany({ where: { fumigacion_id: id, anulado: false }, data: { anulado: true, motivo_anulacion: `FUMIGACIÓN ANULADA: ${motivo.trim()}`, anulado_por: s.id, anulado_en: new Date(), actualizado_por: s.id } });
-    for (const insumoId of new Set(f.productos.map((p) => p.insumo_id))) await recalcular(tx, insumoId, s.id);
+    for (const insumoId of new Set(f.productos.map((p) => p.insumo_id))) await recalcularInsumo(tx, insumoId, s.id);
   });
   await registrarAuditoria({ usuario_id: s.id, entidad: "fumigacion", entidad_id: id, accion: "anular", datos_despues: { motivo } });
   refrescar();

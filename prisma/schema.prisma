@@ -1248,6 +1248,7 @@ model Empleado {
   equipos_a_cargo    Equipo[]
   fumigaciones       Fumigacion[]
   donaciones_granja  MovimientoProducto[]
+  tratamientos       Tratamiento[]
 
   mantenimientos_equipo MantenimientoEquipo[]
 
@@ -1411,6 +1412,7 @@ model Animal {
   raciones       Racion[]
   traslados      TrasladoAnimal[]
   alimentaciones RegistroAlimentacion[]
+  tratamientos   Tratamiento[]
   movimientos    MovimientoAnimal[]
 
   creado_en       DateTime @default(now())
@@ -2101,27 +2103,29 @@ model InsumoGranja {
 }
 
 model MovimientoInsumo {
-  id            String        @id @default(uuid())
-  insumo_id     String
-  tipo          TipoMovInsumo
+  id             String        @id @default(uuid())
+  insumo_id      String
+  tipo           TipoMovInsumo
   /// entrada/salida: cantidad positiva. ajuste: NUEVO saldo contado.
-  cantidad      Decimal       @db.Decimal(12, 3)
-  fecha         DateTime
-  motivo        String?
-  valor         Int? // COP (compras)
-  proveedor_id  String?
-  lote          String?
-  vencimiento   DateTime?     @db.Date
-  fumigacion_id String?
+  cantidad       Decimal       @db.Decimal(12, 3)
+  fecha          DateTime
+  motivo         String?
+  valor          Int? // COP (compras)
+  proveedor_id   String?
+  lote           String?
+  vencimiento    DateTime?     @db.Date
+  fumigacion_id  String?
+  tratamiento_id String?
 
   anulado          Boolean   @default(false)
   motivo_anulacion String?
   anulado_por      String?
   anulado_en       DateTime?
 
-  insumo     InsumoGranja @relation(fields: [insumo_id], references: [id])
-  proveedor  Proveedor?   @relation(fields: [proveedor_id], references: [id])
-  fumigacion Fumigacion?  @relation(fields: [fumigacion_id], references: [id])
+  insumo      InsumoGranja @relation(fields: [insumo_id], references: [id])
+  proveedor   Proveedor?   @relation(fields: [proveedor_id], references: [id])
+  fumigacion  Fumigacion?  @relation(fields: [fumigacion_id], references: [id])
+  tratamiento Tratamiento? @relation(fields: [tratamiento_id], references: [id])
 
   creado_en       DateTime @default(now())
   creado_por      String?
@@ -2131,6 +2135,7 @@ model MovimientoInsumo {
   @@index([insumo_id])
   @@index([fecha])
   @@index([fumigacion_id])
+  @@index([tratamiento_id])
   @@map("movimientos_insumo")
 }
 
@@ -2167,18 +2172,21 @@ model Fumigacion {
 
 /// Fotos de evidencia de la granja (fumigaciones; luego tratamientos).
 model FotoGranja {
-  id            String  @id @default(uuid())
-  fumigacion_id String?
-  mime          String
-  tamano        Int
-  contenido     Bytes
+  id             String  @id @default(uuid())
+  fumigacion_id  String?
+  tratamiento_id String?
+  mime           String
+  tamano         Int
+  contenido      Bytes
 
-  fumigacion Fumigacion? @relation(fields: [fumigacion_id], references: [id])
+  fumigacion  Fumigacion?  @relation(fields: [fumigacion_id], references: [id])
+  tratamiento Tratamiento? @relation(fields: [tratamiento_id], references: [id])
 
   creado_en  DateTime @default(now())
   creado_por String?
 
   @@index([fumigacion_id])
+  @@index([tratamiento_id])
   @@map("fotos_granja")
 }
 
@@ -2249,4 +2257,60 @@ model MovimientoProducto {
   @@index([producto_id])
   @@index([fecha])
   @@map("movimientos_producto")
+}
+
+// ------------------------- TRATAMIENTOS (REPORTE MÉDICO) -------------------------
+// Un caso clínico de un animal (o lote): diagnóstico, tratamiento indicado, medicamentos aplicados
+// (salen del inventario de insumos), quién lo atendió, fotos y seguimiento hasta que se cierra.
+
+enum EstadoTratamiento {
+  en_curso
+  finalizado
+  anulado
+}
+
+model Tratamiento {
+  id               String            @id @default(uuid())
+  fecha            DateTime          @db.Date
+  animal_id        String
+  sintomas         String?
+  diagnostico      String
+  indicaciones     String? // tratamiento indicado: dosis, frecuencia, duración
+  veterinario      String? // médico veterinario que lo atendió (puede ser externo)
+  empleado_id      String? // quién lo aplica / cuida
+  proxima_revision DateTime?         @db.Date
+  estado           EstadoTratamiento @default(en_curso)
+  resultado        String? // cómo terminó (al finalizar)
+  motivo_anulacion String?
+
+  animal       Animal                   @relation(fields: [animal_id], references: [id])
+  empleado     Empleado?                @relation(fields: [empleado_id], references: [id])
+  medicamentos MovimientoInsumo[]
+  fotos        FotoGranja[]
+  seguimientos SeguimientoTratamiento[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([animal_id])
+  @@index([fecha])
+  @@index([estado])
+  @@map("tratamientos")
+}
+
+model SeguimientoTratamiento {
+  id             String   @id @default(uuid())
+  tratamiento_id String
+  fecha          DateTime @db.Date
+  nota           String
+
+  tratamiento Tratamiento @relation(fields: [tratamiento_id], references: [id])
+
+  creado_en  DateTime @default(now())
+  creado_por String?
+
+  @@index([tratamiento_id])
+  @@map("seguimientos_tratamiento")
 }

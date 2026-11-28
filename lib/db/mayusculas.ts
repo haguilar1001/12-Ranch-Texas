@@ -47,6 +47,8 @@ export const CAMPOS_MAYUSCULAS: Record<string, readonly string[]> = {
   MovimientoInsumo: ["motivo", "lote", "motivo_anulacion"],
   Fumigacion: ["zona", "plaga", "observaciones", "motivo_anulacion"],
   ProductoGranja: ["nombre"],
+  Tratamiento: ["sintomas", "diagnostico", "indicaciones", "veterinario", "resultado", "motivo_anulacion"],
+  SeguimientoTratamiento: ["nota"],
   MovimientoProducto: ["cliente", "motivo", "motivo_anulacion"],
   RubroGasto: ["nombre"],
   Gasto: ["descripcion"],
