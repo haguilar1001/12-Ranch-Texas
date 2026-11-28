@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { formatearCOP, formatearMiles } from "@/lib/dinero/cop";
 import { NOVEDADES_EQUIPO, ETIQUETA_EQUIPO, EFECTO_EQUIPO, MOTIVO_OBLIGATORIO_EQUIPO, type TipoMovEquipo } from "@/lib/inventario/kardex";
@@ -44,6 +44,8 @@ interface Opcion { id: string; nombre: string }
 interface Props {
   /** Pestaña pedida por la URL (?tab=). */
   tabInicial?: string;
+  /** Nombres de área separados por coma (?area=GRANJA,CABALLOS): el inventario abre filtrado. */
+  areaInicial?: string;
   esAdmin: boolean;
   hoy: string;
   kpis: { registros: number; unidades: number; operativos: number; noOperativos: number; valor: number; mantVencidos: number; garantiasPorVencer: number };
@@ -192,13 +194,21 @@ function fichaDe(e: EquipoVista): Ficha {
 }
 
 function Inventario({
-  equipos, grupos, areas, empleados, proveedores, movimientos, hoy, busy, correr, irANovedad,
+  equipos, grupos, areas, empleados, proveedores, movimientos, hoy, busy, correr, irANovedad, areaInicial,
 }: Props & { busy: boolean; correr: Correr; irANovedad: (id: string) => void }) {
   const [ficha, setFicha] = useState<{ id: string | null; f: Ficha } | null>(null);
   const [traslado, setTraslado] = useState<{ id: string; area_id: string; ubicacion: string; cantidad: string; motivo: string } | null>(null);
   const [historial, setHistorial] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   const [grupo, setGrupo] = useState("");
+  // Áreas del enlace (?area=): varias a la vez salen como una sola opción del filtro.
+  const areasEnlace = useMemo(() => {
+    const nombres = (areaInicial ?? "").split(",").map((t) => sinTildes(t.trim())).filter(Boolean);
+    return areas.filter((a) => nombres.includes(sinTildes(a.nombre))).map((a) => a.id);
+  }, [areaInicial, areas]);
+  const [area, setArea] = useState(areasEnlace.length > 1 ? "__enlace__" : areasEnlace[0] ?? "");
+  useEffect(() => setArea(areasEnlace.length > 1 ? "__enlace__" : areasEnlace[0] ?? ""), [areasEnlace]);
+  const filtroAreas = area === "__enlace__" ? areasEnlace : area ? [area] : null;
   const [verCero, setVerCero] = useState(false);
   const [carga, setCarga] = useState(false);
   const router = useRouter();
@@ -208,6 +218,7 @@ function Inventario({
   const visibles = equipos.filter((e) => {
     if (!verCero && e.cantidad === 0) return false;
     if (grupo && e.categoria_id !== grupo) return false;
+    if (filtroAreas && !filtroAreas.includes(e.area_id ?? "")) return false;
     if (palabras.length === 0) return true;
     const texto = sinTildes([
       e.nombre, e.codigo, e.grupo, e.marca, e.modelo, e.referencia, e.serie, e.area, e.ubicacion, e.proveedor,
@@ -223,6 +234,11 @@ function Inventario({
         <select className={input} value={grupo} onChange={(e) => setGrupo(e.target.value)}>
           <option value="">Todos los grupos</option>
           {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+        </select>
+        <select className={input} value={area} onChange={(e) => setArea(e.target.value)} aria-label="Filtrar por área">
+          <option value="">Todas las áreas</option>
+          {areasEnlace.length > 1 && <option value="__enlace__">{areas.filter((a) => areasEnlace.includes(a.id)).map((a) => a.nombre).join(" + ")}</option>}
+          {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
         </select>
         <label className="flex items-center gap-1 text-xs text-ranch-marron/70">
           <input type="checkbox" checked={verCero} onChange={(e) => setVerCero(e.target.checked)} /> Ver dados de baja

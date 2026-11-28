@@ -76,7 +76,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
     {
       id: "animales",
       icono: "🐄",
-      label: "Animales",
+      label: "Granja",
       grupos: [
         {
           filas: [
@@ -87,6 +87,12 @@ export function construirMenu(rol: string): SeccionMenu[] {
             ["🛒", "Compras", "/admin/animales?tab=compras", "Compras de alimento", granja],
             ["🥕", "Dieta", "/admin/animales?tab=dieta", "Raciones por grupo", granja],
             ["📖", "Bitácora", "/admin/animales?tab=bitacora", "Registro de alimentación", granja],
+          ],
+        },
+        {
+          titulo: "Equipos e implementos",
+          filas: [
+            ["🐴", "Equipos de la granja", "/admin/equipos?tab=inventario&area=GRANJA,CABALLOS,VETERINARIA", "Sillas, frenos, herramientas y maquinaria de la granja, con su mantenimiento", supervisor],
           ],
         },
       ],
