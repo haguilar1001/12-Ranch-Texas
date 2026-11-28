@@ -90,6 +90,13 @@ export function construirMenu(rol: string): SeccionMenu[] {
           ],
         },
         {
+          titulo: "Sanidad e insumos",
+          filas: [
+            ["🧴", "Insumos y medicamentos", "/admin/granja/insumos", "Aseo, desinfección, venenos y medicamentos: existencias y kardex", granja],
+            ["🪰", "Fumigación", "/admin/granja/fumigacion", "Dónde, con qué producto, cuánto, quién y fotos", granja],
+          ],
+        },
+        {
           titulo: "Equipos e implementos",
           filas: [
             ["🐴", "Equipos de la granja", "/admin/equipos?tab=inventario&area=GRANJA,CABALLOS,VETERINARIA", "Sillas, frenos, herramientas y maquinaria de la granja, con su mantenimiento", supervisor],

@@ -124,3 +124,28 @@ describe("plantilla de ida y vuelta", () => {
     expect(filas.slice(1, 3)).toEqual([["KARTS", "PISTA"], ["BOTES", null]]);
   });
 });
+
+describe("carga de insumos de granja", () => {
+  it("entiende la categoría por su nombre, acepta decimales y guarda la existencia contada", () => {
+    const r = leerCatalogo("insumos", [
+      enc("insumos"),
+      ["Citronela", "FUM-002", "Venenos de fumigación", "cc", "200", "100", ""],
+      ["Formol", "DES-002", "desinfeccion", "Litro", "0,5", "1", ""],
+      ["Sin conteo", "", "Aseo general", "litro", "", "", ""],
+      ["Mala", "", "Venenos", "litro"],
+      ["Mala 2", "", "Aseo general", "litro", "", "mucho"],
+    ], vacio);
+    expect(r.nuevos.map((f) => [f.datos.categoria, f.datos.unidad, f.datos.stock_minimo, f.existencia])).toEqual([
+      ["fumigacion", "cc", 200, 100], ["desinfeccion", "litro", 0.5, 1], ["aseo", "litro", null, null],
+    ]);
+    expect(r.errores.map((e) => e.fila)).toEqual([5, 6]);
+  });
+
+  it("si ya existe, solo actualiza lo que cambia; un conteo distinto cuenta como cambio", () => {
+    const ex: Existentes = { registros: new Map([["cloro", { id: "i1", nombre: "CLORO", categoria: "aseo", unidad: "litro", stock_minimo: 2, existencia: 0 }]]) };
+    const igual = leerCatalogo("insumos", [enc("insumos"), ["Cloro", "", "Aseo general", "litro", "2", "0"]], ex);
+    expect(igual.actualizar).toEqual([]);
+    const conteo = leerCatalogo("insumos", [enc("insumos"), ["Cloro", "", "Aseo general", "litro", "2", "5"]], ex);
+    expect(conteo.actualizar[0]).toMatchObject({ id: "i1", existencia: 5, datos: {} });
+  });
+});

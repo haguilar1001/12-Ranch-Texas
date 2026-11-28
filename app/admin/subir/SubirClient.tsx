@@ -8,7 +8,7 @@ import { CargaExcel } from "@/app/admin/equipos/EquiposClient";
 const card = "rounded-2xl border-2 border-ranch-marron/15 bg-white";
 const botonSec = "rounded-lg border border-ranch-marron/30 px-3 py-1.5 text-xs font-semibold text-ranch-marron hover:bg-ranch-crema/60";
 
-const ICONOS: Record<string, string> = { equipos: "🔧", proveedores: "🏪", materias: "🧴", rubros: "🧾", alimentos: "🌾", grupos: "🗂️", areas: "🏢" };
+const ICONOS: Record<string, string> = { equipos: "🔧", proveedores: "🏪", materias: "🧴", rubros: "🧾", alimentos: "🌾", grupos: "🗂️", areas: "🏢", insumos: "🧴" };
 
 interface Props {
   inicial?: string;

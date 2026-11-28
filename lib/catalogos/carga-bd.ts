@@ -1,6 +1,7 @@
 import { prisma, type Tx } from "@/lib/db";
 import { normalizar } from "@/lib/equipos/importar";
 import { etiquetaCondicion } from "./validar";
+import { ETIQUETA_CATEGORIA, type CategoriaInsumo } from "@/lib/granja/insumos";
 import { DEFS, type Existentes, type FilaCatalogo, type TipoCatalogo } from "./importar";
 
 // Acceso a BD de la carga de catálogos: qué existe hoy (para decidir crear o actualizar), los datos
@@ -32,6 +33,9 @@ export async function existentesDe(tipo: TipoCatalogo): Promise<Existentes> {
     case "alimentos": return { registros: porNombre(await prisma.alimento.findMany()) };
     case "grupos": return { registros: porNombre(await prisma.categoriaEquipo.findMany()) };
     case "areas": return { registros: porNombre(await prisma.areaTrabajo.findMany()) };
+    case "insumos":
+      // Los Decimal se pasan a número para poder comparar con lo que trae el Excel.
+      return { registros: porNombre((await prisma.insumoGranja.findMany()).map((i) => ({ ...i, stock_minimo: i.stock_minimo === null ? null : Number(i.stock_minimo), existencia: Number(i.existencia) }))) };
     case "rubros": {
       const r = await rutasRubros();
       return { registros: new Map(), rutasRubros: new Map(r.map((x) => [x.partes.map(normalizar).join("|"), x.id])) };
@@ -52,6 +56,10 @@ export async function filasActuales(tipo: TipoCatalogo): Promise<(string | numbe
     case "alimentos": return (await prisma.alimento.findMany(activos)).map(fila);
     case "grupos": return (await prisma.categoriaEquipo.findMany(activos)).map(fila);
     case "areas": return (await prisma.areaTrabajo.findMany(activos)).map(fila);
+    case "insumos":
+      return (await prisma.insumoGranja.findMany(activos)).map((i) => fila({
+        ...i, categoria: ETIQUETA_CATEGORIA[i.categoria as CategoriaInsumo], stock_minimo: i.stock_minimo === null ? null : Number(i.stock_minimo), existencia: Number(i.existencia),
+      }));
     case "rubros":
       return (await rutasRubros())
         .sort((a, b) => a.partes.join(" ").localeCompare(b.partes.join(" "), "es"))
@@ -97,6 +105,20 @@ export async function aplicarCarga(tx: Tx, tipo: TipoCatalogo, nuevos: FilaCatal
     provNuevos.set(k, ya?.id ?? (await tx.proveedor.create({ data: { nombre: f.proveedor_nuevo, ...por } })).id);
   }
   const datosDe = (f: FilaCatalogo) => (f.proveedor_nuevo ? { ...f.datos, proveedor_id: provNuevos.get(normalizar(f.proveedor_nuevo))! } : f.datos);
+
+  if (tipo === "insumos") {
+    // El conteo entra al kardex: saldo inicial si el insumo es nuevo, ajuste si ya existía.
+    const ahora = new Date();
+    for (const f of [...nuevos, ...actualizar]) {
+      const id = f.id ?? (await tx.insumoGranja.create({ data: { ...(f.datos as Record<string, never>), ...por } as never })).id;
+      if (f.id && Object.keys(f.datos).length) await tx.insumoGranja.update({ where: { id }, data: { ...f.datos, ...act } });
+      if (f.existencia !== null && f.existencia !== undefined) {
+        await tx.movimientoInsumo.create({ data: { insumo_id: id, tipo: f.id ? "ajuste" : "saldo_inicial", cantidad: f.existencia, fecha: ahora, motivo: "CONTEO CARGADO DESDE EXCEL", creado_por: usuario } });
+        await tx.insumoGranja.update({ where: { id }, data: { existencia: f.existencia, ...act } });
+      }
+    }
+    return { creados: nuevos.length, actualizados: actualizar.length };
+  }
 
   /* eslint-disable @typescript-eslint/no-explicit-any -- los datos ya vienen validados por `leerCatalogo` */
   const modelo: any = { proveedores: tx.proveedor, materias: tx.materiaPrima, alimentos: tx.alimento, grupos: tx.categoriaEquipo, areas: tx.areaTrabajo }[tipo];

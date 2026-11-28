@@ -7,8 +7,9 @@ import { normalizar, type Celda } from "@/lib/equipos/importar";
 import {
   CONDICIONES_PAGO, TIPOS_PROVEEDOR, UNIDADES, pesos, validarProveedor, validarMateriaPrima, validarArea,
 } from "./validar";
+import { CATEGORIAS_INSUMO, ETIQUETA_CATEGORIA, UNIDADES_INSUMO, cantidad as cantidadInsumo, validarInsumo } from "@/lib/granja/insumos";
 
-export type TipoCatalogo = "proveedores" | "materias" | "rubros" | "alimentos" | "grupos" | "areas";
+export type TipoCatalogo = "proveedores" | "materias" | "rubros" | "alimentos" | "grupos" | "areas" | "insumos";
 
 export interface ColumnaCatalogo {
   clave: string;
@@ -17,7 +18,7 @@ export interface ColumnaCatalogo {
   ancho: number;
   ayuda: string;
   /** Lista desplegable en la plantilla. `estricta`: solo valores de la lista. */
-  lista?: { origen: "condiciones" | "tipos_proveedor" | "unidades" | "proveedores" | "unidades_alimento" | "tipos_alimento"; estricta?: boolean };
+  lista?: { origen: "condiciones" | "tipos_proveedor" | "unidades" | "proveedores" | "unidades_alimento" | "tipos_alimento" | "categorias_insumo" | "unidades_insumo"; estricta?: boolean };
   numero?: boolean;
 }
 
@@ -95,6 +96,20 @@ export const DEFS: Record<TipoCatalogo, DefCatalogo> = {
     ],
     ejemplos: [["HERRAMIENTAS", "GUADAÑAS, MOTOSIERRAS, TALADROS"]],
   },
+  insumos: {
+    tipo: "insumos", titulo: "Insumos de granja", hoja: "INSUMOS", singular: "insumo",
+    columnas: [
+      C("nombre", "NOMBRE", 30, "Nombre del insumo. Si ya existe, la fila actualiza sus datos.", { obligatoria: true }),
+      C("codigo", "CÓDIGO", 12, "Ej.: ASE-001, FUM-001, MED-001."),
+      C("categoria", "CATEGORÍA", 24, "Aseo general, Desinfección y curación, Venenos de fumigación, Medicamentos u Otros.", { obligatoria: true, lista: { origen: "categorias_insumo", estricta: true } }),
+      C("unidad", "UNIDAD", 12, "litro, cc, kg, unidad, frasco…", { obligatoria: true, lista: { origen: "unidades_insumo" } }),
+      C("stock_minimo", "STOCK MÍNIMO", 14, "Por debajo de esto sale \"stock bajo\". Puede tener decimales (0,5)."),
+      C("existencia", "EXISTENCIA (CONTEO)", 16, "Lo que hay hoy contado en bodega. Se registra como ajuste por conteo. Vacío = no toca la existencia."),
+      C("observaciones", "OBSERVACIONES", 34, "Cualquier nota."),
+    ],
+    ejemplos: [["CLORO", "ASE-002", "Aseo general", "litro", "2", "5", ""]],
+    nota: "La existencia contada queda como un ajuste en el kardex del insumo, con la fecha y hora de la carga.",
+  },
   areas: {
     tipo: "areas", titulo: "Áreas de trabajo", hoja: "AREAS", singular: "área",
     columnas: [
@@ -115,7 +130,17 @@ export const LISTAS_FIJAS = {
   unidades: UNIDADES,
   unidades_alimento: ["bulto", "kg", "g", "litro", "ml", "unidad", "paca"],
   tipos_alimento: ["concentrado", "forraje", "fruta", "verdura", "suplemento"],
+  categorias_insumo: CATEGORIAS_INSUMO.map((c) => ETIQUETA_CATEGORIA[c]),
+  unidades_insumo: UNIDADES_INSUMO,
 };
+
+/** Categoría de insumo desde su nombre ("Venenos de fumigación") o su código ("fumigacion"). */
+export function categoriaInsumoDesde(t: string | null): string | null | "error" {
+  if (!t) return null;
+  const n = normalizar(t);
+  const c = CATEGORIAS_INSUMO.find((x) => x === n || normalizar(ETIQUETA_CATEGORIA[x]) === n);
+  return c ?? "error";
+}
 
 // ------------------------------------------------------------------ lectura
 
@@ -139,6 +164,8 @@ export interface FilaCatalogo {
   proveedor_nuevo?: string | null;
   /** Rubros: los niveles de la ruta, de grupo a la hoja. */
   ruta?: string[];
+  /** Insumos: existencia contada (se guarda como ajuste en el kardex). */
+  existencia?: number | null;
 }
 
 export interface ErrorFila { fila: number; errores: string[] }
@@ -227,6 +254,7 @@ export function leerCatalogo(tipo: TipoCatalogo, filas: Celda[][], ex: Existente
 
     let datos: Record<string, string | number | null> = {};
     let proveedor_nuevo: string | null = null;
+    let existencia: number | null = null;
 
     if (tipo === "proveedores") {
       const cond = condicionDesde(v("condiciones_pago"));
@@ -248,6 +276,14 @@ export function leerCatalogo(tipo: TipoCatalogo, filas: Celda[][], ex: Existente
           else { proveedor_nuevo = prov; proveedoresNuevos.add(prov.toUpperCase()); }
         }
       }
+    } else if (tipo === "insumos") {
+      const cat = categoriaInsumoDesde(v("categoria"));
+      if (cat === "error") errores.push("CATEGORÍA no válida: elíjala de la lista.");
+      const r = validarInsumo({ nombre: nombre ?? "", codigo: v("codigo"), categoria: cat === "error" || !cat ? "" : cat, unidad: v("unidad") ?? "", stock_minimo: v("stock_minimo"), observaciones: v("observaciones") });
+      if (!r.ok) { if (nombre && cat !== "error") errores.push(r.error); } else datos = r.datos;
+      const ex = cantidadInsumo(v("existencia"));
+      if (ex === "error") errores.push("EXISTENCIA debe ser un número (puede tener decimales, ej. 0,5).");
+      else existencia = ex;
     } else if (tipo === "alimentos") {
       const unidad = v("unidad_medida");
       if (!unidad) errores.push("Falta la UNIDAD DE COMPRA.");
@@ -271,9 +307,12 @@ export function leerCatalogo(tipo: TipoCatalogo, filas: Celda[][], ex: Existente
       const distinto = (val: string | number | null, antes: unknown) =>
         typeof val === "string" ? normalizar(val) !== normalizar(String(antes ?? "")) : val !== antes;
       const cambios = Object.fromEntries(Object.entries(conValor(datos)).filter(([k, val]) => k !== "nombre" && distinto(val, existente[k])));
-      if (proveedor_nuevo || Object.keys(cambios).length) res.actualizar.push({ fila: numero, id: existente.id, nombre: nombre!, datos: cambios, proveedor_nuevo });
+      const cambiaExistencia = existencia !== null && existencia !== existente.existencia;
+      if (proveedor_nuevo || cambiaExistencia || Object.keys(cambios).length) {
+        res.actualizar.push({ fila: numero, id: existente.id, nombre: nombre!, datos: cambios, proveedor_nuevo, existencia: cambiaExistencia ? existencia : null });
+      }
     } else {
-      res.nuevos.push({ fila: numero, id: null, nombre: nombre!, datos, proveedor_nuevo });
+      res.nuevos.push({ fila: numero, id: null, nombre: nombre!, datos, proveedor_nuevo, existencia });
     }
   });
 

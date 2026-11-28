@@ -53,3 +53,23 @@ describe("guardar carga de materias primas", () => {
     expect(materias[0].creado_por).toBe("u1");
   });
 });
+
+describe("guardar carga de insumos", () => {
+  it("nuevo con conteo → saldo inicial; existente con conteo → ajuste; la existencia queda en lo contado", async () => {
+    const movs: Record<string, unknown>[] = [];
+    const updates: Record<string, unknown>[] = [];
+    const tx = {
+      insumoGranja: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "nuevo", ...data })),
+        update: vi.fn(async (a: Record<string, unknown>) => { updates.push(a); return a; }),
+      },
+      movimientoInsumo: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { movs.push(data); return data; }) },
+    };
+    await aplicarCarga(tx as never, "insumos", [
+      { fila: 2, id: null, nombre: "Citronela", datos: { nombre: "Citronela", categoria: "fumigacion", unidad: "cc" }, existencia: 100 },
+      { fila: 3, id: null, nombre: "Vinagre", datos: { nombre: "Vinagre", categoria: "aseo", unidad: "litro" }, existencia: null },
+    ], [{ fila: 4, id: "i1", nombre: "Cloro", datos: {}, existencia: 5 }], "u1");
+    expect(movs.map((m) => [m.insumo_id, m.tipo, m.cantidad])).toEqual([["nuevo", "saldo_inicial", 100], ["i1", "ajuste", 5]]);
+    expect(updates.filter((u) => (u as { data: { existencia?: number } }).data.existencia !== undefined).map((u) => (u as { data: { existencia: number } }).data.existencia)).toEqual([100, 5]);
+  });
+});

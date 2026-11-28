@@ -761,28 +761,29 @@ model Consentimiento {
 // ------------------------- GASTOS -------------------------
 
 model Proveedor {
-  id         String  @id @default(uuid())
-  nombre     String
-  nit_cedula String?
-  contacto   String?
-  telefono   String?
-  email      String?
-  direccion  String?
-  ciudad     String?
+  id               String  @id @default(uuid())
+  nombre           String
+  nit_cedula       String?
+  contacto         String?
+  telefono         String?
+  email            String?
+  direccion        String?
+  ciudad           String?
   /// Qué tipo de proveedor es (alimentos, repuestos, materias primas…).
-  tipo       String?
+  tipo             String?
   /// Qué productos o servicios le compramos.
-  suministra String?
+  suministra       String?
   /// contado, credito_15, credito_30, credito_60, otro
   condiciones_pago String?
   observaciones    String?
-  activo     Boolean @default(true)
+  activo           Boolean @default(true)
 
-  materias_primas MateriaPrima[]
-  gastos           Gasto[]
-  recurrentes      GastoRecurrente[]
-  compras_alimento CompraAlimento[]
-  equipos          Equipo[]
+  materias_primas    MateriaPrima[]
+  movimientos_insumo MovimientoInsumo[]
+  gastos             Gasto[]
+  recurrentes        GastoRecurrente[]
+  compras_alimento   CompraAlimento[]
+  equipos            Equipo[]
 
   mantenimientos_equipo MantenimientoEquipo[]
 
@@ -1243,6 +1244,7 @@ model Empleado {
 
   gastos_solicitados Gasto[]
   equipos_a_cargo    Equipo[]
+  fumigaciones       Fumigacion[]
 
   mantenimientos_equipo MantenimientoEquipo[]
 
@@ -1374,6 +1376,7 @@ model Recinto {
   animales          Animal[]
   traslados_origen  TrasladoAnimal[]       @relation("traslado_origen")
   traslados_destino TrasladoAnimal[]       @relation("traslado_destino")
+  fumigaciones      Fumigacion[]
   alimentaciones    RegistroAlimentacion[]
 
   creado_en       DateTime @default(now())
@@ -1864,16 +1867,16 @@ enum EstadoFalla {
 /// Falla o daño reportado por cualquier usuario (operario, cajero...). El supervisor la convierte
 /// en orden correctiva o la descarta con motivo.
 model ReporteFalla {
-  id               String         @id @default(uuid())
-  equipo_id        String
-  descripcion      String
+  id                String         @id @default(uuid())
+  equipo_id         String
+  descripcion       String
   /// Lo que propone quien reporta para arreglarlo (opcional).
   solucion_sugerida String?
-  prioridad        PrioridadFalla @default(media)
-  equipo_detenido  Boolean        @default(false)
-  estado           EstadoFalla    @default(abierta)
-  mantenimiento_id String?        @unique
-  motivo_cierre    String?
+  prioridad         PrioridadFalla @default(media)
+  equipo_detenido   Boolean        @default(false)
+  estado            EstadoFalla    @default(abierta)
+  mantenimiento_id  String?        @unique
+  motivo_cierre     String?
 
   equipo        Equipo               @relation(fields: [equipo_id], references: [id])
   mantenimiento MantenimientoEquipo? @relation(fields: [mantenimiento_id], references: [id])
@@ -2043,4 +2046,135 @@ model SolicitudVehiculo {
   @@index([chofer_id])
   @@index([solicitante_id])
   @@map("solicitudes_vehiculo")
+}
+
+// ------------------------- INSUMOS DE GRANJA Y FUMIGACIÓN -------------------------
+// Aseo, desinfección, venenos de fumigación y medicamentos. La existencia NUNCA se escribe a mano:
+// se recalcula desde los movimientos (como el alimento). Las cantidades pueden tener decimales
+// (medio litro, 0,3 bultos), por eso van en Decimal y no en Int; la plata sigue en Int (COP).
+
+enum CategoriaInsumo {
+  aseo
+  desinfeccion
+  fumigacion
+  medicamento
+  otro
+}
+
+enum TipoMovInsumo {
+  saldo_inicial
+  compra
+  entrada_otra // donación, devolución…
+  consumo // uso diario (aseo, curaciones)
+  fumigacion // generado por una fumigación
+  tratamiento // generado por un tratamiento (etapa de reporte médico)
+  perdida
+  vencido
+  ajuste // conteo físico: FIJA el saldo
+}
+
+model InsumoGranja {
+  id            String          @id @default(uuid())
+  nombre        String
+  codigo        String?
+  categoria     CategoriaInsumo
+  unidad        String // litro, cc, kg, unidad, frasco…
+  /// Por debajo de esto sale "stock bajo". Vacío = solo avisa cuando se agota.
+  stock_minimo  Decimal?        @db.Decimal(12, 3)
+  /// Se RECALCULA desde movimientos_insumo.
+  existencia    Decimal         @default(0) @db.Decimal(12, 3)
+  observaciones String?
+  activo        Boolean         @default(true)
+
+  movimientos MovimientoInsumo[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([categoria])
+  @@map("insumos_granja")
+}
+
+model MovimientoInsumo {
+  id            String        @id @default(uuid())
+  insumo_id     String
+  tipo          TipoMovInsumo
+  /// entrada/salida: cantidad positiva. ajuste: NUEVO saldo contado.
+  cantidad      Decimal       @db.Decimal(12, 3)
+  fecha         DateTime
+  motivo        String?
+  valor         Int? // COP (compras)
+  proveedor_id  String?
+  lote          String?
+  vencimiento   DateTime?     @db.Date
+  fumigacion_id String?
+
+  anulado          Boolean   @default(false)
+  motivo_anulacion String?
+  anulado_por      String?
+  anulado_en       DateTime?
+
+  insumo     InsumoGranja @relation(fields: [insumo_id], references: [id])
+  proveedor  Proveedor?   @relation(fields: [proveedor_id], references: [id])
+  fumigacion Fumigacion?  @relation(fields: [fumigacion_id], references: [id])
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([insumo_id])
+  @@index([fecha])
+  @@index([fumigacion_id])
+  @@map("movimientos_insumo")
+}
+
+enum EstadoFumigacion {
+  registrada
+  anulada
+}
+
+/// Una fumigación: dónde, contra qué, con qué productos (sus movimientos de salida), quién y fotos.
+model Fumigacion {
+  id               String           @id @default(uuid())
+  fecha            DateTime
+  recinto_id       String?
+  zona             String? // zona del parque si no es un recinto
+  plaga            String? // contra qué: moscas, garrapatas, roedores…
+  empleado_id      String? // quién la hizo
+  observaciones    String?
+  estado           EstadoFumigacion @default(registrada)
+  motivo_anulacion String?
+
+  recinto   Recinto?           @relation(fields: [recinto_id], references: [id])
+  empleado  Empleado?          @relation(fields: [empleado_id], references: [id])
+  productos MovimientoInsumo[]
+  fotos     FotoGranja[]
+
+  creado_en       DateTime @default(now())
+  creado_por      String?
+  actualizado_en  DateTime @updatedAt
+  actualizado_por String?
+
+  @@index([fecha])
+  @@map("fumigaciones")
+}
+
+/// Fotos de evidencia de la granja (fumigaciones; luego tratamientos).
+model FotoGranja {
+  id            String  @id @default(uuid())
+  fumigacion_id String?
+  mime          String
+  tamano        Int
+  contenido     Bytes
+
+  fumigacion Fumigacion? @relation(fields: [fumigacion_id], references: [id])
+
+  creado_en  DateTime @default(now())
+  creado_por String?
+
+  @@index([fumigacion_id])
+  @@map("fotos_granja")
 }
