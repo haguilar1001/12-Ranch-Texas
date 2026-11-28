@@ -214,6 +214,7 @@ export function construirMenu(rol: string): SeccionMenu[] {
           titulo: "Catálogos",
           filas: [
             ["📚", "Catálogos", "/admin/catalogos", "Proveedores, materias primas, rubros, alimentos, grupos y áreas", supervisor],
+            ["⬆️", "Subir archivos", "/admin/subir", "Cargar desde Excel: equipos, proveedores, materias primas, rubros, insumos…", supervisor],
           ],
         },
         {

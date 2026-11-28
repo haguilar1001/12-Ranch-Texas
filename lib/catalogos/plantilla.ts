@@ -80,7 +80,7 @@ export async function construirPlantillaCatalogo(tipo: TipoCatalogo, o: Opciones
   ins.addRow([`1. Llene la hoja ${def.hoja}: una fila por ${def.singular}.`]);
   ins.addRow(["2. Las columnas en DORADO con * son obligatorias. Pase el mouse por cada título para ver la ayuda."]);
   ins.addRow(["3. Si el nombre ya existe en la app, la fila ACTUALIZA ese registro; las celdas vacías no borran lo que había. Si no existe, se CREA."]);
-  ins.addRow(["4. Súbala en la app: botón ⬆ Subir archivos (en el menú) o Configuración → Catálogos. Primero verá una revisión; nada se guarda hasta confirmar."]);
+  ins.addRow(["4. Súbala en la app: Configuración → Subir archivos (o Configuración → Catálogos). Primero verá una revisión; nada se guarda hasta confirmar."]);
   if (def.nota) ins.addRow([`5. ${def.nota}`]);
   ins.addRow([]);
   const t = ins.addRow(["COLUMNA", "OBLIGATORIA", "QUÉ ESCRIBIR"]);
